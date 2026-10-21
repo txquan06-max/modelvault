@@ -675,3 +675,8 @@ body {
   margin-bottom: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* 适配 iOS 底部安全区 */
+.mini-window {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}

@@ -13,6 +13,9 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
+// 检测微信环境
+const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+
 const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -60,6 +63,12 @@ const FocusPanel = ({
       catch (err) { showToast(t('imageProcessingFailed') || 'Image processing failed'); }
     }
     e.target.value = '';
+  };
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
   };
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
@@ -163,7 +172,7 @@ const FocusPanel = ({
         <div className="inline-confirm">
           <div className="confirm-text">🎉 {t('finishPart')}!</div>
           <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-            <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} />
+            <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
             <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
               📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
             </label>
@@ -460,13 +469,6 @@ function App() {
     }
   };
 
-  const handleReopenModel = (modelId: string) => {
-    AudioManager.playClick();
-    const updated = ModelManager.reopenModel(modelId);
-    setModels(updated); refreshData(); setCurrentModelId(modelId); setActiveTab('focus'); setViewingModelId(null);
-    showToast(t('reopenedForRebuild'));
-  };
-
   const handleDeleteModel = (modelId: string) => {
     AudioManager.playClick();
     const updated = ModelManager.deleteModel(modelId);
@@ -579,7 +581,14 @@ function App() {
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
-    if (!('documentPictureInPicture' in window)) { showToast(i18n.language === 'zh' ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
+    if (isWeChat) {
+      showToast(i18n.language === 'zh' ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.');
+      return;
+    }
+    if (!('documentPictureInPicture' in window)) { 
+      showToast(i18n.language === 'zh' ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); 
+      return; 
+    }
     try {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
@@ -664,6 +673,12 @@ function App() {
 
   const viewingModel = models.find(m => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+  };
 
   return (
     <div className="app-wrapper">
@@ -844,7 +859,7 @@ function App() {
                 {isAddingModel && (
                   <div className="inline-form vertical-form" style={{ position: 'relative' }}>
                     <div className="search-autocomplete">
-                      <input id="new-model-name" autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} />
+                      <input id="new-model-name" autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} onFocus={handleFocus} />
                       {searchResults.length > 0 && (
                         <div className="autocomplete-dropdown">
                           {searchResults.map((item, idx) => {
@@ -865,7 +880,7 @@ function App() {
                     </div>
                     
                     <select id="new-model-grade" value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} />
+                    <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} onFocus={handleFocus} />
                     <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => setUseDefaultTasks(e.target.checked)} />{t('useDefaultTasks')}</label>
                     <div style={{display:'flex', gap:'8px', width:'100%'}}>
                       <button className="btn start" style={{flex: 1, padding: '6px'}} onClick={handleAddModel}>{t('save')}</button>
@@ -881,7 +896,7 @@ function App() {
                         const updated = ModelManager.addTask(currentModelId, newTaskName.trim());
                         setModels(updated); setNewTaskName(''); setIsAddingTask(false);
                       }
-                    }} />
+                    }} onFocus={handleFocus} />
                     <button onClick={() => setIsAddingTask(false)}>{t('cancel')}</button>
                   </div>
                 )}
@@ -898,6 +913,7 @@ function App() {
                     value={journalFilterMonth} 
                     onChange={e => { AudioManager.playClick(); setJournalFilterMonth(e.target.value); }} 
                     style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '4px 8px', borderRadius: '6px', outline: 'none', fontSize: '12px' }}
+                    onFocus={handleFocus}
                   />
                   {journalFilterMonth && <button className="mini-btn" onClick={() => setJournalFilterMonth('')}>清除</button>}
                 </div>
@@ -957,7 +973,7 @@ function App() {
                 <div className="profile-header">
                   <div className="avatar">🧑‍🔧</div>
                   <div className="profile-info">
-                    <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" />
+                    <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
                     {equippedTitleDef && <div className="equipped-title">[{t(equippedTitleDef.nameKey)}]</div>}
                   </div>
                 </div>
@@ -994,6 +1010,7 @@ function App() {
                             }
                           }}
                           onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
+                          onFocus={handleFocus}
                         />
                         {legacyResults.length > 0 && (
                           <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>

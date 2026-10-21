@@ -1,3 +1,5 @@
+import localforage from 'localforage';
+
 const CURRENT_SCHEMA_VERSION = 1;
 const DATA_KEY = 'modelvault_core_data';
 
@@ -20,87 +22,118 @@ const KEYS = {
   LEGACY_XP: 'mv_legacy_xp',
 };
 
-interface CoreData {
-  schemaVersion: number;
-  models: any[];
-}
+// 内存缓存，保证读写是同步的，不改变原有逻辑
+const memoryCache: Record<string, string> = {};
+let isInit = false;
 
 export const StorageManager = {
-  getRawStorage(): CoreData {
-    const raw = localStorage.getItem(DATA_KEY);
-    if (raw) return JSON.parse(raw);
-    const legacyV8 = localStorage.getItem('modelvault_data_v8');
-    if (legacyV8) {
-      const parsedModels = JSON.parse(legacyV8);
-      const migratedData = { schemaVersion: CURRENT_SCHEMA_VERSION, models: parsedModels };
-      localStorage.setItem(DATA_KEY, JSON.stringify(migratedData));
-      localStorage.removeItem('modelvault_data_v8');
-      return migratedData;
+  // 初始化：将 IndexedDB 或老版 LocalStorage 的数据全部载入内存
+  async init() {
+    if (isInit) return;
+    await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
+
+    // 1. 尝试从老版 localStorage 迁移数据
+    const legacyKeys = Object.keys(localStorage).filter(k => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data');
+    if (legacyKeys.length > 0) {
+      for (const key of legacyKeys) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          memoryCache[key] = val;
+          await localforage.setItem(key, val);
+        }
+      }
+      // 迁移完清空老数据，释放 LocalStorage 空间
+      legacyKeys.forEach(k => localStorage.removeItem(k));
     }
+
+    // 2. 从 IndexedDB 加载全量数据到内存
+    const keys = await localforage.keys();
+    for (const key of keys) {
+      const val = await localforage.getItem<string>(key);
+      if (val !== null) memoryCache[key] = val;
+    }
+    isInit = true;
+  },
+
+  // 统一的写入方法（防爆仓保护）
+  async _set(key: string, val: string) {
+    memoryCache[key] = val;
+    try {
+      await localforage.setItem(key, val);
+    } catch (err) {
+      console.error('Storage save failed', err);
+      // 如果 IndexedDB 都写满了，说明用户存了海量图片，只能提示清理
+      alert('本地存储空间已满，请前往个人页导出备份，并清理部分图片。');
+    }
+  },
+
+  getRawStorage(): { schemaVersion: number; models: any[] } {
+    const raw = memoryCache[DATA_KEY];
+    if (raw) return JSON.parse(raw);
     return { schemaVersion: CURRENT_SCHEMA_VERSION, models: [] };
   },
 
   saveRawStorage(models: any[]) {
     const current = this.getRawStorage();
-    localStorage.setItem(DATA_KEY, JSON.stringify({ ...current, models }));
+    this._set(DATA_KEY, JSON.stringify({ ...current, models }));
   },
 
-  getSessions: () => localStorage.getItem(KEYS.SESSIONS),
-  getAchievements: () => localStorage.getItem(KEYS.ACHIEVEMENTS),
-  getUsername: () => localStorage.getItem(KEYS.USERNAME) || 'New Builder',
-  getTimeboxTarget: () => Number(localStorage.getItem(KEYS.TIMEBOX_TARGET)) || 0,
-  getTimeboxElapsed: () => Number(localStorage.getItem(KEYS.TIMEBOX_ELAPSED)) || 0,
-  getCoinsBalance: () => Number(localStorage.getItem(KEYS.COINS_BALANCE)) || 0,
-  getCoinsTotalEarned: () => Number(localStorage.getItem(KEYS.COINS_TOTAL_EARNED)) || 0,
-  getEquippedTitle: () => localStorage.getItem(KEYS.EQUIPPED_TITLE) || '',
-  getEarnedTitles: () => JSON.parse(localStorage.getItem(KEYS.EARNED_TITLES) || '[]'),
-  getAudioSettings: () => JSON.parse(localStorage.getItem(KEYS.AUDIO_SETTINGS) || '{"click":"default","stage":"default","timebox":"default","complete":"default"}'),
-  getCustomAudios: () => JSON.parse(localStorage.getItem(KEYS.CUSTOM_AUDIOS) || '{}'),
-  getBgMain: () => localStorage.getItem(KEYS.BG_IMAGE_MAIN) || '',
-  getBgPip: () => localStorage.getItem(KEYS.BG_IMAGE_PIP) || '',
-  getBgSize: () => localStorage.getItem(KEYS.BG_SIZE) || 'cover',
-  getBgPosition: () => localStorage.getItem(KEYS.BG_POSITION) || 'center',
-  getLegacyXP: () => Number(localStorage.getItem(KEYS.LEGACY_XP)) || 0,
+  getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
+  getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
+  getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',
+  getTimeboxTarget: () => Number(memoryCache[KEYS.TIMEBOX_TARGET]) || 0,
+  getTimeboxElapsed: () => Number(memoryCache[KEYS.TIMEBOX_ELAPSED]) || 0,
+  getCoinsBalance: () => Number(memoryCache[KEYS.COINS_BALANCE]) || 0,
+  getCoinsTotalEarned: () => Number(memoryCache[KEYS.COINS_TOTAL_EARNED]) || 0,
+  getEquippedTitle: () => memoryCache[KEYS.EQUIPPED_TITLE] || '',
+  getEarnedTitles: () => JSON.parse(memoryCache[KEYS.EARNED_TITLES] || '[]'),
+  getAudioSettings: () => JSON.parse(memoryCache[KEYS.AUDIO_SETTINGS] || '{"click":"default","stage":"default","timebox":"default","complete":"default"}'),
+  getCustomAudios: () => JSON.parse(memoryCache[KEYS.CUSTOM_AUDIOS] || '{}'),
+  getBgMain: () => memoryCache[KEYS.BG_IMAGE_MAIN] || '',
+  getBgPip: () => memoryCache[KEYS.BG_IMAGE_PIP] || '',
+  getBgSize: () => memoryCache[KEYS.BG_SIZE] || 'cover',
+  getBgPosition: () => memoryCache[KEYS.BG_POSITION] || 'center',
+  getLegacyXP: () => Number(memoryCache[KEYS.LEGACY_XP]) || 0,
 
-  setSessions: (data: string) => localStorage.setItem(KEYS.SESSIONS, data),
-  setAchievements: (data: string) => localStorage.setItem(KEYS.ACHIEVEMENTS, data),
-  setUsername: (data: string) => localStorage.setItem(KEYS.USERNAME, data),
-  setTimeboxTarget: (data: number) => localStorage.setItem(KEYS.TIMEBOX_TARGET, data.toString()),
-  setTimeboxElapsed: (data: number) => localStorage.setItem(KEYS.TIMEBOX_ELAPSED, data.toString()),
-  setCoinsBalance: (val: number) => localStorage.setItem(KEYS.COINS_BALANCE, val.toString()),
-  setCoinsTotalEarned: (val: number) => localStorage.setItem(KEYS.COINS_TOTAL_EARNED, val.toString()),
-  setEquippedTitle: (val: string) => localStorage.setItem(KEYS.EQUIPPED_TITLE, val),
-  setEarnedTitles: (val: string[]) => localStorage.setItem(KEYS.EARNED_TITLES, JSON.stringify(val)),
-  setAudioSettings: (val: any) => localStorage.setItem(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
-  setCustomAudios: (val: any) => localStorage.setItem(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
-  setBgMain: (val: string) => localStorage.setItem(KEYS.BG_IMAGE_MAIN, val),
-  setBgPip: (val: string) => localStorage.setItem(KEYS.BG_IMAGE_PIP, val),
-  setBgSize: (val: string) => localStorage.setItem(KEYS.BG_SIZE, val),
-  setBgPosition: (val: string) => localStorage.setItem(KEYS.BG_POSITION, val),
-  setLegacyXP: (val: number) => localStorage.setItem(KEYS.LEGACY_XP, val.toString()),
+  setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
+  setAchievements: (data: string) => StorageManager._set(KEYS.ACHIEVEMENTS, data),
+  setUsername: (data: string) => StorageManager._set(KEYS.USERNAME, data),
+  setTimeboxTarget: (data: number) => StorageManager._set(KEYS.TIMEBOX_TARGET, data.toString()),
+  setTimeboxElapsed: (data: number) => StorageManager._set(KEYS.TIMEBOX_ELAPSED, data.toString()),
+  setCoinsBalance: (val: number) => StorageManager._set(KEYS.COINS_BALANCE, val.toString()),
+  setCoinsTotalEarned: (val: number) => StorageManager._set(KEYS.COINS_TOTAL_EARNED, val.toString()),
+  setEquippedTitle: (val: string) => StorageManager._set(KEYS.EQUIPPED_TITLE, val),
+  setEarnedTitles: (val: string[]) => StorageManager._set(KEYS.EARNED_TITLES, JSON.stringify(val)),
+  setAudioSettings: (val: any) => StorageManager._set(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
+  setCustomAudios: (val: any) => StorageManager._set(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
+  setBgMain: (val: string) => StorageManager._set(KEYS.BG_IMAGE_MAIN, val),
+  setBgPip: (val: string) => StorageManager._set(KEYS.BG_IMAGE_PIP, val),
+  setBgSize: (val: string) => StorageManager._set(KEYS.BG_SIZE, val),
+  setBgPosition: (val: string) => StorageManager._set(KEYS.BG_POSITION, val),
+  setLegacyXP: (val: number) => StorageManager._set(KEYS.LEGACY_XP, val.toString()),
 
   exportAll: () => {
-    const data: any = { version: 7, coreData: localStorage.getItem(DATA_KEY) };
+    const data: any = { version: 8, coreData: memoryCache[DATA_KEY] || null };
     Object.entries(KEYS).forEach(([key, storageKey]) => {
-      data[key.toLowerCase()] = localStorage.getItem(storageKey);
+      data[key.toLowerCase()] = memoryCache[storageKey] || null;
     });
     return data;
   },
 
   importAll: (data: any) => {
     if (!data.version) return false;
-    if (data.coreData) localStorage.setItem(DATA_KEY, data.coreData);
+    if (data.coreData) StorageManager._set(DATA_KEY, data.coreData);
     Object.entries(KEYS).forEach(([key, storageKey]) => {
       const val = data[key.toLowerCase()];
-      if (val) localStorage.setItem(storageKey, val);
+      if (val) StorageManager._set(storageKey, val);
     });
     return true;
   },
 
   getStorageUsage: () => {
     let total = 0;
-    for (let x in localStorage) {
-      if (Object.prototype.hasOwnProperty.call(localStorage, x)) total += (localStorage[x].length * 2);
+    for (let x in memoryCache) {
+      if (memoryCache[x]) total += (memoryCache[x].length * 2);
     }
     return (total / 1024 / 1024).toFixed(2);
   }

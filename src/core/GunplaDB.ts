@@ -406,9 +406,12 @@ export class GunplaSearch {
     // 1. 优先放入本地核心库
     CORE_DB.forEach(item => merged.set(item.id, item));
 
-    // 2. 拉取远程数据，仅添加核心库中没有的条目
+    // 2. 加入超时控制，防止网络请求卡住UI
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
     try {
-      const res = await fetch(REMOTE_URL);
+      const res = await fetch(REMOTE_URL, { signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw: any = await res.json();
       if (!Array.isArray(raw)) throw new Error('数据格式非数组');
@@ -419,8 +422,14 @@ export class GunplaSearch {
           merged.set(localized.id, localized);
         }
       });
-    } catch (err) {
-      console.warn('远程数据加载失败，使用本地核心库。', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.warn('远程数据请求超时，使用本地核心库。');
+      } else {
+        console.warn('远程数据加载失败，使用本地核心库。', err);
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     this.data = Array.from(merged.values());

@@ -367,7 +367,7 @@ function App() {
     setBgImage(tempBgUrl);
     try {
       StorageManager.setBgImage(tempBgUrl);
-      alert("✅ 背景图应用成功！\n(如果没看到变化，请确认图片链接有效)");
+      alert("✅ 背景图应用成功！");
     } catch (err) {
       alert("❌ 本地存储空间不足，无法保存背景图！请尝试更小的图片。");
     }
@@ -470,10 +470,11 @@ function App() {
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
   return (
-    <div 
-      className="app-container" 
-      style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none' }}
-    >
+    <div className="app-wrapper">
+      {/* 将背景图直接渲染为底层 img 标签 */}
+      {bgImage && (
+        <img src={bgImage} alt="background" className="app-bg-img" />
+      )}
       {bgImage && <div className="bg-overlay" />}
       
       {toastMsg && <div className="toast">{toastMsg}</div>}

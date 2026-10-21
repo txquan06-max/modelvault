@@ -14,28 +14,38 @@ body {
   overflow: hidden;
 }
 
-.app-container {
+/* 彻底重构的外层容器，防止层级丢失 */
+.app-wrapper {
   position: relative;
-  width: 100%;
+  width: 100vw;
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
 }
 
-/* 降低遮罩透明度，让背景图清晰可见 */
+/* 背景图层：绝对定位，不干涉点击 */
+.app-bg-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0; /* 核心修复：不再使用负数，放在最底层的 z-index 0 */
+  pointer-events: none; /* 防止挡住鼠标点击 */
+}
+
+/* 遮罩层：在图片之上，UI 之下 */
 .bg-overlay {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5); /* 从 0.75 降到 0.5 */
-  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6); /* 降低透明度让图更清晰 */
+  z-index: 1;
 }
 
 /* =========================================
@@ -43,8 +53,8 @@ body {
    ========================================= */
 .mini-window {
   position: relative;
-  z-index: 1;
-  background: rgba(45, 45, 45, 0.95); /* 让主窗口稍微有点透 */
+  z-index: 2; /* 在遮罩之上 */
+  background: rgba(45, 45, 45, 0.95); /* 增加一点点透明度显得不突兀 */
   border: 1px solid #444;
   border-radius: 12px;
   padding: 20px 24px;
@@ -554,7 +564,7 @@ body {
    ========================================= */
 @media (max-width: 600px) {
   body { align-items: flex-start; }
-  .app-container { height: 100vh; align-items: flex-start; overflow-y: auto; }
+  .app-wrapper { height: 100vh; align-items: flex-start; overflow-y: auto; }
   .mini-window { width: 100%; min-height: 100vh; max-height: none; border-radius: 0; border: none; box-shadow: none; padding: 16px; }
   .hangar-grid { grid-template-columns: 1fr; }
   .timer-display { font-size: 64px; margin: 20px 0; }

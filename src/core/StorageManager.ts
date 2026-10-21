@@ -20,19 +20,17 @@ const KEYS = {
   BG_SIZE: 'mv_bg_size',
   BG_POSITION: 'mv_bg_position',
   LEGACY_XP: 'mv_legacy_xp',
+  REMINDER_INTERVAL: 'mv_reminder_interval',
 };
 
-// 内存缓存，保证读写是同步的，不改变原有逻辑
 const memoryCache: Record<string, string> = {};
 let isInit = false;
 
 export const StorageManager = {
-  // 初始化：将 IndexedDB 或老版 LocalStorage 的数据全部载入内存
   async init() {
     if (isInit) return;
     await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
-    // 1. 尝试从老版 localStorage 迁移数据
     const legacyKeys = Object.keys(localStorage).filter(k => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data');
     if (legacyKeys.length > 0) {
       for (const key of legacyKeys) {
@@ -42,11 +40,9 @@ export const StorageManager = {
           await localforage.setItem(key, val);
         }
       }
-      // 迁移完清空老数据，释放 LocalStorage 空间
       legacyKeys.forEach(k => localStorage.removeItem(k));
     }
 
-    // 2. 从 IndexedDB 加载全量数据到内存
     const keys = await localforage.keys();
     for (const key of keys) {
       const val = await localforage.getItem<string>(key);
@@ -55,14 +51,12 @@ export const StorageManager = {
     isInit = true;
   },
 
-  // 统一的写入方法（防爆仓保护）
   async _set(key: string, val: string) {
     memoryCache[key] = val;
     try {
       await localforage.setItem(key, val);
     } catch (err) {
       console.error('Storage save failed', err);
-      // 如果 IndexedDB 都写满了，说明用户存了海量图片，只能提示清理
       alert('本地存储空间已满，请前往个人页导出备份，并清理部分图片。');
     }
   },
@@ -94,6 +88,7 @@ export const StorageManager = {
   getBgSize: () => memoryCache[KEYS.BG_SIZE] || 'cover',
   getBgPosition: () => memoryCache[KEYS.BG_POSITION] || 'center',
   getLegacyXP: () => Number(memoryCache[KEYS.LEGACY_XP]) || 0,
+  getReminderInterval: () => Number(memoryCache[KEYS.REMINDER_INTERVAL]) || 0,
 
   setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
   setAchievements: (data: string) => StorageManager._set(KEYS.ACHIEVEMENTS, data),
@@ -111,6 +106,7 @@ export const StorageManager = {
   setBgSize: (val: string) => StorageManager._set(KEYS.BG_SIZE, val),
   setBgPosition: (val: string) => StorageManager._set(KEYS.BG_POSITION, val),
   setLegacyXP: (val: number) => StorageManager._set(KEYS.LEGACY_XP, val.toString()),
+  setReminderInterval: (val: number) => StorageManager._set(KEYS.REMINDER_INTERVAL, val.toString()),
 
   exportAll: () => {
     const data: any = { version: 8, coreData: memoryCache[DATA_KEY] || null };

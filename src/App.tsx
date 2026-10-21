@@ -48,7 +48,7 @@ const FocusPanel = ({
   timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast
+  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget
 }: any) => {
   const currentTaskName = currentTask ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -178,20 +178,26 @@ const FocusPanel = ({
           <div className={`task-status ${currentTask?.status === 'Completed' ? 'status-completed' : currentTask?.status === 'InProgress' ? 'status-inprogress' : 'status-notstarted'}`}>
             {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
           </div>
-          {timerState === 'Idle' && !lastSession && timeboxElapsed === 0 && !isFinishingPart && (
+          
+          {timerState === 'Idle' && !lastSession && (
             <div className="timebox-selector">
               <span className="timebox-label">{t('timebox')}:</span>
-              {[0, 15, 30, 60].map(min => (
-                <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setTimeboxTarget(min * 60); }}>
+              {[0, 10, 30, 60].map(min => (
+                <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => handleSetTimeboxTarget(min)}>
                   {min === 0 ? t('timeboxNone') : `${min}m`}
                 </button>
               ))}
             </div>
           )}
+
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`}>{formatTime(activeSeconds)}</div>
+          
           {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
-            <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
+            <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>
+              {isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}
+            </div>
           )}
+
           {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
             <div className="stages-panel">
               {currentTask.stages.map((stage: any) => (
@@ -249,6 +255,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const [activeSeconds, setActiveSeconds] = useState(0);
@@ -310,6 +317,8 @@ function App() {
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
   const [timeboxElapsed, setTimeboxElapsed] = useState(() => StorageManager.getTimeboxElapsed());
   const [hasPlayedTimeboxSound, setHasPlayedTimeboxSound] = useState(false);
+  const [reminderInterval, setReminderInterval] = useState(() => StorageManager.getReminderInterval());
+  const [lastRemindedAt, setLastRemindedAt] = useState(0);
   const [username, setUsername] = useState(() => StorageManager.getUsername());
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
@@ -337,7 +346,6 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [timerState]);
 
-  // 解决切到后台再切回来，UI时间刷新延迟的问题
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -382,14 +390,13 @@ function App() {
     const allModels = ModelManager.getAllModels();
     setModels(allModels);
 
-    // 自动过滤并选中第一个可用的模型
     const available = allModels.filter(m => m.status !== 'Completed');
     if (available.length > 0) {
       if (!currentModelId || !available.some(m => m.id === currentModelId)) {
         setCurrentModelId(available[0].id);
       }
     } else {
-      setCurrentModelId(''); // 全部完成则清空当前选择，UI会显示空状态
+      setCurrentModelId(''); 
     }
   };
 
@@ -431,19 +438,44 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (timeboxTarget > 0 && timeboxElapsed >= timeboxTarget && !hasPlayedTimeboxSound && timerState === 'Running') {
+    if (timerState === 'Running' && timeboxTarget > 0 && timeboxElapsed >= timeboxTarget && !hasPlayedTimeboxSound) {
       AudioManager.playTimeboxEnd(); setHasPlayedTimeboxSound(true);
     }
   }, [timeboxElapsed, timeboxTarget, hasPlayedTimeboxSound, timerState]);
 
+  // 定期提醒逻辑 (基于累计专注时长)
+  useEffect(() => {
+    if (timerState === 'Running' && reminderInterval > 0) {
+      if (activeSeconds > 0 && activeSeconds % reminderInterval === 0 && activeSeconds !== lastRemindedAt) {
+        AudioManager.playTimeboxEnd();
+        showToast(i18n.language === 'zh' ? `⏰ 已专注 ${reminderInterval / 60} 分钟，记得休息一下！` : `⏰ Focused for ${reminderInterval / 60} min. Take a break!`);
+        setLastRemindedAt(activeSeconds);
+      }
+    }
+  }, [activeSeconds, timerState, reminderInterval, lastRemindedAt]);
+
+  useEffect(() => {
+    if (timerState !== 'Running') {
+      setLastRemindedAt(0);
+    }
+  }, [timerState]);
+
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
+
+  const handleSetTimeboxTarget = (min: number) => {
+    AudioManager.playClick();
+    setTimeboxTarget(min * 60);
+    setTimeboxElapsed(0);
+    setHasPlayedTimeboxSound(false);
+  };
 
   const handleStart = () => { AudioManager.playStart(); engineRef.current.start(); setModels(ModelManager.startStage(currentTaskId, currentStageId)); setHasPlayedTimeboxSound(false); refreshData(); };
   const handlePause = () => { AudioManager.playClick(); engineRef.current.pause(); };
   const handleResume = () => { AudioManager.playClick(); engineRef.current.resume(); };
   
   const handleComplete = () => {
+    AudioManager.playClick();
     const result = engineRef.current.complete();
     if (result) {
       if (result.activeSeconds < 10) {
@@ -466,7 +498,6 @@ function App() {
     }
   };
 
-  // 统一检查模型是否彻底完成的逻辑
   const checkAndPromptCompleteModel = (updatedModels: Model[], modelId?: string) => {
     let targetId = modelId;
     if (!targetId) {
@@ -504,7 +535,6 @@ function App() {
     setModels(result.models); refreshData(); processAchievements();
     setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
     setIsFinishingPart(false);
-
     checkAndPromptCompleteModel(result.models);
   };
 
@@ -521,6 +551,7 @@ function App() {
 
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
+    AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
@@ -533,6 +564,7 @@ function App() {
   };
 
   const addToLegacyList = (item: GunplaItem) => {
+    AudioManager.playClick();
     if (!legacyList.some(i => i.name.en === item.name.en && i.grade === item.grade)) {
       setLegacyList([...legacyList, { ...item }]);
     } else {
@@ -543,6 +575,7 @@ function App() {
   };
 
   const removeLegacyItem = (id: string) => {
+    AudioManager.playClick();
     setLegacyList(legacyList.filter(i => i.id !== id));
   };
 
@@ -561,6 +594,7 @@ function App() {
 
   const handleLegacyImport = () => {
     if (legacyList.length === 0) return;
+    AudioManager.playClick();
     const result = ModelManager.importLegacyModelsFromList(legacyList);
     if (result.count > 0) {
       AudioManager.playFinishPart(); 
@@ -594,6 +628,7 @@ function App() {
   };
 
   const handleStartRebuild = (taskId: string) => {
+    AudioManager.playClick();
     setPendingRebuildTask(taskId);
     const stages = viewingModel?.tasks.find(t => t.name === 'part_legacy')?.stages.filter(s => s.status === 'Completed').map(s => s.nameKey) || ['stage_assembly'];
     setImportedStages(stages);
@@ -610,6 +645,7 @@ function App() {
   };
 
   const handleDoRebuild = () => {
+    AudioManager.playClick();
     setShowRebuildConfirm(false);
     if (pendingRebuildTask) {
       handleJumpToFocus(pendingRebuildTask);
@@ -637,12 +673,14 @@ function App() {
   };
 
   const openPreview = () => {
+    AudioManager.playClick();
     setBgSize(StorageManager.getBgSize());
     setBgPosition(StorageManager.getBgPosition());
     setIsPreviewOpen(true);
   };
 
   const applyBackground = () => {
+    AudioManager.playClick();
     StorageManager.setBgSize(bgSize);
     StorageManager.setBgPosition(bgPosition);
     setIsPreviewOpen(false);
@@ -704,7 +742,7 @@ function App() {
   };
 
   const buyTitle = (id: string) => { if (UserManager.buyTitle(id)) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); } else { AudioManager.playClick(); showToast(t('notEnoughCoins')); } };
-  const equipTitle = (id: string) => { StorageManager.setEquippedTitle(id); setEquippedTitle(id); AudioManager.playStageDone(); };
+  const equipTitle = (id: string) => { AudioManager.playClick(); StorageManager.setEquippedTitle(id); setEquippedTitle(id); AudioManager.playStageDone(); };
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
@@ -736,10 +774,11 @@ function App() {
     }
   };
 
-  const exportData = () => { const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
+  const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
     const file = e.target.files?.[0]; 
     if (!file) return; 
+    AudioManager.playClick();
     const reader = new FileReader(); 
     reader.onload = (event) => { 
       try { 
@@ -756,6 +795,15 @@ function App() {
     }; 
     reader.readAsText(file); 
     e.target.value = ''; 
+  };
+
+  const handleResetData = () => {
+    AudioManager.playClick();
+    localStorage.clear();
+    if (window.indexedDB) {
+      window.indexedDB.deleteDatabase('ModelVault');
+    }
+    window.location.reload();
   };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -795,7 +843,7 @@ function App() {
     isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
     currentModel, getModelName, t,
     bgImage: bgPip, bgSize, bgPosition,
-    showToast
+    showToast, handleSetTimeboxTarget
   };
 
   const viewingModel = models.find(m => m.id === viewingModelId);
@@ -825,12 +873,12 @@ function App() {
                   <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>
                     {i18n.language === 'zh' ? '确认删除' : 'Confirm'}
                   </button>
-                  <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => setConfirmDeleteId(null)}>
+                  <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(null); }}>
                     {t('cancel')}
                   </button>
                 </>
               ) : (
-                <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => setConfirmDeleteId(viewingModel.id)}>🗑️</button>
+                <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(viewingModel.id); }}>🗑️</button>
               )}
               <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
             </div>
@@ -889,7 +937,7 @@ function App() {
                     📁 上传图片
                     <input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
                   </label>
-                  <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => setIsEditingCover(false)}>取消</button>
+                  <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>取消</button>
                 </div>
               </div>
             )}
@@ -917,7 +965,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleConfirmRebuild}>确认并开始改造</button>
-                    <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setIsEditingImportedStatus(false)}>取消</button>
+                    <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>取消</button>
                   </div>
                 </div>
               </div>
@@ -928,7 +976,7 @@ function App() {
                 <div className="confirm-text" style={{ fontSize: '14px' }}>改造状态已激活！<br/><span>是否直接跳转至专注页面开始制作？</span></div>
                 <div className="confirm-actions">
                   <button className="btn yes" onClick={handleDoRebuild}>是，前往专注</button>
-                  <button className="btn no" onClick={() => setShowRebuildConfirm(false)}>留在详情页</button>
+                  <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>留在详情页</button>
                 </div>
               </div>
             )}
@@ -985,8 +1033,8 @@ function App() {
             {activeTab === 'focus' && (
               <div className="view-content">
                 <div className="add-controls">
-                  <button className="add-btn-large" onClick={() => setIsAddingModel(true)} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
-                  <button className="add-btn-large" onClick={() => setIsAddingTask(true)} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
+                  <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
+                  <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
                 </div>
                 
                 {isAddingModel && (
@@ -999,7 +1047,7 @@ function App() {
                             const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
                             const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
                             return (
-                              <div key={idx} className="autocomplete-item" onClick={() => { setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
+                              <div key={idx} className="autocomplete-item" onClick={() => { AudioManager.playClick(); setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span className="ac-grade">{item.grade}</span>
                                   <strong style={{ color: '#fff' }}>{displayName}</strong>
@@ -1012,12 +1060,12 @@ function App() {
                       )}
                     </div>
                     
-                    <select id="new-model-grade" value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    <select id="new-model-grade" value={newModelGrade} onChange={e => { AudioManager.playClick(); setNewModelGrade(e.target.value); }}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
                     <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} onFocus={handleFocus} />
-                    <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => setUseDefaultTasks(e.target.checked)} />{t('useDefaultTasks')}</label>
+                    <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => { AudioManager.playClick(); setUseDefaultTasks(e.target.checked); }} />{t('useDefaultTasks')}</label>
                     <div style={{display:'flex', gap:'8px', width:'100%'}}>
                       <button className="btn start" style={{flex: 1, padding: '6px'}} onClick={handleAddModel}>{t('save')}</button>
-                      <button className="btn no" style={{flex: 1, padding: '6px'}} onClick={() => { setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
+                      <button className="btn no" style={{flex: 1, padding: '6px'}} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
                     </div>
                   </div>
                 )}
@@ -1026,11 +1074,12 @@ function App() {
                   <div className="inline-form">
                     <input id="new-task-name" autoFocus placeholder={t('taskName')} value={newTaskName} onChange={e => setNewTaskName(e.target.value)} onKeyDown={e => {
                       if (e.key === 'Enter' && newTaskName.trim()) {
+                        AudioManager.playClick();
                         const updated = ModelManager.addTask(currentModelId, newTaskName.trim());
                         setModels(updated); setNewTaskName(''); setIsAddingTask(false);
                       }
                     }} onFocus={handleFocus} />
-                    <button onClick={() => setIsAddingTask(false)}>{t('cancel')}</button>
+                    <button onClick={() => { AudioManager.playClick(); setIsAddingTask(false); }}>{t('cancel')}</button>
                   </div>
                 )}
                 <FocusPanel {...panelProps} isPip={false} />
@@ -1048,7 +1097,7 @@ function App() {
                     style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '4px 8px', borderRadius: '6px', outline: 'none', fontSize: '12px' }}
                     onFocus={handleFocus}
                   />
-                  {journalFilterMonth && <button className="mini-btn" onClick={() => setJournalFilterMonth('')}>清除</button>}
+                  {journalFilterMonth && <button className="mini-btn" onClick={() => { AudioManager.playClick(); setJournalFilterMonth(''); }}>清除</button>}
                 </div>
                 <div className="journal-list" style={{ flex: 1, maxHeight: 'none' }}>
                   {getHistoryLogs().length === 0 ? (
@@ -1111,12 +1160,12 @@ function App() {
                   </div>
                 </div>
                 <div className="stats-grid">
-                  <div className="stat-card" onClick={() => setShowModelDetails(!showModelDetails)}>
+                  <div className="stat-card" onClick={() => { AudioManager.playClick(); setShowModelDetails(!showModelDetails); }}>
                     <div className="stat-label">{t('totalModels')}</div>
                     <div className="stat-value">{modelStats.total}</div>
                     {showModelDetails && (<div className="stat-details">{['HG', 'RG', 'MG', 'PG'].map(grade => modelStats[grade] > 0 ? (<div key={grade} className="detail-row"><span>{grade}</span> <span>{modelStats[grade]}</span></div>) : null)}</div>)}
                   </div>
-                  <div className="stat-card" onClick={() => setShowTimeDetails(!showTimeDetails)}>
+                  <div className="stat-card" onClick={() => { AudioManager.playClick(); setShowTimeDetails(!showTimeDetails); }}>
                     <div className="stat-label">{t('totalTime')}</div>
                     <div className="stat-value">{formatTime(timeStats.totalSeconds)}</div>
                     {showTimeDetails && (<div className="stat-details">{Object.entries(timeStats.stageTime).map(([stageKey, seconds]) => seconds > 0 ? (<div key={stageKey} className="detail-row"><span>{t(stageKey)}</span> <span>{formatTime(seconds)}</span></div>) : null)}</div>)}
@@ -1127,7 +1176,7 @@ function App() {
                   <h4>📦 {t('legacyImport')}</h4>
                   <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>随时补录旧模型并上传封面。每个奖励 20 XP。</p>
                   {!showLegacyForm ? (
-                    <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
+                    <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(true); }}>{t('legacyImport')}</button>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div className="search-autocomplete">
@@ -1193,7 +1242,7 @@ function App() {
                         <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>
                           {t('importBtn')} ({legacyList.length})
                         </button>
-                        <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>
+                        <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>
                           {t('cancel')}
                         </button>
                       </div>
@@ -1205,13 +1254,33 @@ function App() {
                   <h4>⚙️ {t('customization')}</h4>
                   
                   <div className="custom-row">
+                    <span>定期专注提醒音效:</span>
+                    <select 
+                      value={reminderInterval} 
+                      onChange={(e) => {
+                        AudioManager.playClick();
+                        const val = Number(e.target.value);
+                        setReminderInterval(val);
+                        StorageManager.setReminderInterval(val);
+                      }}
+                      style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}
+                    >
+                      <option value={0}>关闭 (Off)</option>
+                      <option value={15 * 60}>每 15 分钟</option>
+                      <option value={30 * 60}>每 30 分钟</option>
+                      <option value={45 * 60}>每 45 分钟</option>
+                      <option value={60 * 60}>每 60 分钟</option>
+                    </select>
+                  </div>
+
+                  <div className="custom-row">
                     <span>主页背景 (横版):</span>
                     <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                       <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         📁 上传主页图
                         <input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
                       </label>
-                      {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { setBgMain(''); StorageManager.setBgMain(''); }}>清除</button>}
+                      {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>清除</button>}
                     </div>
                   </div>
 
@@ -1222,7 +1291,7 @@ function App() {
                         📁 上传悬浮窗图
                         <input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
                       </label>
-                      {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { setBgPip(''); StorageManager.setBgPip(''); }}>清除</button>}
+                      {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>清除</button>}
                     </div>
                   </div>
 
@@ -1295,10 +1364,28 @@ function App() {
                 </div>
                 <div className="data-backup-section">
                   <h4>{t('dataBackup')} <span style={{float:'right', fontSize:'11px', color:'#888'}}>Used: {storageUsage} MB</span></h4>
-                  <div className="backup-actions">
+                  <div className="backup-actions" style={{ marginBottom: '16px' }}>
                     <button className="backup-btn" onClick={exportData}>{t('exportData')}</button>
                     <label className="backup-btn import-label">{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
                   </div>
+                  
+                  <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginTop: '8px' }}>
+                    <h4 style={{ color: '#ef4444', marginBottom: '8px', fontSize: '12px' }}>⚠️ 危险区域 (测试用)</h4>
+                    {!showResetConfirm ? (
+                      <button className="backup-btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(true); }}>
+                        彻底清空所有数据
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>确定要清空所有模型、时间记录和成就吗？此操作不可逆！</p>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData}>确认清空</button>
+                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }}>取消</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
                     <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.0</p>
                     <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>
@@ -1321,7 +1408,7 @@ function App() {
             </p>
             <div className="modal-actions" style={{ justifyContent: 'center' }}>
               <button className="btn yes" style={{ flex: 1 }} onClick={handleConfirmCompleteModel}>收入格纳库</button>
-              <button className="btn no" style={{ flex: 1 }} onClick={() => setShowCompleteModelConfirm(false)}>稍后再说</button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setShowCompleteModelConfirm(false); }}>稍后再说</button>
             </div>
           </div>
         </div>
@@ -1345,14 +1432,14 @@ function App() {
 
             <div className="custom-row">
               <span>填充模式 (Object-Fit):</span>
-              <select value={bgSize} onChange={e => setBgSize(e.target.value)} style={{ padding: '6px', marginBottom: '10px' }}>
+              <select value={bgSize} onChange={e => { AudioManager.playClick(); setBgSize(e.target.value); }} style={{ padding: '6px', marginBottom: '10px' }}>
                 <option value="cover">Cover (覆盖并裁切)</option>
                 <option value="contain">Contain (包含并留边)</option>
                 <option value="fill">Fill (拉伸填满)</option>
               </select>
               
               <span>对齐位置 (Object-Position):</span>
-              <select value={bgPosition} onChange={e => setBgPosition(e.target.value)} style={{ padding: '6px' }}>
+              <select value={bgPosition} onChange={e => { AudioManager.playClick(); setBgPosition(e.target.value); }} style={{ padding: '6px' }}>
                 <option value="center">居中 (Center)</option>
                 <option value="top">顶部对齐 (Top)</option>
                 <option value="bottom">底部对齐 (Bottom)</option>
@@ -1362,7 +1449,7 @@ function App() {
             </div>
 
             <div className="modal-actions" style={{ marginTop: '20px' }}>
-              <button onClick={() => setIsPreviewOpen(false)} style={{ background: 'transparent', color: '#aaa' }}>取消</button>
+              <button onClick={() => { AudioManager.playClick(); setIsPreviewOpen(false); }} style={{ background: 'transparent', color: '#aaa' }}>取消</button>
               <button className="btn start" style={{ flex: 1, maxWidth: '120px' }} onClick={applyBackground}>确认应用</button>
             </div>
           </div>

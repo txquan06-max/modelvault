@@ -19,6 +19,7 @@ export class AudioManager {
     osc.connect(gain); gain.connect(ctx.destination);
     osc.type = type;
     osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+    // 增加声音衰减，让声音更干脆（水滴感）
     gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
     osc.start(ctx.currentTime + delay);
@@ -47,23 +48,29 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('click')) return;
     
-    if (style === 'chiptune') this.playTone(1046, 'square', 0.05, 0.05);
-    else if (style === 'soft') this.playTone(400, 'sine', 0.1, 0.05);
-    else this.playTone(800, 'sine', 0.05, 0.05);
+    // 清脆、短促的点击声
+    if (style === 'chiptune') this.playTone(1200, 'square', 0.03, 0.04);
+    else if (style === 'soft') this.playTone(600, 'sine', 0.05, 0.04);
+    else this.playTone(900, 'sine', 0.04, 0.05);
   }
 
-  static playStart() { this.playTone(600, 'sine', 0.15, 0.08); this.playTone(800, 'sine', 0.15, 0.08, 0.08); }
+  static playStart() { 
+    // 上升双音，令人振奋
+    this.playTone(600, 'sine', 0.08, 0.08); 
+    this.playTone(900, 'sine', 0.15, 0.08, 0.08); 
+  }
 
   static playComplete() {
     const style = this.getStyle('complete');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('complete')) return;
 
-    const notes = [523.25, 659.25, 1046.50];
+    // 大三和弦加高音，非常上头
+    const notes = [523.25, 659.25, 783.99, 1046.50];
     notes.forEach((f, i) => {
-      if (style === 'chiptune') this.playTone(f * 2, 'square', 0.2, 0.08, i * 0.1);
-      else if (style === 'soft') this.playTone(f, 'sine', 0.4, 0.08, i * 0.1);
-      else this.playTone(f, 'triangle', 0.3, 0.1, i * 0.1);
+      if (style === 'chiptune') this.playTone(f * 2, 'square', 0.15, 0.06, i * 0.08);
+      else if (style === 'soft') this.playTone(f, 'sine', 0.3, 0.06, i * 0.08);
+      else this.playTone(f, 'triangle', 0.2, 0.08, i * 0.08);
     });
   }
 
@@ -72,16 +79,22 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('stage')) return;
 
-    const notes = [1046.50, 1567.98, 2093.00];
+    // 类似金币入袋的清脆叮当声
+    const notes = [1046.50, 1318.51, 1567.98];
     notes.forEach((f, i) => {
-      if (style === 'chiptune') this.playTone(f, 'square', 0.15, 0.08, i * 0.06);
-      else if (style === 'soft') this.playTone(f, 'sine', 0.3, 0.06, i * 0.06);
-      else this.playTone(f, 'triangle', 0.2, 0.12, i * 0.06);
+      if (style === 'chiptune') this.playTone(f, 'square', 0.1, 0.06, i * 0.05);
+      else if (style === 'soft') this.playTone(f, 'sine', 0.2, 0.05, i * 0.05);
+      else this.playTone(f, 'triangle', 0.15, 0.08, i * 0.05);
     });
   }
 
-  static playFinishPart() { [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'triangle', 0.4, 0.12, i * 0.08)); }
-  static playAchievement() { [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'sine', 0.4, 0.12, i * 0.1)); }
+  static playFinishPart() { 
+    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'triangle', 0.3, 0.1, i * 0.06)); 
+  }
+  
+  static playAchievement() { 
+    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'sine', 0.4, 0.1, i * 0.08)); 
+  }
 
   static playTimeboxEnd() {
     const style = this.getStyle('timebox');
@@ -92,7 +105,7 @@ export class AudioManager {
     notes.forEach((f, i) => {
       if (style === 'chiptune') this.playTone(f, 'square', 0.15, 0.08, i * 0.15);
       else if (style === 'soft') this.playTone(f, 'sine', 0.6, 0.06, i * 0.15);
-      else this.playTone(f, 'sine', 0.6, 0.08, i * 0.15);
+      else this.playTone(f, 'sine', 0.5, 0.08, i * 0.15);
     });
   }
 

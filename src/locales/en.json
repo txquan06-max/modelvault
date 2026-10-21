@@ -67,6 +67,7 @@
   "legacyPlaceholder": "e.g.:\nMG Barbatos, MG\nRG Hi-Nu, RG",
   "importBtn": "Import Models",
   "importedSuccess": "Successfully imported {{count}} models!",
+  "imageProcessingFailed": "Image processing failed",
 
   "part_head": "Head",
   "part_torso": "Torso",

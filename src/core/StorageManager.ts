@@ -13,11 +13,11 @@ const KEYS = {
   EARNED_TITLES: 'mv_earned_titles',
   AUDIO_SETTINGS: 'mv_audio_settings',
   CUSTOM_AUDIOS: 'mv_custom_audios',
-  BG_IMAGE: 'mv_bg_image',
-  BG_SIZE: 'mv_bg_size', // 新增
-  BG_POSITION: 'mv_bg_position', // 新增
+  BG_IMAGE_MAIN: 'mv_bg_main',
+  BG_IMAGE_PIP: 'mv_bg_pip',
+  BG_SIZE: 'mv_bg_size',
+  BG_POSITION: 'mv_bg_position',
   LEGACY_XP: 'mv_legacy_xp',
-  LEGACY_IMPORTED: 'mv_legacy_imported',
 };
 
 interface CoreData {
@@ -56,11 +56,11 @@ export const StorageManager = {
   getEarnedTitles: () => JSON.parse(localStorage.getItem(KEYS.EARNED_TITLES) || '[]'),
   getAudioSettings: () => JSON.parse(localStorage.getItem(KEYS.AUDIO_SETTINGS) || '{"click":"default","stage":"default","timebox":"default","complete":"default"}'),
   getCustomAudios: () => JSON.parse(localStorage.getItem(KEYS.CUSTOM_AUDIOS) || '{}'),
-  getBgImage: () => localStorage.getItem(KEYS.BG_IMAGE) || '',
-  getBgSize: () => localStorage.getItem(KEYS.BG_SIZE) || 'cover', // 默认 cover
-  getBgPosition: () => localStorage.getItem(KEYS.BG_POSITION) || 'center', // 默认 center
+  getBgMain: () => localStorage.getItem(KEYS.BG_IMAGE_MAIN) || '',
+  getBgPip: () => localStorage.getItem(KEYS.BG_IMAGE_PIP) || '',
+  getBgSize: () => localStorage.getItem(KEYS.BG_SIZE) || 'cover',
+  getBgPosition: () => localStorage.getItem(KEYS.BG_POSITION) || 'center',
   getLegacyXP: () => Number(localStorage.getItem(KEYS.LEGACY_XP)) || 0,
-  isLegacyImported: () => localStorage.getItem(KEYS.LEGACY_IMPORTED) === 'true',
 
   setSessions: (data: string) => localStorage.setItem(KEYS.SESSIONS, data),
   setAchievements: (data: string) => localStorage.setItem(KEYS.ACHIEVEMENTS, data),
@@ -73,14 +73,14 @@ export const StorageManager = {
   setEarnedTitles: (val: string[]) => localStorage.setItem(KEYS.EARNED_TITLES, JSON.stringify(val)),
   setAudioSettings: (val: any) => localStorage.setItem(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
   setCustomAudios: (val: any) => localStorage.setItem(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
-  setBgImage: (val: string) => localStorage.setItem(KEYS.BG_IMAGE, val),
-  setBgSize: (val: string) => localStorage.setItem(KEYS.BG_SIZE, val), // 新增
-  setBgPosition: (val: string) => localStorage.setItem(KEYS.BG_POSITION, val), // 新增
+  setBgMain: (val: string) => localStorage.setItem(KEYS.BG_IMAGE_MAIN, val),
+  setBgPip: (val: string) => localStorage.setItem(KEYS.BG_IMAGE_PIP, val),
+  setBgSize: (val: string) => localStorage.setItem(KEYS.BG_SIZE, val),
+  setBgPosition: (val: string) => localStorage.setItem(KEYS.BG_POSITION, val),
   setLegacyXP: (val: number) => localStorage.setItem(KEYS.LEGACY_XP, val.toString()),
-  setLegacyImported: () => localStorage.setItem(KEYS.LEGACY_IMPORTED, 'true'),
 
   exportAll: () => {
-    const data: any = { version: 6, coreData: localStorage.getItem(DATA_KEY) };
+    const data: any = { version: 7, coreData: localStorage.getItem(DATA_KEY) };
     Object.entries(KEYS).forEach(([key, storageKey]) => {
       data[key.toLowerCase()] = localStorage.getItem(storageKey);
     });
@@ -89,7 +89,7 @@ export const StorageManager = {
 
   importAll: (data: any) => {
     if (!data.version) return false;
-    if (data.coreData) localStorage.setItem(DATA_KEY, data.coredata);
+    if (data.coreData) localStorage.setItem(DATA_KEY, data.coreData);
     Object.entries(KEYS).forEach(([key, storageKey]) => {
       const val = data[key.toLowerCase()];
       if (val) localStorage.setItem(storageKey, val);

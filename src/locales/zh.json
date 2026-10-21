@@ -67,6 +67,7 @@
   "legacyPlaceholder": "例如：\nMG Barbatos, MG\nRG Hi-Nu, RG\nHG Aerial, HG",
   "importBtn": "确认导入",
   "importedSuccess": "成功导入 {{count}} 台模型！",
+  "imageProcessingFailed": "图片处理失败",
 
   "part_head": "头部",
   "part_torso": "躯干",

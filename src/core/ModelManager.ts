@@ -27,6 +27,7 @@ export interface Model {
   status: 'NotStarted' | 'InProgress' | 'Completed';
   coverImage?: string;
   isRebuilding?: boolean;
+  isImported?: boolean; // 标记为历史模型
   tasks: Task[];
 }
 
@@ -40,9 +41,18 @@ export const DEFAULT_TASK_KEYS = ['part_head', 'part_torso', 'part_waist', 'part
 
 const generateStages = () => STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'NotStarted' as StageStatus, xpReward: s.xp }));
 
-const generateLegacyTask = (modelId: string) => ({
-  id: crypto.randomUUID(), modelId, name: 'part_legacy', status: 'Completed' as const,
-  stages: STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'Completed' as const, xpReward: s.xp }))
+// 默认历史模型只完成素组
+const generateImportedTask = (modelId: string) => ({
+  id: crypto.randomUUID(), 
+  modelId, 
+  name: 'part_legacy', 
+  status: 'Completed' as const,
+  stages: STAGE_DEFS.map(s => ({ 
+    id: crypto.randomUUID(), 
+    nameKey: s.key, 
+    status: s.key === 'stage_assembly' ? 'Completed' : 'NotStarted' as StageStatus, 
+    xpReward: s.xp 
+  }))
 });
 
 const DEFAULT_DATA: Model[] = [
@@ -61,7 +71,6 @@ export class ModelManager {
     const coreData = StorageManager.getRawStorage();
     let models = coreData.models;
 
-    // 兼容旧版本数据结构
     models = models.map((m: any) => {
       const isLegacyName = typeof m.name === 'string';
       return {
@@ -80,6 +89,37 @@ export class ModelManager {
 
   static saveModels(models: Model[]) {
     StorageManager.saveRawStorage(models);
+  }
+
+  static deleteModel(modelId: string): Model[] {
+    const models = this.getAllModels().filter(m => m.id !== modelId);
+    this.saveModels(models);
+    return models;
+  }
+
+  static updateModelCover(modelId: string, coverImage: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      model.coverImage = coverImage;
+      this.saveModels(models);
+    }
+    return models;
+  }
+
+  // 更新历史模型的流程完成状态
+  static updateImportedModelStatus(modelId: string, completedStageKeys: string[]): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      model.tasks.forEach(task => {
+        task.stages.forEach(stage => {
+          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+        });
+      });
+      this.saveModels(models);
+    }
+    return models;
   }
 
   static getTotalXP(): number {
@@ -102,8 +142,7 @@ export class ModelManager {
     return models;
   }
 
-  // 新增：批量导入历史对象
-  static importLegacyModelsFromList(items: { name: { en: string; zh: string }, grade: string, series: { en: string; zh: string } }[]): { models: Model[], count: number } {
+  static importLegacyModelsFromList(items: { name: { en: string; zh: string }, grade: string, series: { en: string; zh: string }, coverImage?: string }[]): { models: Model[], count: number } {
     const models = this.getAllModels();
     let count = 0;
 
@@ -115,17 +154,17 @@ export class ModelManager {
         series: item.series,
         grade: item.grade,
         status: 'Completed',
-        tasks: [generateLegacyTask(modelId)]
+        coverImage: item.coverImage,
+        isImported: true,
+        tasks: [generateImportedTask(modelId)]
       });
       count++;
     });
 
     if (count > 0) {
-      let legacyXp = 0;
-      if (count >= 100) legacyXp = 1500; else if (count >= 51) legacyXp = 1200; else if (count >= 26) legacyXp = 800; else if (count >= 11) legacyXp = 500; else if (count >= 6) legacyXp = 250; else if (count >= 1) legacyXp = 100;
+      const legacyXp = count * 20;
       StorageManager.setLegacyXP(StorageManager.getLegacyXP() + legacyXp);
-      StorageManager.setLegacyImported();
-      UserManager.addCoins(legacyXp / 2);
+      UserManager.addCoins(count * 10);
       this.saveModels(models);
     }
     return { models, count };
@@ -143,12 +182,23 @@ export class ModelManager {
     for (const m of models) {
       const task = m.tasks.find(t => t.id === taskId);
       if (task) {
-        if (task.status === 'NotStarted') task.status = 'InProgress';
-        if (stageId) { const stage = task.stages.find(s => s.id === stageId); if (stage && stage.status === 'NotStarted') stage.status = 'InProgress'; }
+        if (m.status === 'Completed' || task.status === 'Completed') {
+          m.status = 'InProgress';
+          m.isRebuilding = true;
+          task.status = 'InProgress';
+          task.stages.forEach(s => { if (s.status === 'Completed') s.status = 'InProgress'; });
+        } else if (task.status === 'NotStarted') {
+          task.status = 'InProgress';
+        }
+        if (stageId) {
+          const stage = task.stages.find(s => s.id === stageId);
+          if (stage && stage.status === 'NotStarted') stage.status = 'InProgress';
+        }
         break;
       }
     }
-    this.saveModels(models); return models;
+    this.saveModels(models); 
+    return models;
   }
 
   static completeStage(taskId: string, stageId: string | null, photoUrl?: string): Model[] {
@@ -161,8 +211,13 @@ export class ModelManager {
         changedModelId = m.id; break;
       }
     }
-    if (changedModelId) { const model = models.find(m => m.id === changedModelId)!; if (model.tasks.every(t => t.status === 'Completed')) { model.status = 'Completed'; model.isRebuilding = false; } }
-    this.saveModels(models); if (isStageCompletedNow) UserManager.addCoins(10); return models;
+    if (changedModelId) { 
+      const model = models.find(m => m.id === changedModelId)!; 
+      if (model.tasks.every(t => t.status === 'Completed')) { model.status = 'Completed'; model.isRebuilding = false; } 
+    }
+    this.saveModels(models); 
+    if (isStageCompletedNow) UserManager.addCoins(10); 
+    return models;
   }
 
   static finishTask(taskId: string, coverImage?: string): { models: Model[], error?: string } {

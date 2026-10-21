@@ -46,7 +46,7 @@ const FocusPanel = ({
   timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t, bgImage, bgSize, bgPosition
+  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast
 }: any) => {
   const currentTaskName = currentTask ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -57,7 +57,7 @@ const FocusPanel = ({
     const file = e.target.files?.[0];
     if (file) {
       try { const base64 = await compressImage(file, 800, 0.6); setFinishPartPhoto(base64); } 
-      catch (err) { alert("Image processing failed"); }
+      catch (err) { showToast(t('imageProcessingFailed') || 'Image processing failed'); }
     }
     e.target.value = '';
   };
@@ -102,7 +102,7 @@ const FocusPanel = ({
             </div>
           ) : (
             <div className="controls" style={{ flexDirection: 'column' }}>
-              {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId || currentTask?.status === 'Completed'}>{currentTask?.status === 'Completed' ? t('statusCompleted') : t('start')}</button>}
+              {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
               {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
               {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
             </div>
@@ -153,7 +153,7 @@ const FocusPanel = ({
       {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
         <div className="stages-panel">
           {currentTask.stages.map((stage: any) => (
-            <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused' || currentTask.status === 'Completed'}>
+            <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
               {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
             </button>
           ))}
@@ -186,7 +186,11 @@ const FocusPanel = ({
         </div>
       ) : (
         <div className="controls">
-          {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId || currentStage?.status === 'Completed' || currentTask?.status === 'Completed'}>{currentTask?.status === 'Completed' ? t('statusCompleted') : t('start')}</button>}
+          {timerState === 'Idle' && (
+            <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>
+              {t('start')}
+            </button>
+          )}
           {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
           {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
         </div>
@@ -200,6 +204,7 @@ function App() {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const [activeSeconds, setActiveSeconds] = useState(0);
@@ -212,11 +217,18 @@ function App() {
   const [equippedTitle, setEquippedTitle] = useState('');
   const [audioSettings, setAudioSettings] = useState<any>({});
   const [customAudios, setCustomAudios] = useState<any>({});
-  const [bgImage, setBgImage] = useState('');
-  const [tempBgUrl, setTempBgUrl] = useState('');
+  
+  const [bgMain, setBgMain] = useState(() => StorageManager.getBgMain());
+  const [bgPip, setBgPip] = useState(() => StorageManager.getBgPip());
   const [bgSize, setBgSize] = useState(() => StorageManager.getBgSize());
   const [bgPosition, setBgPosition] = useState(() => StorageManager.getBgPosition());
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const [isEditingImportedStatus, setIsEditingImportedStatus] = useState(false);
+  const [importedStages, setImportedStages] = useState<string[]>([]);
+  const [isEditingCover, setIsEditingCover] = useState(false);
+
+  const [journalFilterMonth, setJournalFilterMonth] = useState('');
 
   const [models, setModels] = useState<Model[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string>('');
@@ -243,7 +255,7 @@ function App() {
 
   const [legacyInput, setLegacyInput] = useState('');
   const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
-  const [legacyList, setLegacyList] = useState<GunplaItem[]>([]);
+  const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
 
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
@@ -258,16 +270,19 @@ function App() {
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
 
-  useEffect(() => { GunplaSearch.init(); }, []);
+  useEffect(() => {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist();
+    }
+    GunplaSearch.init();
+  }, []);
 
-  // 新建模型搜索
   useEffect(() => {
     if (!isAddingModel) return;
     const timer = setTimeout(() => { setSearchResults(GunplaSearch.search(newModelNameInput)); }, 200);
     return () => clearTimeout(timer);
   }, [newModelNameInput, isAddingModel]);
 
-  // 历史模型补录搜索（修改：输入即触发）
   useEffect(() => {
     if (!showLegacyForm) return;
     const timer = setTimeout(() => { 
@@ -288,8 +303,8 @@ function App() {
     setEquippedTitle(StorageManager.getEquippedTitle());
     setAudioSettings(StorageManager.getAudioSettings());
     setCustomAudios(StorageManager.getCustomAudios());
-    setBgImage(StorageManager.getBgImage());
-    setTempBgUrl(StorageManager.getBgImage());
+    setBgMain(StorageManager.getBgMain());
+    setBgPip(StorageManager.getBgPip());
     setBgSize(StorageManager.getBgSize());
     setBgPosition(StorageManager.getBgPosition());
     const allModels = ModelManager.getAllModels();
@@ -348,9 +363,13 @@ function App() {
   const handleResume = () => { AudioManager.playClick(); engineRef.current.resume(); };
   
   const handleComplete = () => {
-    AudioManager.playComplete();
     const result = engineRef.current.complete();
     if (result) {
+      if (result.activeSeconds < 60) {
+        showToast(i18n.language === 'zh' ? '计时太短，无法记录。' : 'Time too short, not saved.');
+        return;
+      }
+      AudioManager.playComplete();
       const newSession = { id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result };
       SessionManager.saveSession(newSession);
       refreshData();
@@ -403,8 +422,10 @@ function App() {
   };
 
   const addToLegacyList = (item: GunplaItem) => {
-    if (!legacyList.some(i => i.id === item.id)) {
-      setLegacyList([...legacyList, item]);
+    if (!legacyList.some(i => i.name.en === item.name.en && i.grade === item.grade)) {
+      setLegacyList([...legacyList, { ...item }]);
+    } else {
+      showToast(i18n.language === 'zh' ? '该模型已经在待导入列表中啦！' : 'Model already in import list!');
     }
     setLegacyInput('');
     setLegacyResults([]);
@@ -414,20 +435,26 @@ function App() {
     setLegacyList(legacyList.filter(i => i.id !== id));
   };
 
+  const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await compressImage(file, 400, 0.6);
+        const newList = [...legacyList];
+        newList[index].coverImage = base64;
+        setLegacyList(newList);
+      } catch (err) { showToast(i18n.language === 'zh' ? '图片上传失败' : 'Image upload failed'); }
+    }
+    e.target.value = '';
+  };
+
   const handleLegacyImport = () => {
     if (legacyList.length === 0) return;
-    
-    const result = ModelManager.importLegacyModelsFromList(legacyList.map(item => ({
-      name: item.name,
-      grade: item.grade,
-      series: item.series
-    })));
-    
+    const result = ModelManager.importLegacyModelsFromList(legacyList);
     if (result.count > 0) {
       AudioManager.playFinishPart(); 
       showToast(t('importedSuccess', { count: result.count }));
       setLegacyList([]); 
-      setShowLegacyForm(false); 
       refreshData(); 
       processAchievements();
     }
@@ -438,6 +465,36 @@ function App() {
     const updated = ModelManager.reopenModel(modelId);
     setModels(updated); refreshData(); setCurrentModelId(modelId); setActiveTab('focus'); setViewingModelId(null);
     showToast(t('reopenedForRebuild'));
+  };
+
+  const handleDeleteModel = (modelId: string) => {
+    AudioManager.playClick();
+    const updated = ModelManager.deleteModel(modelId);
+    setModels(updated);
+    setViewingModelId(null);
+    refreshData();
+    showToast(i18n.language === 'zh' ? "已删除" : "Deleted");
+  };
+
+  const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
+    AudioManager.playClick();
+    if (viewingModel?.status === 'Completed') {
+      const updated = ModelManager.reopenModel(viewingModel.id);
+      setModels(updated);
+    }
+    setCurrentModelId(viewingModelId!);
+    setCurrentTaskId(taskId);
+    if (stageId) setCurrentStageId(stageId);
+    setActiveTab('focus');
+    setViewingModelId(null);
+  };
+
+  const handleSaveImportedStages = () => {
+    if (!viewingModelId) return;
+    AudioManager.playStageDone();
+    const updated = ModelManager.updateImportedModelStatus(viewingModelId, importedStages);
+    setModels(updated);
+    setIsEditingImportedStatus(false);
   };
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
@@ -451,43 +508,46 @@ function App() {
   };
 
   const openPreview = () => {
-    setTempBgUrl(bgImage);
     setBgSize(StorageManager.getBgSize());
     setBgPosition(StorageManager.getBgPosition());
     setIsPreviewOpen(true);
   };
 
   const applyBackground = () => {
-    if (!tempBgUrl || tempBgUrl.trim() === '') {
-      alert("请输入图片链接或上传本地图片。");
-      return;
-    }
-    setBgImage(tempBgUrl);
-    StorageManager.setBgImage(tempBgUrl);
     StorageManager.setBgSize(bgSize);
     StorageManager.setBgPosition(bgPosition);
     setIsPreviewOpen(false);
-    alert("✅ 背景图与适配设置应用成功！");
+    showToast(i18n.language === 'zh' ? '✅ 适配设置应用成功！' : '✅ Settings applied!');
   };
 
-  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
     const file = e.target.files?.[0];
     if (file) {
       try {
         const base64 = await compressImage(file, 800, 0.4);
-        if (base64.length > 1.5 * 1024 * 1024) {
-          alert("❌ 图片压缩后仍然过大（>1.5MB），无法存入本地。请更换图片或使用网络URL。");
-          return;
+        if (type === 'main') {
+          setBgMain(base64);
+          StorageManager.setBgMain(base64);
+        } else {
+          setBgPip(base64);
+          StorageManager.setBgPip(base64);
         }
-        setTempBgUrl(base64); 
-        setBgImage(base64);
-        StorageManager.setBgImage(base64);
-        setBgSize('cover');
-        setBgPosition('center');
-        StorageManager.setBgSize('cover');
-        StorageManager.setBgPosition('center');
-        alert("✅ 本地背景图上传成功！点击“预览适配”进行调整。");
-      } catch (err) { alert("❌ 图片处理失败"); }
+        showToast(i18n.language === 'zh' ? '✅ 背景图上传成功！' : '✅ Background uploaded!');
+      } catch (err) { showToast(i18n.language === 'zh' ? '❌ 图片处理失败' : '❌ Image processing failed'); }
+    }
+    e.target.value = '';
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && viewingModelId) {
+      try {
+        const base64 = await compressImage(file, 800, 0.6);
+        const updated = ModelManager.updateModelCover(viewingModelId, base64);
+        setModels(updated);
+        setIsEditingCover(false);
+        showToast(i18n.language === 'zh' ? '✅ 封面修改成功！' : '✅ Cover updated!');
+      } catch (err) { showToast(i18n.language === 'zh' ? '❌ 图片处理失败' : '❌ Image processing failed'); }
     }
     e.target.value = '';
   };
@@ -495,7 +555,7 @@ function App() {
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) { alert("Audio file too large (max 1MB)"); return; }
+    if (file.size > 1024 * 1024) { showToast(i18n.language === 'zh' ? '音频文件太大（最大1MB）' : 'Audio file too large (max 1MB)'); return; }
     
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -505,8 +565,9 @@ function App() {
       try {
         StorageManager.setCustomAudios(newAudios);
         updateAudioSetting(type, 'custom');
+        showToast(i18n.language === 'zh' ? '✅ 音效上传成功！' : '✅ Audio uploaded!');
       } catch (err) {
-        alert("本地存储空间不足，音效保存失败。");
+        showToast(i18n.language === 'zh' ? '本地存储空间不足，音效保存失败。' : 'Not enough local storage.');
       }
     };
     reader.readAsDataURL(file);
@@ -518,7 +579,7 @@ function App() {
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
-    if (!('documentPictureInPicture' in window)) { alert("Your browser does not support PiP. Please use Chrome/Edge."); return; }
+    if (!('documentPictureInPicture' in window)) { showToast(i18n.language === 'zh' ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
     try {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
@@ -533,15 +594,51 @@ function App() {
       pipWin.document.body.style.height = '100vh';
       pipWin.document.body.style.overflow = 'hidden';
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err);
+      showToast(i18n.language === 'zh' ? '画中画打开失败' : 'Failed to open PiP');
+    }
   };
 
   const exportData = () => { const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
-  const importData = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const data = JSON.parse(event.target?.result as string); if (StorageManager.importAll(data)) { alert(t('importSuccess')); window.location.reload(); } else { alert(t('importError')); } } catch (err) { alert(t('importError')); } }; reader.readAsText(file); e.target.value = ''; };
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
+    const file = e.target.files?.[0]; 
+    if (!file) return; 
+    const reader = new FileReader(); 
+    reader.onload = (event) => { 
+      try { 
+        const data = JSON.parse(event.target?.result as string); 
+        if (StorageManager.importAll(data)) { 
+          showToast(t('importSuccess')); 
+          setTimeout(() => window.location.reload(), 1000); 
+        } else { 
+          showToast(t('importError')); 
+        } 
+      } catch (err) { 
+        showToast(t('importError')); 
+      } 
+    }; 
+    reader.readAsText(file); 
+    e.target.value = ''; 
+  };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
   const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
-  const getHistoryLogs = () => { const sessions = SessionManager.getAllSessions(); return sessions.sort((a, b) => b.startedAt - a.startedAt).map(s => ({ ...s, details: ModelManager.getTaskDetails(s.taskId), stageNameKey: ModelManager.getStageNameKey(s.taskId, s.stageId) })); };
+  
+  const getHistoryLogs = () => { 
+    let sessions = SessionManager.getAllSessions(); 
+    
+    if (journalFilterMonth) {
+      sessions = sessions.filter(s => {
+        const d = new Date(s.startedAt);
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${year}-${month}` === journalFilterMonth;
+      });
+    }
+
+    return sessions.sort((a, b) => b.startedAt - a.startedAt).map(s => ({ ...s, details: ModelManager.getTaskDetails(s.taskId), stageNameKey: ModelManager.getStageNameKey(s.taskId, s.stageId) })); 
+  };
 
   const currentTask = tasks.find(t => t.id === currentTaskId);
   const currentStage = currentTask?.stages.find(s => s.id === currentStageId);
@@ -553,7 +650,6 @@ function App() {
   const titles = UserManager.getTitleLibrary();
   const equippedTitleDef = titles.find(t => t.id === equippedTitle);
   const completedModels = ModelManager.getCompletedModels();
-  const hasLegacyImported = StorageManager.isLegacyImported();
 
   const panelProps = {
     currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -562,7 +658,8 @@ function App() {
     handleConfirmStageDone, handleCancelDone, handleFinishPart,
     isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
     currentModel, getModelName, t,
-    bgImage, bgSize, bgPosition
+    bgImage: bgPip, bgSize, bgPosition,
+    showToast
   };
 
   const viewingModel = models.find(m => m.id === viewingModelId);
@@ -570,8 +667,8 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {bgImage && (
-        <img src={bgImage} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
+      {bgMain && (
+        <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
       )}
       
       {toastMsg && <div className="toast">{toastMsg}</div>}
@@ -579,8 +676,22 @@ function App() {
       <div className="mini-window">
         {viewingModel ? (
           <div className="profile-topbar">
-            <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); }}>← {t('backToHangar')}</button>
-            <div className="top-right"><button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button></div>
+            <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); }}>← {t('backToHangar')}</button>
+            <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {confirmDeleteId === viewingModel.id ? (
+                <>
+                  <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>
+                    {i18n.language === 'zh' ? '确认删除' : 'Confirm'}
+                  </button>
+                  <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => setConfirmDeleteId(null)}>
+                    {t('cancel')}
+                  </button>
+                </>
+              ) : (
+                <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => setConfirmDeleteId(viewingModel.id)}>🗑️</button>
+              )}
+              <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
+            </div>
           </div>
         ) : activeTab === 'profile' ? (
           <div className="profile-topbar">
@@ -619,13 +730,74 @@ function App() {
                   <span>Total: {formatTime(viewingModelTotalSec)}</span>
                 </div>
               </div>
+              <div 
+                style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10, background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => setIsEditingCover(true)}
+              >
+                <span style={{ fontSize: '14px' }}>📷</span>
+                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>封面</span>
+              </div>
             </div>
+
+            {isEditingCover && (
+              <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#ccc' }}>上传/修改模型封面</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    📁 上传图片
+                    <input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
+                  </label>
+                  <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => setIsEditingCover(false)}>取消</button>
+                </div>
+              </div>
+            )}
+
+            {viewingModel.isImported && (
+              <div className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
+                <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 历史模型进度录入</h4>
+                {!isEditingImportedStatus ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#ccc' }}>点击右侧按钮修改完成的流程</span>
+                    <button className="mini-btn" onClick={() => {
+                      const stages = viewingModel.tasks[0].stages.filter(s => s.status === 'Completed').map(s => s.nameKey);
+                      setImportedStages(stages);
+                      setIsEditingImportedStatus(true);
+                    }}>修改</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#ccc' }}>勾选你当时已经完成的流程：</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                      {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
+                        <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={importedStages.includes(stageKey)} 
+                            onChange={(e) => {
+                              if (e.target.checked) setImportedStages([...importedStages, stageKey]);
+                              else setImportedStages(importedStages.filter(k => k !== stageKey));
+                            }}
+                          />
+                          {t(stageKey)}
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleSaveImportedStages}>保存进度</button>
+                      <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setIsEditingImportedStatus(false)}>取消</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="timeline-container">
               {viewingModel.tasks.map(task => {
                 const taskSessions = SessionManager.getAllSessions().filter(s => s.taskId === task.id);
                 const taskTime = taskSessions.reduce((sum, s) => sum + s.activeSeconds, 0);
                 const isExpanded = expandedTaskId === task.id;
                 const isCompleted = task.status === 'Completed';
+                
                 return (
                   <div key={task.id} className="timeline-item">
                     <div className="timeline-header" onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}>
@@ -646,15 +818,18 @@ function App() {
                             {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                           </div>
                         ))}
+                        <button 
+                          className="mini-btn" 
+                          style={{ width: '100%', marginTop: '8px', background: '#3b82f6', color: '#fff', border: 'none', padding: '8px' }}
+                          onClick={() => handleJumpToFocus(task.id, task.stages.find(s => s.status !== 'Completed')?.id || task.stages[0].id)}
+                        >
+                          {viewingModel.isRebuilding || viewingModel.status === 'Completed' ? `🔧 ${t('continueRebuild')}` : `⏱ ${t('focus')}`}
+                        </button>
                       </div>
                     )}
                   </div>
                 );
               })}
-            </div>
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              {viewingModel.status === 'Completed' && <button className="btn start" onClick={() => handleReopenModel(viewingModel.id)}>{t('continueRebuild')}</button>}
-              {viewingModel.isRebuilding && <button className="btn start" onClick={() => { setCurrentModelId(viewingModel.id); setActiveTab('focus'); setViewingModelId(null); }}>{t('backToFocus')}</button>}
             </div>
           </div>
         ) : (
@@ -715,8 +890,18 @@ function App() {
             )}
 
             {activeTab === 'journal' && (
-              <div className="view-content journal-view">
-                <div className="journal-list">
+              <div className="view-content journal-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '13px', color: '#ccc', fontWeight: 'bold' }}>制作日志</span>
+                  <input 
+                    type="month" 
+                    value={journalFilterMonth} 
+                    onChange={e => { AudioManager.playClick(); setJournalFilterMonth(e.target.value); }} 
+                    style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '4px 8px', borderRadius: '6px', outline: 'none', fontSize: '12px' }}
+                  />
+                  {journalFilterMonth && <button className="mini-btn" onClick={() => setJournalFilterMonth('')}>清除</button>}
+                </div>
+                <div className="journal-list" style={{ flex: 1, maxHeight: 'none' }}>
                   {getHistoryLogs().length === 0 ? (
                     <div className="empty-state">{t('emptyJournal').split('\n').map((line: string, i: number) => <span key={i}>{line}<br/></span>)}</div>
                   ) : (
@@ -789,89 +974,110 @@ function App() {
                   </div>
                 </div>
 
-                {!hasLegacyImported && (
-                  <div className="custom-section" style={{ border: '1px dashed #3b82f6' }}>
-                    <h4>📦 {t('legacyImport')}</h4>
-                    <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{t('legacyDesc')}</p>
-                    {!showLegacyForm ? (
-                      <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div className="search-autocomplete">
-                          <input 
-                            id="legacy-search-input"
-                            autoFocus 
-                            placeholder={i18n.language === 'zh' ? "搜索并回车添加..." : "Search and press Enter..."} 
-                            value={legacyInput} 
-                            onChange={e => setLegacyInput(e.target.value)} 
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && legacyResults.length > 0) {
-                                addToLegacyList(legacyResults[0]);
-                              }
-                            }}
-                            onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
-                          />
-                          {legacyResults.length > 0 && (
-                            <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
-                              {legacyResults.map((item, idx) => {
-                                const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
-                                const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
-                                return (
-                                  <div key={idx} className="autocomplete-item" onClick={() => addToLegacyList(item)}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span className="ac-grade">{item.grade}</span>
-                                      <strong style={{ color: '#fff' }}>{displayName}</strong>
-                                    </div>
-                                    <div className="ac-series">| {displaySeries}</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {legacyList.length > 0 && (
-                          <div className="legacy-temp-list">
-                            {legacyList.map((item, idx) => {
+                <div className="custom-section" style={{ border: '1px dashed #3b82f6' }}>
+                  <h4>📦 {t('legacyImport')}</h4>
+                  <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>随时补录旧模型并上传封面。每个奖励 20 XP。</p>
+                  {!showLegacyForm ? (
+                    <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div className="search-autocomplete">
+                        <input 
+                          id="legacy-search-input"
+                          autoFocus 
+                          placeholder={i18n.language === 'zh' ? "搜索并回车添加..." : "Search and press Enter..."} 
+                          value={legacyInput} 
+                          onChange={e => setLegacyInput(e.target.value)} 
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && legacyResults.length > 0) {
+                              addToLegacyList(legacyResults[0]);
+                            }
+                          }}
+                          onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
+                        />
+                        {legacyResults.length > 0 && (
+                          <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
+                            {legacyResults.map((item, idx) => {
                               const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
+                              const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
                               return (
-                                <div key={idx} className="legacy-temp-item">
-                                  <span><span className="ac-grade">{item.grade}</span> {displayName}</span>
-                                  <button onClick={() => removeLegacyItem(item.id)}>✕</button>
+                                <div key={idx} className="autocomplete-item" onClick={() => addToLegacyList(item)}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span className="ac-grade">{item.grade}</span>
+                                    <strong style={{ color: '#fff' }}>{displayName}</strong>
+                                  </div>
+                                  <div className="ac-series">| {displaySeries}</div>
                                 </div>
                               );
                             })}
                           </div>
                         )}
-
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                          <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>
-                            {t('importBtn')} ({legacyList.length})
-                          </button>
-                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>
-                            {t('cancel')}
-                          </button>
-                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
+                      
+                      {legacyList.length > 0 && (
+                        <div className="legacy-temp-list">
+                          {legacyList.map((item, idx) => {
+                            const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
+                            return (
+                              <div key={idx} className="legacy-temp-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                  <span><span className="ac-grade">{item.grade}</span> {displayName}</span>
+                                  <button onClick={() => removeLegacyItem(item.id)}>✕</button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
+                                  <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0 }}>
+                                    {item.coverImage ? '✅ 已添加封面' : '📷 添加封面图 (可选)'}
+                                    <input type="file" accept="image/*" onChange={(e) => handleLegacyCoverUpload(e, idx)} style={{ display: 'none' }} />
+                                  </label>
+                                  {item.coverImage && (
+                                    <img src={item.coverImage} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>
+                          {t('importBtn')} ({legacyList.length})
+                        </button>
+                        <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>
+                          {t('cancel')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="custom-section">
                   <h4>⚙️ {t('customization')}</h4>
+                  
                   <div className="custom-row">
-                    <span>{t('bgUrl')}:</span>
-                    <div style={{display:'flex', gap:'8px', width:'100%', flexWrap:'wrap'}}>
-                      <input id="bg-url-input" type="text" value={tempBgUrl.startsWith('data:') ? t('localImageSelected') : tempBgUrl} onChange={e => setTempBgUrl(e.target.value)} placeholder="https://..." className="url-input" disabled={tempBgUrl.startsWith('data:')} />
-                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                        <button className="mini-btn" onClick={openPreview}>预览适配</button>
-                        <label className="mini-btn" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
-                          📁 上传
-                          <input type="file" accept="image/*" onChange={handleBgFileUpload} style={{ display: 'none' }} />
-                        </label>
-                        {bgImage && <button className="mini-btn" style={{color: '#ef4444'}} onClick={() => { setBgImage(''); setTempBgUrl(''); StorageManager.setBgImage(''); }}>清除</button>}
-                      </div>
+                    <span>主页背景 (横版):</span>
+                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                      <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📁 上传主页图
+                        <input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
+                      </label>
+                      {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { setBgMain(''); StorageManager.setBgMain(''); }}>清除</button>}
                     </div>
+                  </div>
+
+                  <div className="custom-row">
+                    <span>悬浮窗背景 (竖版):</span>
+                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                      <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        📁 上传悬浮窗图
+                        <input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
+                      </label>
+                      {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { setBgPip(''); StorageManager.setBgPip(''); }}>清除</button>}
+                    </div>
+                  </div>
+
+                  <div className="custom-row">
+                    <button className="mini-btn" onClick={openPreview}>预览主屏适配</button>
                   </div>
                   
                   <div className="audio-settings">
@@ -954,21 +1160,14 @@ function App() {
         <div className="modal-overlay">
           <div className="modal-content" style={{ width: '400px' }}>
             <h3>背景图预览与编辑</h3>
-            <p style={{ fontSize: '12px', color: '#aaa' }}>左侧为手机屏幕比例，右侧为悬浮窗比例（固定 320x480）。</p>
+            <p style={{ fontSize: '12px', color: '#aaa' }}>仅用于主屏预览。</p>
             
             <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ width: '160px', height: '280px', backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
-                  {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
+                  {bgMain && <img src={bgMain} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 'bold' }}>Main</div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: '160px', height: '240px', backgroundColor: '#1e1e1e', border: '2px solid #3b82f6', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
-                  {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
-                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 'bold' }}>PiP (2:3)</div>
                 </div>
               </div>
             </div>

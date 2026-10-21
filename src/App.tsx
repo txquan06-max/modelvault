@@ -471,11 +471,10 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* 将背景图直接渲染为底层 img 标签 */}
+      {/* 直接渲染背景图，彻底移除黑色遮罩层 */}
       {bgImage && (
         <img src={bgImage} alt="background" className="app-bg-img" />
       )}
-      {bgImage && <div className="bg-overlay" />}
       
       {toastMsg && <div className="toast">{toastMsg}</div>}
 

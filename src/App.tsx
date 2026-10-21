@@ -95,13 +95,34 @@ const FocusPanel = ({
             </div>
           </div>
 
-          <div className="task-header" style={{ justifyContent: 'center' }}>
+          <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
             <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
+            {/* 悬浮窗增加“完成该部位”按钮 */}
+            {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
+              <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
+            )}
           </div>
 
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
 
-          {lastSession ? (
+          {isFinishingPart ? (
+            <div className="inline-confirm">
+              <div className="confirm-text" style={{ fontSize: '12px' }}>🎉 {t('finishPart')}!</div>
+              <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
+                <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, fontSize: '11px', padding: '4px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
+                <label className="btn no" style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
+                  📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+              {finishPartPhoto.startsWith('data:') && (
+                <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '60px', objectFit: 'contain', borderRadius: '4px' }} />
+              )}
+              <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+                <button className="btn yes" onClick={handleConfirmFinishPart}>{t('confirm')}</button>
+                <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
+              </div>
+            </div>
+          ) : lastSession ? (
             <div className="inline-confirm">
               <div className="confirm-text" style={{ fontSize: '12px' }}>{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
               <div className="confirm-actions" style={{ flexDirection: 'column' }}>
@@ -386,8 +407,9 @@ function App() {
   const handleComplete = () => {
     const result = engineRef.current.complete();
     if (result) {
-      if (result.activeSeconds < 60) {
-        showToast(i18n.language === 'zh' ? '计时太短，无法记录。' : 'Time too short, not saved.');
+      // 将限制从 60 秒降低到 10 秒，方便测试体验
+      if (result.activeSeconds < 10) {
+        showToast(i18n.language === 'zh' ? '计时太短，无法记录（至少10秒）。' : 'Time too short, not saved (min 10s).');
         return;
       }
       AudioManager.playComplete();

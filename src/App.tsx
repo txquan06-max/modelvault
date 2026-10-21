@@ -22,7 +22,7 @@ const compressImage = (file: File): Promise<string> => {
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
+        const MAX_WIDTH = 1920; // 背景图支持更大分辨率
         let width = img.width;
         let height = img.height;
         if (width > MAX_WIDTH) {
@@ -33,7 +33,7 @@ const compressImage = (file: File): Promise<string> => {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
       img.onerror = (err) => reject(err);
     };
@@ -63,8 +63,11 @@ const FocusPanel = ({
     e.target.value = '';
   };
 
+  // 根据状态应用不同的悬浮窗 class
+  const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
+
   return (
-    <div className={isPip ? "mini-window" : "view-content focus-panel"} style={isPip ? { width: '280px', padding: '20px', margin: '0 auto', boxShadow: 'none', border: 'none' } : {}}>
+    <div className={isPip ? pipClass : "view-content focus-panel"}>
       <div className="selector-group">
         <div className="selector-row">
           <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
@@ -161,6 +164,7 @@ function App() {
   const [earnedTitles, setEarnedTitles] = useState<string[]>([]);
   const [equippedTitle, setEquippedTitle] = useState('');
   const [audioSettings, setAudioSettings] = useState<any>({});
+  const [customAudios, setCustomAudios] = useState<any>({});
   const [bgImage, setBgImage] = useState('');
   const [tempBgUrl, setTempBgUrl] = useState('');
 
@@ -202,15 +206,11 @@ function App() {
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
 
-  useEffect(() => {
-    GunplaSearch.init();
-  }, []);
+  useEffect(() => { GunplaSearch.init(); }, []);
 
   useEffect(() => {
     if (!isAddingModel) return;
-    const timer = setTimeout(() => {
-      setSearchResults(GunplaSearch.search(newModelNameInput));
-    }, 200);
+    const timer = setTimeout(() => { setSearchResults(GunplaSearch.search(newModelNameInput)); }, 200);
     return () => clearTimeout(timer);
   }, [newModelNameInput, isAddingModel]);
 
@@ -221,6 +221,7 @@ function App() {
     setEarnedTitles(StorageManager.getEarnedTitles());
     setEquippedTitle(StorageManager.getEquippedTitle());
     setAudioSettings(StorageManager.getAudioSettings());
+    setCustomAudios(StorageManager.getCustomAudios()); // 加载自定义音效
     setBgImage(StorageManager.getBgImage());
     setTempBgUrl(StorageManager.getBgImage());
     const allModels = ModelManager.getAllModels();
@@ -300,19 +301,13 @@ function App() {
   const handleConfirmStageDone = () => {
     AudioManager.playStageDone();
     const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
-    setModels(updated);
-    refreshData();
-    setLastSession(null);
-    processAchievements();
+    setModels(updated); refreshData(); setLastSession(null); processAchievements();
   };
 
   const handleFinishPart = () => {
     AudioManager.playClick();
     const assembly = currentTask?.stages.find(s => s.nameKey === 'stage_assembly');
-    if (assembly && assembly.status !== 'Completed') {
-      showToast(t('errorAssemblyRequired'));
-      return;
-    }
+    if (assembly && assembly.status !== 'Completed') { showToast(t('errorAssemblyRequired')); return; }
     setFinishPartPhoto('');
     setIsFinishingPart(true);
   };
@@ -321,33 +316,21 @@ function App() {
     AudioManager.playFinishPart();
     const result = ModelManager.finishTask(currentTaskId, finishPartPhoto);
     if (result.error) { showToast(t(result.error)); return; }
-    setModels(result.models);
-    refreshData();
-    processAchievements();
+    setModels(result.models); refreshData(); processAchievements();
     setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
     setIsFinishingPart(false);
   };
 
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
-    
-    const nameObj = selectedGunpla 
-      ? selectedGunpla.name 
-      : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
-    const seriesObj = selectedGunpla 
-      ? selectedGunpla.series 
-      : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
+    const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
+    const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks);
-    setModels(updated);
-    setCurrentModelId(updated[updated.length - 1].id);
+    setModels(updated); setCurrentModelId(updated[updated.length - 1].id);
     
-    setNewModelNameInput(''); 
-    setNewModelSeriesInput(''); 
-    setSelectedGunpla(null);
-    setIsAddingModel(false); 
-    setUseDefaultTasks(true); 
-    setSearchResults([]);
+    setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null);
+    setIsAddingModel(false); setUseDefaultTasks(true); setSearchResults([]);
     processAchievements();
   };
 
@@ -355,38 +338,66 @@ function App() {
     if (!legacyInput.trim()) return;
     const result = ModelManager.importLegacyModels(legacyInput);
     if (result.count > 0) {
-      AudioManager.playFinishPart();
-      showToast(t('importedSuccess', { count: result.count }));
-      setLegacyInput(''); setShowLegacyForm(false);
-      refreshData();
-      processAchievements();
+      AudioManager.playFinishPart(); showToast(t('importedSuccess', { count: result.count }));
+      setLegacyInput(''); setShowLegacyForm(false); refreshData(); processAchievements();
     }
   };
 
   const handleReopenModel = (modelId: string) => {
     AudioManager.playClick();
     const updated = ModelManager.reopenModel(modelId);
-    setModels(updated);
-    refreshData();
-    setCurrentModelId(modelId);
-    setActiveTab('focus');
-    setViewingModelId(null);
+    setModels(updated); refreshData(); setCurrentModelId(modelId); setActiveTab('focus'); setViewingModelId(null);
     showToast(t('reopenedForRebuild'));
   };
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); StorageManager.setUsername(e.target.value); };
-  const updateAudioSetting = (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); StorageManager.setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); };
-  const applyBackground = () => { setBgImage(tempBgUrl); StorageManager.setBgImage(tempBgUrl); };
   
+  const updateAudioSetting = (type: string, style: string) => { 
+    const newSettings = { ...audioSettings, [type]: style }; 
+    setAudioSettings(newSettings); 
+    StorageManager.setAudioSettings(newSettings); 
+    if (style !== 'off') AudioManager.previewSound(type as any); 
+  };
+
+  // 应用背景图
+  const applyBackground = () => {
+    setBgImage(tempBgUrl);
+    StorageManager.setBgImage(tempBgUrl);
+  };
+
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
         const base64 = await compressImage(file);
-        setTempBgUrl(base64); setBgImage(base64); StorageManager.setBgImage(base64);
+        setTempBgUrl(base64); 
+        setBgImage(base64); 
+        StorageManager.setBgImage(base64);
+        showToast("Background Applied!");
       } catch (err) { alert("Image processing failed"); }
     }
+    e.target.value = '';
+  };
+
+  // 自定义音效上传
+  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // 限制大小 1MB 以内
+    if (file.size > 1024 * 1024) { alert("Audio file too large (max 1MB)"); return; }
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      const newAudios = { ...customAudios, [type]: base64 };
+      setCustomAudios(newAudios);
+      StorageManager.setCustomAudios(newAudios);
+      
+      // 切换为自定义模式
+      updateAudioSetting(type, 'custom');
+    };
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 
@@ -397,7 +408,7 @@ function App() {
     AudioManager.playClick();
     if (!('documentPictureInPicture' in window)) { alert("Your browser does not support PiP. Please use Chrome/Edge."); return; }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 500 });
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
         try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
         catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
@@ -444,7 +455,7 @@ function App() {
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
   return (
-    <div className="app-container" style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div className="app-container" style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none' }}>
       {bgImage && <div className="bg-overlay" />}
       {toastMsg && <div className="toast">{toastMsg}</div>}
 
@@ -541,34 +552,14 @@ function App() {
                 {isAddingModel && (
                   <div className="inline-form vertical-form" style={{ position: 'relative' }}>
                     <div className="search-autocomplete">
-                      <input 
-                        autoFocus 
-                        placeholder={t('modelName')} 
-                        value={newModelNameInput} 
-                        onChange={e => {
-                          setNewModelNameInput(e.target.value);
-                          setSelectedGunpla(null); 
-                        }} 
-                        onBlur={() => setTimeout(() => setSearchResults([]), 200)}
-                      />
+                      <input autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} />
                       {searchResults.length > 0 && (
                         <div className="autocomplete-dropdown">
                           {searchResults.map((item, idx) => {
                             const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
                             const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
-                            
                             return (
-                              <div 
-                                key={idx} 
-                                className="autocomplete-item"
-                                onClick={() => {
-                                  setNewModelNameInput(displayName);
-                                  setNewModelSeriesInput(displaySeries);
-                                  setNewModelGrade(item.grade);
-                                  setSelectedGunpla(item); 
-                                  setSearchResults([]);
-                                }}
-                              >
+                              <div key={idx} className="autocomplete-item" onClick={() => { setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span className="ac-grade">{item.grade}</span>
                                   <strong style={{ color: '#fff' }}>{displayName}</strong>
@@ -581,7 +572,7 @@ function App() {
                       )}
                     </div>
                     
-                    <select value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    <select value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
                     <input placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} />
                     <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => setUseDefaultTasks(e.target.checked)} />{t('useDefaultTasks')}</label>
                     <div style={{display:'flex', gap:'8px', width:'100%'}}>
@@ -712,20 +703,31 @@ function App() {
                       {bgImage && <button className="mini-btn" onClick={() => { setBgImage(''); setTempBgUrl(''); StorageManager.setBgImage(''); }}>{t('clear')}</button>}
                     </div>
                   </div>
+                  
                   <div className="audio-settings">
                     {['click', 'stage', 'timebox', 'complete'].map(type => {
                       const labelMap: any = { click: t('audioClick'), stage: t('audioStage'), timebox: t('audioTimebox'), complete: t('audioComplete') };
                       return (
                         <div key={type} className="audio-row">
                           <span>{labelMap[type]}</span>
-                          <select value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
-                            <option value="default">Default</option><option value="chiptune">8-Bit</option><option value="soft">Soft</option><option value="off">Off</option>
-                          </select>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <select value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
+                              <option value="default">Default</option>
+                              <option value="chiptune">8-Bit</option>
+                              <option value="soft">Soft</option>
+                              <option value="off">Off</option>
+                              {customAudios[type] && <option value="custom">Custom</option>}
+                            </select>
+                            <label className="mini-btn" style={{ padding: '2px 6px', cursor: 'pointer', margin: 0 }} title="Upload MP3/WAV">
+                              🎵<input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(type, e)} style={{ display: 'none' }} />
+                            </label>
+                          </div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
+
                 <div className="shop-section">
                   <div className="shop-header"><h4>🏪 {t('titlesShop')}</h4><span>🪙 {coinsBalance}</span></div>
                   <div className="title-list">

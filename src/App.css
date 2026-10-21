@@ -901,3 +901,45 @@ body {
   color: #fff;
   border-color: #fff;
 }
+
+/* 修复背景图全屏铺满 */
+.app-container {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed;
+}
+
+/* =========================================
+   PiP 悬浮窗自适应与呼吸灯
+   ========================================= */
+.pip-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 12px;
+  background: #2d2d2d;
+  border: 2px solid transparent;
+  transition: all 0.5s ease;
+  overflow: hidden;
+}
+
+/* 计时中的呼吸灯特效 */
+.pip-running {
+  animation: pip-breathing 2s ease-in-out infinite alternate;
+}
+
+@keyframes pip-breathing {
+  0% { border-color: #333; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.1); }
+  100% { border-color: #3b82f6; box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.5); }
+}
+
+/* 在 PiP 里缩小字体边距，完全自适应 */
+.pip-container .timer-display { font-size: clamp(32px, 15vh, 64px); margin: 10px 0; }
+.pip-container .task-name { font-size: clamp(14px, 4vw, 18px); }
+.pip-container .btn { padding: clamp(6px, 2vh, 12px); font-size: clamp(10px, 3vw, 14px); }
+.pip-container select { padding: 4px; font-size: clamp(10px, 3vw, 14px); }

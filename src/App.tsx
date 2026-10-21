@@ -69,12 +69,12 @@ const FocusPanel = ({
     <div className={isPip ? pipClass : "view-content focus-panel"}>
       <div className="selector-group">
         <div className="selector-row">
-          <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
+          <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
             {models.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
           </select>
         </div>
         <div className="selector-row">
-          <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
+          <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
             {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
           </select>
         </div>
@@ -115,7 +115,7 @@ const FocusPanel = ({
         <div className="inline-confirm">
           <div className="confirm-text">🎉 {t('finishPart')}!</div>
           <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-            <input type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} />
+            <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} />
             <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
               📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
             </label>
@@ -369,7 +369,7 @@ function App() {
       StorageManager.setBgImage(tempBgUrl);
       showToast("Background Applied!");
     } catch (err) {
-      alert("本地存储空间不足，无法保存背景图！请尝试更小的图片或清理旧数据。");
+      alert("本地存储空间不足，无法保存背景图！请尝试更小的图片。");
     }
   };
 
@@ -383,9 +383,9 @@ function App() {
           return;
         }
         setTempBgUrl(base64); 
+        setBgImage(base64); // 选图直接应用
         try {
           StorageManager.setBgImage(base64);
-          setBgImage(base64);
           showToast("Background Applied!");
         } catch (e) {
           alert("本地存储空间已满，背景图未能保存。请前往“数据备份”导出数据后，清理旧图片。");
@@ -470,19 +470,10 @@ function App() {
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
   return (
-    <div className="app-container">
-      {bgImage && (
-        <img 
-          src={bgImage} 
-          alt="background" 
-          className="app-bg-img" 
-          onError={() => {
-            alert("图片加载失败，请检查 URL 是否有效，或文件是否损坏。");
-            setBgImage('');
-            StorageManager.setBgImage('');
-          }}
-        />
-      )}
+    <div 
+      className="app-container" 
+      style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none' }}
+    >
       {bgImage && <div className="bg-overlay" />}
       
       {toastMsg && <div className="toast">{toastMsg}</div>}
@@ -580,7 +571,7 @@ function App() {
                 {isAddingModel && (
                   <div className="inline-form vertical-form" style={{ position: 'relative' }}>
                     <div className="search-autocomplete">
-                      <input autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} />
+                      <input id="new-model-name" autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} />
                       {searchResults.length > 0 && (
                         <div className="autocomplete-dropdown">
                           {searchResults.map((item, idx) => {
@@ -600,8 +591,8 @@ function App() {
                       )}
                     </div>
                     
-                    <select value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    <input placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} />
+                    <select id="new-model-grade" value={newModelGrade} onChange={e => setNewModelGrade(e.target.value)}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} />
                     <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => setUseDefaultTasks(e.target.checked)} />{t('useDefaultTasks')}</label>
                     <div style={{display:'flex', gap:'8px', width:'100%'}}>
                       <button className="btn start" style={{flex: 1, padding: '6px'}} onClick={handleAddModel}>{t('save')}</button>
@@ -612,7 +603,7 @@ function App() {
 
                 {isAddingTask && (
                   <div className="inline-form">
-                    <input autoFocus placeholder={t('taskName')} value={newTaskName} onChange={e => setNewTaskName(e.target.value)} onKeyDown={e => {
+                    <input id="new-task-name" autoFocus placeholder={t('taskName')} value={newTaskName} onChange={e => setNewTaskName(e.target.value)} onKeyDown={e => {
                       if (e.key === 'Enter' && newTaskName.trim()) {
                         const updated = ModelManager.addTask(currentModelId, newTaskName.trim());
                         setModels(updated); setNewTaskName(''); setIsAddingTask(false);
@@ -683,7 +674,7 @@ function App() {
                 <div className="profile-header">
                   <div className="avatar">🧑‍🔧</div>
                   <div className="profile-info">
-                    <input type="text" value={username} onChange={handleUsernameChange} className="username-input" />
+                    <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" />
                     {equippedTitleDef && <div className="equipped-title">[{t(equippedTitleDef.nameKey)}]</div>}
                   </div>
                 </div>
@@ -708,7 +699,7 @@ function App() {
                       <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <textarea rows={4} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} placeholder={t('legacyPlaceholder')} className="url-input" style={{ resize: 'vertical' }} />
+                        <textarea id="legacy-input" rows={4} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} placeholder={t('legacyPlaceholder')} className="url-input" style={{ resize: 'vertical' }} />
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport}>{t('importBtn')}</button>
                           <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setShowLegacyForm(false)}>{t('cancel')}</button>
@@ -723,7 +714,7 @@ function App() {
                   <div className="custom-row">
                     <span>{t('bgUrl')}:</span>
                     <div style={{display:'flex', gap:'8px', width:'100%'}}>
-                      <input type="text" value={tempBgUrl.startsWith('data:') ? t('localImageSelected') : tempBgUrl} onChange={e => setTempBgUrl(e.target.value)} placeholder="https://..." className="url-input" disabled={tempBgUrl.startsWith('data:')} />
+                      <input id="bg-url-input" type="text" value={tempBgUrl.startsWith('data:') ? t('localImageSelected') : tempBgUrl} onChange={e => setTempBgUrl(e.target.value)} placeholder="https://..." className="url-input" disabled={tempBgUrl.startsWith('data:')} />
                       <button className="mini-btn" onClick={applyBackground}>{t('apply')}</button>
                       <label className="mini-btn" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
                         📁<input type="file" accept="image/*" onChange={handleBgFileUpload} style={{ display: 'none' }} />
@@ -739,7 +730,7 @@ function App() {
                         <div key={type} className="audio-row">
                           <span>{labelMap[type]}</span>
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <select value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
+                            <select id={`audio-select-${type}`} value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
                               <option value="default">Default</option>
                               <option value="chiptune">8-Bit</option>
                               <option value="soft">Soft</option>

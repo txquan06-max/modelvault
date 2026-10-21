@@ -286,6 +286,18 @@ function App() {
     GunplaSearch.init();
   }, []);
 
+  // 拦截意外刷新，防止计时丢失
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (timerState === 'Running') {
+        e.preventDefault();
+        e.returnValue = '你有正在进行的计时，刷新或关闭将丢失当前计时！Are you sure?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [timerState]);
+
   useEffect(() => {
     if (!isAddingModel) return;
     const timer = setTimeout(() => { setSearchResults(GunplaSearch.search(newModelNameInput)); }, 200);
@@ -1165,6 +1177,12 @@ function App() {
                   <div className="backup-actions">
                     <button className="backup-btn" onClick={exportData}>{t('exportData')}</button>
                     <label className="backup-btn import-label">{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
+                  </div>
+                  <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
+                    <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.0</p>
+                    <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+                      🐞 遇到 Bug？点击提交反馈
+                    </a>
                   </div>
                 </div>
               </div>

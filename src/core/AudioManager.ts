@@ -13,17 +13,20 @@ export class AudioManager {
   }
 
   private static playTone(freq: number, type: OscillatorType, duration: number, vol: number = 0.1, delay: number = 0) {
-    const ctx = this.getCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
-    // 增加声音衰减，让声音更干脆（水滴感）
-    gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
-    osc.start(ctx.currentTime + delay);
-    osc.stop(ctx.currentTime + delay + duration);
+    try {
+      const ctx = this.getCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+      gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + duration);
+    } catch (e) {
+      // 忽略音频并发或未交互拦截报错
+    }
   }
 
   private static playCustom(type: SoundType): boolean {
@@ -48,14 +51,12 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('click')) return;
     
-    // 清脆、短促的点击声
     if (style === 'chiptune') this.playTone(1200, 'square', 0.03, 0.04);
     else if (style === 'soft') this.playTone(600, 'sine', 0.05, 0.04);
     else this.playTone(900, 'sine', 0.04, 0.05);
   }
 
   static playStart() { 
-    // 上升双音，令人振奋
     this.playTone(600, 'sine', 0.08, 0.08); 
     this.playTone(900, 'sine', 0.15, 0.08, 0.08); 
   }
@@ -65,7 +66,6 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('complete')) return;
 
-    // 大三和弦加高音，非常上头
     const notes = [523.25, 659.25, 783.99, 1046.50];
     notes.forEach((f, i) => {
       if (style === 'chiptune') this.playTone(f * 2, 'square', 0.15, 0.06, i * 0.08);
@@ -79,7 +79,6 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('stage')) return;
 
-    // 类似金币入袋的清脆叮当声
     const notes = [1046.50, 1318.51, 1567.98];
     notes.forEach((f, i) => {
       if (style === 'chiptune') this.playTone(f, 'square', 0.1, 0.06, i * 0.05);

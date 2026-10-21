@@ -4,12 +4,14 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 import { StorageManager } from './core/StorageManager';
+import { ErrorBoundary } from './ErrorBoundary';
 
-// 初始化存储（包含老数据自动迁移），然后再渲染界面
 StorageManager.init().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
 });

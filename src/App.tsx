@@ -71,7 +71,6 @@ const FocusPanel = ({
   };
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
-
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
 
   if (isPip) {
@@ -83,10 +82,85 @@ const FocusPanel = ({
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
         
         <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-          <div className="selector-group" style={{ marginBottom: '0' }}>
+          {availableModels.length === 0 ? (
+            <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginTop: '40px' }}>暂无制作中的模型<br/>请去主页添加</div>
+          ) : (
+            <>
+              <div className="selector-group" style={{ marginBottom: '0' }}>
+                <div className="selector-row">
+                  <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
+                    {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
+                  </select>
+                </div>
+                <div className="selector-row">
+                  <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
+                    {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
+                <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
+                {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
+                  <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
+                )}
+              </div>
+
+              <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
+
+              {isFinishingPart ? (
+                <div className="inline-confirm">
+                  <div className="confirm-text" style={{ fontSize: '12px' }}>🎉 {t('finishPart')}!</div>
+                  <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
+                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, fontSize: '11px', padding: '4px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
+                    <label className="btn no" style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
+                      📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
+                  {finishPartPhoto.startsWith('data:') && (
+                    <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '60px', objectFit: 'contain', borderRadius: '4px' }} />
+                  )}
+                  <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+                    <button className="btn yes" onClick={handleConfirmFinishPart}>{t('confirm')}</button>
+                    <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
+                  </div>
+                </div>
+              ) : lastSession ? (
+                <div className="inline-confirm">
+                  <div className="confirm-text" style={{ fontSize: '12px' }}>{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
+                  <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+                    <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
+                    <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="controls" style={{ flexDirection: 'column' }}>
+                  {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+                  {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
+                  {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
+                </div>
+              )}
+              {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="view-content focus-panel">
+      {availableModels.length === 0 ? (
+         <div className="empty-state" style={{ marginTop: '20px' }}>
+           没有进行中的模型啦！<br/>
+           点击上方“添加模型”开始新的挑战吧 🚀
+         </div>
+      ) : (
+        <>
+          <div className="selector-group">
             <div className="selector-row">
               <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
-                {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
+                {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
               </select>
             </div>
             <div className="selector-row">
@@ -95,137 +169,77 @@ const FocusPanel = ({
               </select>
             </div>
           </div>
-
-          <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
-            <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
+          <div className="task-header">
+            <div className="task-name">{currentTaskName}{currentModel?.isRebuilding && <span className="rebuild-badge">🔧 {t('rebuilding')}</span>}</div>
             {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
-              <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
+               <button className="finish-part-btn" onClick={handleFinishPart}>✓ {t('finishPart')}</button>
             )}
           </div>
-
-          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
-
+          <div className={`task-status ${currentTask?.status === 'Completed' ? 'status-completed' : currentTask?.status === 'InProgress' ? 'status-inprogress' : 'status-notstarted'}`}>
+            {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
+          </div>
+          {timerState === 'Idle' && !lastSession && timeboxElapsed === 0 && !isFinishingPart && (
+            <div className="timebox-selector">
+              <span className="timebox-label">{t('timebox')}:</span>
+              {[0, 15, 30, 60].map(min => (
+                <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setTimeboxTarget(min * 60); }}>
+                  {min === 0 ? t('timeboxNone') : `${min}m`}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`}>{formatTime(activeSeconds)}</div>
+          {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
+            <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
+          )}
+          {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
+            <div className="stages-panel">
+              {currentTask.stages.map((stage: any) => (
+                <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
+                  {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
+                </button>
+              ))}
+            </div>
+          )}
           {isFinishingPart ? (
             <div className="inline-confirm">
-              <div className="confirm-text" style={{ fontSize: '12px' }}>🎉 {t('finishPart')}!</div>
+              <div className="confirm-text">🎉 {t('finishPart')}!</div>
               <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, fontSize: '11px', padding: '4px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
-                <label className="btn no" style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
+                <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
+                <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
                   📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
               </div>
               {finishPartPhoto.startsWith('data:') && (
-                <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '60px', objectFit: 'contain', borderRadius: '4px' }} />
+                <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px', marginTop: '4px' }} />
               )}
-              <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+              <div className="confirm-actions">
                 <button className="btn yes" onClick={handleConfirmFinishPart}>{t('confirm')}</button>
                 <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
               </div>
             </div>
           ) : lastSession ? (
             <div className="inline-confirm">
-              <div className="confirm-text" style={{ fontSize: '12px' }}>{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
-              <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+              <div className="confirm-text">{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
+              <div className="confirm-actions">
                 <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
                 <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
               </div>
             </div>
           ) : (
-            <div className="controls" style={{ flexDirection: 'column' }}>
-              {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+            <div className="controls">
+              {timerState === 'Idle' && (
+                <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>
+                  {t('start')}
+                </button>
+              )}
               {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
               {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
             </div>
           )}
-          {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="view-content focus-panel">
-      <div className="selector-group">
-        <div className="selector-row">
-          <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
-            {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
-          </select>
-        </div>
-        <div className="selector-row">
-          <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
-            {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="task-header">
-        <div className="task-name">{currentTaskName}{currentModel?.isRebuilding && <span className="rebuild-badge">🔧 {t('rebuilding')}</span>}</div>
-        {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
-           <button className="finish-part-btn" onClick={handleFinishPart}>✓ {t('finishPart')}</button>
-        )}
-      </div>
-      <div className={`task-status ${currentTask?.status === 'Completed' ? 'status-completed' : currentTask?.status === 'InProgress' ? 'status-inprogress' : 'status-notstarted'}`}>
-        {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
-      </div>
-      {timerState === 'Idle' && !lastSession && timeboxElapsed === 0 && !isFinishingPart && (
-        <div className="timebox-selector">
-          <span className="timebox-label">{t('timebox')}:</span>
-          {[0, 15, 30, 60].map(min => (
-            <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setTimeboxTarget(min * 60); }}>
-              {min === 0 ? t('timeboxNone') : `${min}m`}
-            </button>
-          ))}
-        </div>
+          {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete}>{t('complete')}</button>}
+        </>
       )}
-      <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`}>{formatTime(activeSeconds)}</div>
-      {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
-        <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
-      )}
-      {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
-        <div className="stages-panel">
-          {currentTask.stages.map((stage: any) => (
-            <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
-              {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
-            </button>
-          ))}
-        </div>
-      )}
-      {isFinishingPart ? (
-        <div className="inline-confirm">
-          <div className="confirm-text">🎉 {t('finishPart')}!</div>
-          <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-            <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
-            <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
-              📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-            </label>
-          </div>
-          {finishPartPhoto.startsWith('data:') && (
-            <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px', marginTop: '4px' }} />
-          )}
-          <div className="confirm-actions">
-            <button className="btn yes" onClick={handleConfirmFinishPart}>{t('confirm')}</button>
-            <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
-          </div>
-        </div>
-      ) : lastSession ? (
-        <div className="inline-confirm">
-          <div className="confirm-text">{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
-          <div className="confirm-actions">
-            <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
-            <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
-          </div>
-        </div>
-      ) : (
-        <div className="controls">
-          {timerState === 'Idle' && (
-            <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>
-              {t('start')}
-            </button>
-          )}
-          {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
-          {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
-        </div>
-      )}
-      {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete}>{t('complete')}</button>}
     </div>
   );
 };
@@ -323,6 +337,18 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [timerState]);
 
+  // 解决切到后台再切回来，UI时间刷新延迟的问题
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const secs = engineRef.current.getActiveSeconds();
+        setActiveSeconds(secs);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   useEffect(() => {
     if (!isAddingModel) return;
     const timer = setTimeout(() => { setSearchResults(GunplaSearch.search(newModelNameInput)); }, 200);
@@ -355,7 +381,16 @@ function App() {
     setBgPosition(StorageManager.getBgPosition());
     const allModels = ModelManager.getAllModels();
     setModels(allModels);
-    if (!currentModelId && allModels.length > 0) setCurrentModelId(allModels[0].id);
+
+    // 自动过滤并选中第一个可用的模型
+    const available = allModels.filter(m => m.status !== 'Completed');
+    if (available.length > 0) {
+      if (!currentModelId || !available.some(m => m.id === currentModelId)) {
+        setCurrentModelId(available[0].id);
+      }
+    } else {
+      setCurrentModelId(''); // 全部完成则清空当前选择，UI会显示空状态
+    }
   };
 
   useEffect(() => { refreshData(); }, []);
@@ -431,10 +466,27 @@ function App() {
     }
   };
 
+  // 统一检查模型是否彻底完成的逻辑
+  const checkAndPromptCompleteModel = (updatedModels: Model[], modelId?: string) => {
+    let targetId = modelId;
+    if (!targetId) {
+       const m = updatedModels.find(m => m.tasks.some(t => t.id === currentTaskId));
+       targetId = m?.id;
+    }
+    if (!targetId) return;
+
+    const targetModel = updatedModels.find(m => m.id === targetId);
+    if (targetModel && targetModel.tasks.length > 0 && targetModel.tasks.every(t => t.status === 'Completed') && targetModel.status !== 'Completed') {
+      setShowCompleteModelConfirm(true);
+      setCompleteModelId(targetId);
+    }
+  };
+
   const handleConfirmStageDone = () => {
     AudioManager.playStageDone();
     const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
     setModels(updated); refreshData(); setLastSession(null); processAchievements();
+    checkAndPromptCompleteModel(updated);
   };
 
   const handleFinishPart = () => {
@@ -453,12 +505,7 @@ function App() {
     setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
     setIsFinishingPart(false);
 
-    // 检查是否整个模型都完成了
-    const currentModel = result.models.find(m => m.tasks.some(t => t.id === currentTaskId));
-    if (currentModel && currentModel.tasks.every(t => t.status === 'Completed')) {
-      setShowCompleteModelConfirm(true);
-      setCompleteModelId(currentModel.id);
-    }
+    checkAndPromptCompleteModel(result.models);
   };
 
   const handleConfirmCompleteModel = () => {
@@ -546,7 +593,6 @@ function App() {
     setViewingModelId(null);
   };
 
-  // 启动历史模型改造的确认逻辑
   const handleStartRebuild = (taskId: string) => {
     setPendingRebuildTask(taskId);
     const stages = viewingModel?.tasks.find(t => t.name === 'part_legacy')?.stages.filter(s => s.status === 'Completed').map(s => s.nameKey) || ['stage_assembly'];
@@ -577,6 +623,7 @@ function App() {
     const updated = ModelManager.updateImportedModelStatus(viewingModelId, importedStages);
     setModels(updated);
     setIsEditingImportedStatus(false);
+    checkAndPromptCompleteModel(updated, viewingModelId);
   };
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };

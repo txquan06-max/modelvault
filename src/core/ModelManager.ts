@@ -27,7 +27,7 @@ export interface Model {
   status: 'NotStarted' | 'InProgress' | 'Completed';
   coverImage?: string;
   isRebuilding?: boolean;
-  isImported?: boolean; // 标记为历史模型
+  isImported?: boolean; 
   tasks: Task[];
 }
 
@@ -41,7 +41,6 @@ export const DEFAULT_TASK_KEYS = ['part_head', 'part_torso', 'part_waist', 'part
 
 const generateStages = () => STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'NotStarted' as StageStatus, xpReward: s.xp }));
 
-// 默认历史模型只完成素组
 const generateImportedTask = (modelId: string) => ({
   id: crypto.randomUUID(), 
   modelId, 
@@ -55,21 +54,10 @@ const generateImportedTask = (modelId: string) => ({
   }))
 });
 
-const DEFAULT_DATA: Model[] = [
-  {
-    id: 'model-1',
-    name: { en: 'MG Barbatos', zh: 'MG 巴巴托斯' },
-    series: { en: 'Iron-Blooded Orphans', zh: '铁血的奥尔芬斯' },
-    grade: 'MG',
-    status: 'NotStarted',
-    tasks: [{ id: 'task-1', modelId: 'model-1', name: 'part_right_arm', status: 'NotStarted', stages: generateStages() }]
-  }
-];
-
 export class ModelManager {
   static getAllModels(): Model[] {
     const coreData = StorageManager.getRawStorage();
-    let models = coreData.models;
+    let models = coreData.models || [];
 
     models = models.map((m: any) => {
       const isLegacyName = typeof m.name === 'string';
@@ -80,15 +68,18 @@ export class ModelManager {
       };
     });
 
-    if (models.length === 0) {
-      StorageManager.saveRawStorage(DEFAULT_DATA);
-      return DEFAULT_DATA;
-    }
+    // 移除了默认的 DEFAULT_DATA，让新用户进来是干净的
     return models;
   }
 
   static saveModels(models: Model[]) {
     StorageManager.saveRawStorage(models);
+  }
+
+  static checkModelComplete(modelId: string): boolean {
+    const model = this.getAllModels().find(m => m.id === modelId);
+    if (!model) return false;
+    return model.tasks.length > 0 && model.tasks.every(t => t.status === 'Completed');
   }
 
   static deleteModel(modelId: string): Model[] {
@@ -155,7 +146,6 @@ export class ModelManager {
     return { models, count };
   }
 
-  // 开始历史模型的改造（勾选流程后调用）
   static startLegacyRebuild(modelId: string, completedStageKeys: string[]): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
@@ -163,24 +153,20 @@ export class ModelManager {
       model.isRebuilding = true;
       model.status = 'InProgress';
       
-      // 如果之前只有默认的历史任务，补齐默认部位，方便用户做其他部位
       if (model.tasks.length <= 1) {
          DEFAULT_TASK_KEYS.forEach(key => {
-           // 避免重复添加同名部位
            if (!model.tasks.some(t => t.name === key)) {
              model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() });
            }
          });
       }
 
-      // 更新 part_legacy 的阶段状态
       const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
       if (legacyTask) {
-        legacyTask.status = 'InProgress'; // 变为改造中
+        legacyTask.status = 'InProgress';
         legacyTask.stages.forEach(stage => {
           stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
         });
-        // 强制素组为完成
         const assembly = legacyTask.stages.find(s => s.nameKey === 'stage_assembly');
         if (assembly) assembly.status = 'Completed';
       }
@@ -189,7 +175,6 @@ export class ModelManager {
     return models;
   }
 
-  // 强制完成整个模型
   static finishModel(modelId: string): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
@@ -259,7 +244,7 @@ export class ModelManager {
     }
     if (changedModelId) { 
       const model = models.find(m => m.id === changedModelId)!; 
-      if (model.tasks.every(t => t.status === 'Completed')) { model.status = 'Completed'; model.isRebuilding = false; } 
+      // 注意：阶段完成不代表部位完成，部位完成才是通过 finishTask
     }
     this.saveModels(models); 
     if (isStageCompletedNow) UserManager.addCoins(10); 

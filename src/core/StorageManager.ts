@@ -23,6 +23,11 @@ const KEYS = {
   REMINDER_INTERVAL: 'mv_reminder_interval',
 };
 
+const DEFAULT_AUDIO = JSON.stringify({
+  click: 'default', start: 'default', pause: 'default', complete: 'default',
+  finishPart: 'default', stage: 'default', timebox: 'default', achievement: 'default',
+});
+
 const memoryCache: Record<string, string> = {};
 let isInit = false;
 
@@ -61,19 +66,14 @@ export const StorageManager = {
     }
   },
 
-  // 新增：安全重置所有数据
   async resetAll() {
     try {
-      // 1. 清空 localforage 中的数据库
       await localforage.clear();
-      // 2. 断开连接，否则浏览器会阻塞后续的删除或刷新操作
       await localforage.dropInstance({ name: 'ModelVault' });
     } catch (e) {
       console.warn('Failed to clear IndexedDB', e);
     }
-    // 3. 清空 localStorage
     localStorage.clear();
-    // 4. 清空内存缓存
     Object.keys(memoryCache).forEach((key) => delete memoryCache[key]);
     isInit = false;
   },
@@ -98,7 +98,12 @@ export const StorageManager = {
   getCoinsTotalEarned: () => Number(memoryCache[KEYS.COINS_TOTAL_EARNED]) || 0,
   getEquippedTitle: () => memoryCache[KEYS.EQUIPPED_TITLE] || '',
   getEarnedTitles: () => JSON.parse(memoryCache[KEYS.EARNED_TITLES] || '[]'),
-  getAudioSettings: () => JSON.parse(memoryCache[KEYS.AUDIO_SETTINGS] || '{"click":"default","stage":"default","timebox":"default","complete":"default"}'),
+  getAudioSettings: () => {
+    const stored = memoryCache[KEYS.AUDIO_SETTINGS];
+    const defaults = JSON.parse(DEFAULT_AUDIO);
+    if (!stored) return defaults;
+    try { return { ...defaults, ...JSON.parse(stored) }; } catch { return defaults; }
+  },
   getCustomAudios: () => JSON.parse(memoryCache[KEYS.CUSTOM_AUDIOS] || '{}'),
   getBgMain: () => memoryCache[KEYS.BG_IMAGE_MAIN] || '',
   getBgPip: () => memoryCache[KEYS.BG_IMAGE_PIP] || '',

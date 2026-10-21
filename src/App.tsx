@@ -471,11 +471,10 @@ function App() {
   };
 
   const handleStart = () => { AudioManager.playStart(); engineRef.current.start(); setModels(ModelManager.startStage(currentTaskId, currentStageId)); setHasPlayedTimeboxSound(false); refreshData(); };
-  const handlePause = () => { AudioManager.playClick(); engineRef.current.pause(); };
-  const handleResume = () => { AudioManager.playClick(); engineRef.current.resume(); };
+  const handlePause = () => { AudioManager.playPause(); engineRef.current.pause(); };
+  const handleResume = () => { AudioManager.playStart(); engineRef.current.resume(); };
   
   const handleComplete = () => {
-    AudioManager.playClick();
     const result = engineRef.current.complete();
     if (result) {
       if (result.activeSeconds < 10) {
@@ -657,10 +656,10 @@ function App() {
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); StorageManager.setUsername(e.target.value); };
   
   const updateAudioSetting = (type: string, style: string) => { 
-  const newSettings = { ...audioSettings, [type]: style }; 
-  setAudioSettings(newSettings); 
-  StorageManager.setAudioSettings(newSettings); 
-  if (style !== 'off') AudioManager.previewSound(type as any); 
+    const newSettings = { ...audioSettings, [type]: style }; 
+    setAudioSettings(newSettings); 
+    StorageManager.setAudioSettings(newSettings); 
+    if (style !== 'off') AudioManager.previewSound(type as any); 
   };
 
   const openPreview = () => {
@@ -1293,8 +1292,17 @@ function App() {
                   </div>
                   
                   <div className="audio-settings">
-                    {['click', 'stage', 'timebox', 'complete'].map(type => {
-                      const labelMap: any = { click: t('audioClick'), stage: t('audioStage'), timebox: t('audioTimebox'), complete: t('audioComplete') };
+                    {(['click', 'start', 'pause', 'complete', 'finishPart', 'stage', 'timebox', 'achievement'] as const).map(type => {
+                      const labelMap: any = { 
+                        click: t('audioClick'), 
+                        start: t('audioStart'),
+                        pause: t('audioPause'),
+                        complete: t('audioComplete'), 
+                        finishPart: t('audioFinishPart'),
+                        stage: t('audioStage'), 
+                        timebox: t('audioTimebox'),
+                        achievement: t('audioAchievement')
+                      };
                       return (
                         <div key={type} className="audio-row">
                           <span>{labelMap[type]}</span>

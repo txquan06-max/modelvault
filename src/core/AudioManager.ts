@@ -1,17 +1,27 @@
 import { createUISFX } from 'uisfx';
 import { StorageManager } from './StorageManager';
 
-type SoundType = 'click' | 'stage' | 'timebox' | 'complete';
-type AudioStyle = 'default' | 'chiptune' | 'soft' | 'off' | 'custom';
+export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' | 'stage' | 'timebox' | 'achievement';
 
-// 1. 默认使用 'glass' 风格（明亮、清脆）
 const ui = createUISFX({ pack: 'glass' });
 
-// 将设置中的风格映射到 uisfx 的 pack 名称
+// 用户风格 → uisfx pack 名称映射
 const STYLE_TO_PACK: Record<string, string> = {
-  'default': 'glass',      // 默认：明亮清脆
-  'chiptune': 'arcade',    // 复古：街机芯片
-  'soft': 'soft',          // 柔和：温暖
+  'default': 'glass',
+  'chiptune': 'arcade',
+  'soft': 'soft',
+};
+
+// 语义事件 → uisfx cue 名称映射
+const CUE_MAP: Record<SoundType, string> = {
+  click: 'press',
+  start: 'start',
+  pause: 'pause',
+  complete: 'complete',
+  finishPart: 'double-click',
+  stage: 'select',
+  timebox: 'focus',
+  achievement: 'long-press',
 };
 
 export class AudioManager {
@@ -21,15 +31,12 @@ export class AudioManager {
     try { await ui.unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
   }
 
-  // 新增：根据设置切换音色包
-  private static syncPack(type: SoundType) {
-    const settings = StorageManager.getAudioSettings();
-    const style = settings[type] || 'default';
+  private static syncPack(style: string) {
     const targetPack = STYLE_TO_PACK[style] || 'glass';
-    
     if (targetPack !== this.currentPack) {
       this.currentPack = targetPack;
-      ui.setPack(targetPack);
+      // uisfx 的 setPack 类型较严格，用 any 断言以兼容 string 变量
+      ui.setPack(targetPack as any);
     }
   }
 
@@ -39,64 +46,29 @@ export class AudioManager {
     if (base64) {
       const audio = new Audio(base64);
       audio.volume = 0.5;
-      audio.play().catch(e => console.warn("Audio play failed", e));
+      audio.play().catch(e => console.warn('Audio play failed', e));
       return true;
     }
     return false;
   }
 
-  private static getStyle(type: SoundType): AudioStyle {
-    return StorageManager.getAudioSettings()[type] || 'default';
-  }
-
-  static playClick() {
-    const style = this.getStyle('click');
+  private static play(type: SoundType) {
+    const settings = StorageManager.getAudioSettings();
+    const style = settings[type] || 'default';
     if (style === 'off') return;
-    if (style === 'custom' && this.playCustom('click')) return;
-    this.syncPack('click');
-    ui.play('press');
+    if (style === 'custom' && this.playCustom(type)) return;
+    this.syncPack(style);
+    ui.play(CUE_MAP[type] as any);
   }
 
-  static playStart() { 
-    ui.play('start'); 
-  }
+  static playClick() { this.play('click'); }
+  static playStart() { this.play('start'); }
+  static playPause() { this.play('pause'); }
+  static playComplete() { this.play('complete'); }
+  static playFinishPart() { this.play('finishPart'); }
+  static playStageDone() { this.play('stage'); }
+  static playTimeboxEnd() { this.play('timebox'); }
+  static playAchievement() { this.play('achievement'); }
 
-  static playComplete() {
-    const style = this.getStyle('complete');
-    if (style === 'off') return;
-    if (style === 'custom' && this.playCustom('complete')) return;
-    this.syncPack('complete');
-    ui.play('complete');
-  }
-
-  static playStageDone() {
-    const style = this.getStyle('stage');
-    if (style === 'off') return;
-    if (style === 'custom' && this.playCustom('stage')) return;
-    this.syncPack('stage');
-    ui.play('select');
-  }
-
-  static playFinishPart() { 
-    ui.play('double-click'); 
-  }
-  
-  static playAchievement() { 
-    ui.play('long-press'); 
-  }
-
-  static playTimeboxEnd() {
-    const style = this.getStyle('timebox');
-    if (style === 'off') return;
-    if (style === 'custom' && this.playCustom('timebox')) return;
-    this.syncPack('timebox');
-    ui.play('focus');
-  }
-
-  static previewSound(type: SoundType) {
-    if (type === 'click') this.playClick();
-    if (type === 'stage') this.playStageDone();
-    if (type === 'timebox') this.playTimeboxEnd();
-    if (type === 'complete') this.playComplete();
-  }
+  static previewSound(type: SoundType) { this.play(type); }
 }

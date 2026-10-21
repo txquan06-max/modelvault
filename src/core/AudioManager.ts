@@ -4,16 +4,32 @@ import { StorageManager } from './StorageManager';
 type SoundType = 'click' | 'stage' | 'timebox' | 'complete';
 type AudioStyle = 'default' | 'chiptune' | 'soft' | 'off' | 'custom';
 
-// 初始化 uisfx，使用 arcade (街机) 风格，清脆且上头
-const ui = createUISFX({ pack: 'arcade' });
+// 1. 默认使用 'glass' 风格（明亮、清脆）
+const ui = createUISFX({ pack: 'glass' });
+
+// 将设置中的风格映射到 uisfx 的 pack 名称
+const STYLE_TO_PACK: Record<string, string> = {
+  'default': 'glass',      // 默认：明亮清脆
+  'chiptune': 'arcade',    // 复古：街机芯片
+  'soft': 'soft',          // 柔和：温暖
+};
 
 export class AudioManager {
-  // 用户首次交互时解锁音频
+  private static currentPack = 'glass';
+
   static async unlock() {
-    try {
-      await ui.unlock();
-    } catch (e) {
-      console.warn('Audio unlock failed', e);
+    try { await ui.unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
+  }
+
+  // 新增：根据设置切换音色包
+  private static syncPack(type: SoundType) {
+    const settings = StorageManager.getAudioSettings();
+    const style = settings[type] || 'default';
+    const targetPack = STYLE_TO_PACK[style] || 'glass';
+    
+    if (targetPack !== this.currentPack) {
+      this.currentPack = targetPack;
+      ui.setPack(targetPack);
     }
   }
 
@@ -30,17 +46,15 @@ export class AudioManager {
   }
 
   private static getStyle(type: SoundType): AudioStyle {
-    const settings = StorageManager.getAudioSettings();
-    return settings[type] || 'default';
+    return StorageManager.getAudioSettings()[type] || 'default';
   }
 
   static playClick() {
     const style = this.getStyle('click');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('click')) return;
-    
-    // 替换为 uisfx 支持的 press
-    ui.play('press'); 
+    this.syncPack('click');
+    ui.play('press');
   }
 
   static playStart() { 
@@ -51,7 +65,7 @@ export class AudioManager {
     const style = this.getStyle('complete');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('complete')) return;
-
+    this.syncPack('complete');
     ui.play('complete');
   }
 
@@ -59,7 +73,7 @@ export class AudioManager {
     const style = this.getStyle('stage');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('stage')) return;
-
+    this.syncPack('stage');
     ui.play('select');
   }
 
@@ -75,8 +89,7 @@ export class AudioManager {
     const style = this.getStyle('timebox');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('timebox')) return;
-
-    // 替换为 uisfx 支持的 focus (通常用于引起注意)
+    this.syncPack('timebox');
     ui.play('focus');
   }
 

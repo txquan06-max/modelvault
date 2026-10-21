@@ -657,10 +657,10 @@ function App() {
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); StorageManager.setUsername(e.target.value); };
   
   const updateAudioSetting = (type: string, style: string) => { 
-    const newSettings = { ...audioSettings, [type]: style }; 
-    setAudioSettings(newSettings); 
-    StorageManager.setAudioSettings(newSettings); 
-    if (style !== 'off') AudioManager.previewSound(type as any); 
+  const newSettings = { ...audioSettings, [type]: style }; 
+  setAudioSettings(newSettings); 
+  StorageManager.setAudioSettings(newSettings); 
+  if (style !== 'off') AudioManager.previewSound(type as any); 
   };
 
   const openPreview = () => {

@@ -68,11 +68,11 @@ const FocusPanel = ({
     return (
       <div className={pipClass}>
         {bgImage && (
-          <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: -1, opacity: 0.9 }} />
+          <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: 0, opacity: 1 }} />
         )}
-        {bgImage && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 0 }} />}
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
         
-        <div style={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
           <div className="selector-group" style={{ marginBottom: '0' }}>
             <div className="selector-row">
               <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
@@ -241,7 +241,6 @@ function App() {
   
   const [searchResults, setSearchResults] = useState<GunplaItem[]>([]);
 
-  // 新增：历史模型补录搜索状态
   const [legacyInput, setLegacyInput] = useState('');
   const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
   const [legacyList, setLegacyList] = useState<GunplaItem[]>([]);
@@ -268,10 +267,16 @@ function App() {
     return () => clearTimeout(timer);
   }, [newModelNameInput, isAddingModel]);
 
-  // 历史模型补录搜索
+  // 历史模型补录搜索（修改：输入即触发）
   useEffect(() => {
     if (!showLegacyForm) return;
-    const timer = setTimeout(() => { setLegacyResults(GunplaSearch.search(legacyInput)); }, 200);
+    const timer = setTimeout(() => { 
+      if (legacyInput.trim().length > 0) {
+        setLegacyResults(GunplaSearch.search(legacyInput));
+      } else {
+        setLegacyResults([]);
+      }
+    }, 200);
     return () => clearTimeout(timer);
   }, [legacyInput, showLegacyForm]);
 
@@ -397,7 +402,6 @@ function App() {
     processAchievements();
   };
 
-  // 历史模型暂存
   const addToLegacyList = (item: GunplaItem) => {
     if (!legacyList.some(i => i.id === item.id)) {
       setLegacyList([...legacyList, item]);
@@ -793,16 +797,14 @@ function App() {
                       <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {/* 替换了原来的 textarea，改为搜索联想 */}
                         <div className="search-autocomplete">
                           <input 
                             id="legacy-search-input"
                             autoFocus 
-                            placeholder={i18n.language === 'zh' ? "搜索要补录的模型，回车添加..." : "Search models to import, press Enter..."} 
+                            placeholder={i18n.language === 'zh' ? "搜索并回车添加..." : "Search and press Enter..."} 
                             value={legacyInput} 
                             onChange={e => setLegacyInput(e.target.value)} 
                             onKeyDown={e => {
-                              // 按回车快速添加搜索结果的第一项
                               if (e.key === 'Enter' && legacyResults.length > 0) {
                                 addToLegacyList(legacyResults[0]);
                               }
@@ -810,7 +812,7 @@ function App() {
                             onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
                           />
                           {legacyResults.length > 0 && (
-                            <div className="autocomplete-dropdown">
+                            <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
                               {legacyResults.map((item, idx) => {
                                 const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
                                 const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
@@ -827,8 +829,7 @@ function App() {
                             </div>
                           )}
                         </div>
-
-                        {/* 暂存列表 */}
+                        
                         {legacyList.length > 0 && (
                           <div className="legacy-temp-list">
                             {legacyList.map((item, idx) => {
@@ -847,7 +848,7 @@ function App() {
                           <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>
                             {t('importBtn')} ({legacyList.length})
                           </button>
-                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); }}>
+                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>
                             {t('cancel')}
                           </button>
                         </div>

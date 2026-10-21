@@ -1,0 +1,230 @@
+import { StorageManager } from './StorageManager';
+import { UserManager } from './UserManager';
+
+export type StageStatus = 'NotStarted' | 'InProgress' | 'Completed';
+
+export interface BuildStage {
+  id: string;
+  nameKey: string;
+  status: StageStatus;
+  xpReward: number;
+  photoUrl?: string;
+}
+
+export interface Task {
+  id: string;
+  modelId: string;
+  name: string; 
+  status: 'NotStarted' | 'InProgress' | 'Completed';
+  stages: BuildStage[];
+}
+
+export interface Model {
+  id: string;
+  name: { en: string; zh: string }; 
+  series: { en: string; zh: string }; 
+  grade: string;
+  status: 'NotStarted' | 'InProgress' | 'Completed';
+  coverImage?: string;
+  isRebuilding?: boolean;
+  tasks: Task[];
+}
+
+// ... STAGE_DEFS, DEFAULT_TASK_KEYS, generateStages 保持不变 ...
+const STAGE_DEFS = [
+  { key: 'stage_assembly', xp: 25 }, { key: 'stage_scribing', xp: 15 },
+  { key: 'stage_lining', xp: 10 }, { key: 'stage_painting', xp: 30 },
+  { key: 'stage_topcoat', xp: 10 },
+];
+
+export const DEFAULT_TASK_KEYS = ['part_head', 'part_torso', 'part_waist', 'part_right_arm', 'part_left_arm', 'part_right_leg', 'part_left_leg', 'part_backpack', 'part_weapons'];
+
+const generateStages = () => STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'NotStarted' as StageStatus, xpReward: s.xp }));
+
+const generateLegacyTask = (modelId: string) => ({
+  id: crypto.randomUUID(), modelId, name: 'part_legacy', status: 'Completed' as const,
+  stages: STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'Completed' as const, xpReward: s.xp }))
+});
+
+const DEFAULT_DATA: Model[] = [
+  {
+    id: 'model-1',
+    name: { en: 'MG Barbatos', zh: 'MG 巴巴托斯' },
+    series: { en: 'Iron-Blooded Orphans', zh: '铁血的奥尔芬斯' },
+    grade: 'MG',
+    status: 'NotStarted',
+    tasks: [{ id: 'task-1', modelId: 'model-1', name: 'part_right_arm', status: 'NotStarted', stages: generateStages() }]
+  }
+];
+
+export class ModelManager {
+  // 核心修改：从统一的 StorageManager 获取数据，并处理旧版数据升级
+  static getAllModels(): Model[] {
+    const coreData = StorageManager.getRawStorage();
+    let models = coreData.models;
+
+    // 校验数据是否为最新结构，如果是从旧版迁移来的，可能需要做结构转换
+    // 这里写一个简易的平滑过渡拦截，防止旧版 v8 (name为string) 导致界面崩溃
+    models = models.map((m: any) => {
+      // 如果发现有旧的字符串格式，自动转换为双语对象
+      const isLegacyName = typeof m.name === 'string';
+      return {
+        ...m,
+        name: isLegacyName ? { en: m.name, zh: m.name } : m.name,
+        series: typeof m.series === 'string' ? { en: m.series, zh: m.series } : m.series,
+      };
+    });
+
+    if (models.length === 0) {
+      // 如果没有数据，初始化默认数据
+      StorageManager.saveRawStorage(DEFAULT_DATA);
+      return DEFAULT_DATA;
+    }
+
+    return models;
+  }
+
+  static saveModels(models: Model[]) {
+    StorageManager.saveRawStorage(models);
+  }
+
+  // 以下方法 (getTotalXP, addModel, importLegacyModels 等) 保持不变...
+  static getTotalXP(): number {
+    let xp = StorageManager.getLegacyXP();
+    this.getAllModels().forEach(m => m.tasks.forEach(t => {
+      t.stages.forEach(s => { if (s.status === 'Completed') xp += s.xpReward; });
+    }));
+    return xp;
+  }
+
+  static addModel(nameObj: { en: string; zh: string }, grade: string, seriesObj: { en: string; zh: string }, useTemplate: boolean = true): Model[] {
+    const models = this.getAllModels();
+    const modelId = crypto.randomUUID();
+    const newModel: Model = {
+      id: modelId, name: nameObj, series: seriesObj, grade, status: 'NotStarted',
+      tasks: useTemplate ? DEFAULT_TASK_KEYS.map(key => ({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() })) : []
+    };
+    models.push(newModel);
+    this.saveModels(models);
+    return models;
+  }
+
+  static importLegacyModels(inputText: string): { models: Model[], count: number } {
+    const lines = inputText.split('\n').filter(l => l.trim().length > 0);
+    const models = this.getAllModels();
+    let count = 0;
+    lines.forEach(line => {
+      const parts = line.split(',');
+      const nameStr = parts[0].trim();
+      const grade = parts.length > 1 ? parts[1].trim().toUpperCase() : 'HG';
+      if (nameStr) {
+        const modelId = crypto.randomUUID();
+        models.push({ id: modelId, name: { en: nameStr, zh: nameStr }, series: { en: 'Imported', zh: '导入' }, grade, status: 'Completed', tasks: [generateLegacyTask(modelId)] });
+        count++;
+      }
+    });
+    if (count > 0) {
+      let legacyXp = 0;
+      if (count >= 100) legacyXp = 1500; else if (count >= 51) legacyXp = 1200; else if (count >= 26) legacyXp = 800; else if (count >= 11) legacyXp = 500; else if (count >= 6) legacyXp = 250; else if (count >= 1) legacyXp = 100;
+      StorageManager.setLegacyXP(StorageManager.getLegacyXP() + legacyXp);
+      StorageManager.setLegacyImported();
+      UserManager.addCoins(legacyXp / 2);
+      this.saveModels(models);
+    }
+    return { models, count };
+  }
+
+  static addTask(modelId: string, name: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) { model.tasks.push({ id: crypto.randomUUID(), modelId, name, status: 'NotStarted', stages: generateStages() }); this.saveModels(models); }
+    return models;
+  }
+
+  static startStage(taskId: string, stageId: string | null): Model[] {
+    const models = this.getAllModels();
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        if (task.status === 'NotStarted') task.status = 'InProgress';
+        if (stageId) { const stage = task.stages.find(s => s.id === stageId); if (stage && stage.status === 'NotStarted') stage.status = 'InProgress'; }
+        break;
+      }
+    }
+    this.saveModels(models); return models;
+  }
+
+  static completeStage(taskId: string, stageId: string | null, photoUrl?: string): Model[] {
+    const models = this.getAllModels();
+    let changedModelId: string | null = null; let isStageCompletedNow = false;
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        if (stageId) { const stage = task.stages.find(s => s.id === stageId); if (stage && stage.status !== 'Completed') { stage.status = 'Completed'; if (photoUrl) stage.photoUrl = photoUrl; isStageCompletedNow = true; } }
+        changedModelId = m.id; break;
+      }
+    }
+    if (changedModelId) { const model = models.find(m => m.id === changedModelId)!; if (model.tasks.every(t => t.status === 'Completed')) { model.status = 'Completed'; model.isRebuilding = false; } }
+    this.saveModels(models); if (isStageCompletedNow) UserManager.addCoins(10); return models;
+  }
+
+  static finishTask(taskId: string, coverImage?: string): { models: Model[], error?: string } {
+    const models = this.getAllModels(); let changedModelId: string | null = null;
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        const assembly = task.stages.find(s => s.nameKey === 'stage_assembly');
+        if (assembly && assembly.status !== 'Completed') return { models, error: 'errorAssemblyRequired' };
+        if (task.status !== 'Completed') { task.status = 'Completed'; UserManager.addCoins(50); }
+        changedModelId = m.id; break;
+      }
+    }
+    if (changedModelId) {
+      const model = models.find(m => m.id === changedModelId)!;
+      if (model.tasks.every(t => t.status === 'Completed')) {
+        if (model.status !== 'Completed') { model.status = 'Completed'; if (coverImage) model.coverImage = coverImage; UserManager.addCoins(200); }
+        model.isRebuilding = false;
+      }
+    }
+    this.saveModels(models); return { models };
+  }
+
+  static reopenModel(modelId: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model && model.status === 'Completed') { model.status = 'InProgress'; model.isRebuilding = true; }
+    this.saveModels(models); return models;
+  }
+
+  static getCompletedModels(): Model[] { return this.getAllModels().filter(m => m.status === 'Completed' || m.isRebuilding); }
+
+  static getTaskDetails(taskId: string): { modelName: { en: string; zh: string }; taskName: string } | null {
+    for (const m of this.getAllModels()) { const t = m.tasks.find(t => t.id === taskId); if (t) return { modelName: m.name, taskName: t.name }; }
+    return null;
+  }
+
+  static getStageNameKey(taskId: string, stageId: string | null): string {
+    if (!stageId) return '';
+    for (const m of this.getAllModels()) { const t = m.tasks.find(t => t.id === taskId); if (t) { const s = t.stages.find(st => st.id === stageId); if (s) return s.nameKey; } }
+    return '';
+  }
+
+  static getModelStats() {
+    const models = this.getAllModels(); const completedModels = models.filter(m => m.status === 'Completed');
+    const stats: Record<string, number> = { total: completedModels.length, HG: 0, RG: 0, MG: 0, PG: 0 };
+    completedModels.forEach(m => { const grade = m.grade.toUpperCase(); if (stats[grade] !== undefined) stats[grade]++; });
+    return stats;
+  }
+
+  static getTimeStats() {
+    const sessions = JSON.parse(StorageManager.getSessions() || '[]');
+    let totalSeconds = 0; const stageTime: Record<string, number> = {};
+    sessions.forEach((sess: any) => { totalSeconds += sess.activeSeconds; if (sess.stageId) { const key = this.getStageNameKey(sess.taskId, sess.stageId); if (key) stageTime[key] = (stageTime[key] || 0) + sess.activeSeconds; } });
+    return { totalSeconds, stageTime };
+  }
+
+  static hasSpeedrunHG(): boolean {
+    const models = this.getAllModels(); const sessions = JSON.parse(StorageManager.getSessions() || '[]');
+    return models.some(m => { if (m.grade !== 'HG' || m.status !== 'Completed') return false; const taskIds = m.tasks.map(t => t.id); const modelTime = sessions.filter((s: any) => taskIds.includes(s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0); return modelTime > 0 && modelTime <= 7200; });
+  }
+}

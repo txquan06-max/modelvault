@@ -67,15 +67,9 @@ const FocusPanel = ({
   if (isPip) {
     return (
       <div className={pipClass}>
-        {/* 悬浮窗内的背景图 */}
         {bgImage && (
-          <img 
-            src={bgImage} 
-            alt="bg" 
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: -1, opacity: 0.9 }} 
-          />
+          <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: -1, opacity: 0.9 }} />
         )}
-        {/* 悬浮窗内的遮罩层，保证文字清晰 */}
         {bgImage && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 0 }} />}
         
         <div style={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
@@ -119,7 +113,6 @@ const FocusPanel = ({
     );
   }
 
-  // --- 主界面渲染 ---
   return (
     <div className="view-content focus-panel">
       <div className="selector-group">
@@ -221,8 +214,6 @@ function App() {
   const [customAudios, setCustomAudios] = useState<any>({});
   const [bgImage, setBgImage] = useState('');
   const [tempBgUrl, setTempBgUrl] = useState('');
-  
-  // 新增：背景图适配与预览
   const [bgSize, setBgSize] = useState(() => StorageManager.getBgSize());
   const [bgPosition, setBgPosition] = useState(() => StorageManager.getBgPosition());
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -250,7 +241,10 @@ function App() {
   
   const [searchResults, setSearchResults] = useState<GunplaItem[]>([]);
 
+  // 新增：历史模型补录搜索状态
   const [legacyInput, setLegacyInput] = useState('');
+  const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
+  const [legacyList, setLegacyList] = useState<GunplaItem[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
 
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
@@ -267,11 +261,19 @@ function App() {
 
   useEffect(() => { GunplaSearch.init(); }, []);
 
+  // 新建模型搜索
   useEffect(() => {
     if (!isAddingModel) return;
     const timer = setTimeout(() => { setSearchResults(GunplaSearch.search(newModelNameInput)); }, 200);
     return () => clearTimeout(timer);
   }, [newModelNameInput, isAddingModel]);
+
+  // 历史模型补录搜索
+  useEffect(() => {
+    if (!showLegacyForm) return;
+    const timer = setTimeout(() => { setLegacyResults(GunplaSearch.search(legacyInput)); }, 200);
+    return () => clearTimeout(timer);
+  }, [legacyInput, showLegacyForm]);
 
   const refreshData = () => {
     setTodayTotal(SessionManager.getTodayTotalSeconds());
@@ -395,12 +397,35 @@ function App() {
     processAchievements();
   };
 
+  // 历史模型暂存
+  const addToLegacyList = (item: GunplaItem) => {
+    if (!legacyList.some(i => i.id === item.id)) {
+      setLegacyList([...legacyList, item]);
+    }
+    setLegacyInput('');
+    setLegacyResults([]);
+  };
+
+  const removeLegacyItem = (id: string) => {
+    setLegacyList(legacyList.filter(i => i.id !== id));
+  };
+
   const handleLegacyImport = () => {
-    if (!legacyInput.trim()) return;
-    const result = ModelManager.importLegacyModels(legacyInput);
+    if (legacyList.length === 0) return;
+    
+    const result = ModelManager.importLegacyModelsFromList(legacyList.map(item => ({
+      name: item.name,
+      grade: item.grade,
+      series: item.series
+    })));
+    
     if (result.count > 0) {
-      AudioManager.playFinishPart(); showToast(t('importedSuccess', { count: result.count }));
-      setLegacyInput(''); setShowLegacyForm(false); refreshData(); processAchievements();
+      AudioManager.playFinishPart(); 
+      showToast(t('importedSuccess', { count: result.count }));
+      setLegacyList([]); 
+      setShowLegacyForm(false); 
+      refreshData(); 
+      processAchievements();
     }
   };
 
@@ -491,7 +516,7 @@ function App() {
     AudioManager.playClick();
     if (!('documentPictureInPicture' in window)) { alert("Your browser does not support PiP. Please use Chrome/Edge."); return; }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 }); // 固定长宽 2:3
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
         try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
         catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
@@ -533,7 +558,7 @@ function App() {
     handleConfirmStageDone, handleCancelDone, handleFinishPart,
     isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
     currentModel, getModelName, t,
-    bgImage, bgSize, bgPosition // 传入给悬浮窗
+    bgImage, bgSize, bgPosition
   };
 
   const viewingModel = models.find(m => m.id === viewingModelId);
@@ -541,7 +566,6 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* 主屏幕背景图 */}
       {bgImage && (
         <img src={bgImage} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
       )}
@@ -583,7 +607,6 @@ function App() {
 
         {viewingModel ? (
           <div className="detail-view">
-             {/* ... 详情页保持不变 ... */}
             <div className="detail-hero" style={{ backgroundImage: viewingModel.coverImage ? `url(${viewingModel.coverImage})` : 'none' }}>
               <div className="detail-hero-info">
                 <div className="detail-title">{getModelName(viewingModel)}</div>
@@ -687,7 +710,6 @@ function App() {
               </div>
             )}
 
-            {/* ... Journal / Hangar 保持不变 ... */}
             {activeTab === 'journal' && (
               <div className="view-content journal-view">
                 <div className="journal-list">
@@ -771,10 +793,63 @@ function App() {
                       <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => setShowLegacyForm(true)}>{t('legacyImport')}</button>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <textarea id="legacy-input" rows={4} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} placeholder={t('legacyPlaceholder')} className="url-input" style={{ resize: 'vertical' }} />
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport}>{t('importBtn')}</button>
-                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setShowLegacyForm(false)}>{t('cancel')}</button>
+                        {/* 替换了原来的 textarea，改为搜索联想 */}
+                        <div className="search-autocomplete">
+                          <input 
+                            id="legacy-search-input"
+                            autoFocus 
+                            placeholder={i18n.language === 'zh' ? "搜索要补录的模型，回车添加..." : "Search models to import, press Enter..."} 
+                            value={legacyInput} 
+                            onChange={e => setLegacyInput(e.target.value)} 
+                            onKeyDown={e => {
+                              // 按回车快速添加搜索结果的第一项
+                              if (e.key === 'Enter' && legacyResults.length > 0) {
+                                addToLegacyList(legacyResults[0]);
+                              }
+                            }}
+                            onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
+                          />
+                          {legacyResults.length > 0 && (
+                            <div className="autocomplete-dropdown">
+                              {legacyResults.map((item, idx) => {
+                                const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
+                                const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
+                                return (
+                                  <div key={idx} className="autocomplete-item" onClick={() => addToLegacyList(item)}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span className="ac-grade">{item.grade}</span>
+                                      <strong style={{ color: '#fff' }}>{displayName}</strong>
+                                    </div>
+                                    <div className="ac-series">| {displaySeries}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 暂存列表 */}
+                        {legacyList.length > 0 && (
+                          <div className="legacy-temp-list">
+                            {legacyList.map((item, idx) => {
+                              const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
+                              return (
+                                <div key={idx} className="legacy-temp-item">
+                                  <span><span className="ac-grade">{item.grade}</span> {displayName}</span>
+                                  <button onClick={() => removeLegacyItem(item.id)}>✕</button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                          <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>
+                            {t('importBtn')} ({legacyList.length})
+                          </button>
+                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { setShowLegacyForm(false); setLegacyList([]); }}>
+                            {t('cancel')}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -874,7 +949,6 @@ function App() {
         )}
       </div>
 
-      {/* 预览与适配弹窗 */}
       {isPreviewOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ width: '400px' }}>
@@ -882,7 +956,6 @@ function App() {
             <p style={{ fontSize: '12px', color: '#aaa' }}>左侧为手机屏幕比例，右侧为悬浮窗比例（固定 320x480）。</p>
             
             <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', justifyContent: 'center' }}>
-              {/* 主屏幕预览 */}
               <div style={{ textAlign: 'center' }}>
                 <div style={{ width: '160px', height: '280px', backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
                   {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
@@ -890,7 +963,6 @@ function App() {
                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 'bold' }}>Main</div>
                 </div>
               </div>
-              {/* 悬浮窗预览 */}
               <div style={{ textAlign: 'center' }}>
                 <div style={{ width: '160px', height: '240px', backgroundColor: '#1e1e1e', border: '2px solid #3b82f6', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
                   {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}

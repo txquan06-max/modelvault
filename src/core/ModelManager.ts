@@ -30,7 +30,6 @@ export interface Model {
   tasks: Task[];
 }
 
-// ... STAGE_DEFS, DEFAULT_TASK_KEYS, generateStages 保持不变 ...
 const STAGE_DEFS = [
   { key: 'stage_assembly', xp: 25 }, { key: 'stage_scribing', xp: 15 },
   { key: 'stage_lining', xp: 10 }, { key: 'stage_painting', xp: 30 },
@@ -58,15 +57,12 @@ const DEFAULT_DATA: Model[] = [
 ];
 
 export class ModelManager {
-  // 核心修改：从统一的 StorageManager 获取数据，并处理旧版数据升级
   static getAllModels(): Model[] {
     const coreData = StorageManager.getRawStorage();
     let models = coreData.models;
 
-    // 校验数据是否为最新结构，如果是从旧版迁移来的，可能需要做结构转换
-    // 这里写一个简易的平滑过渡拦截，防止旧版 v8 (name为string) 导致界面崩溃
+    // 兼容旧版本数据结构
     models = models.map((m: any) => {
-      // 如果发现有旧的字符串格式，自动转换为双语对象
       const isLegacyName = typeof m.name === 'string';
       return {
         ...m,
@@ -76,11 +72,9 @@ export class ModelManager {
     });
 
     if (models.length === 0) {
-      // 如果没有数据，初始化默认数据
       StorageManager.saveRawStorage(DEFAULT_DATA);
       return DEFAULT_DATA;
     }
-
     return models;
   }
 
@@ -88,7 +82,6 @@ export class ModelManager {
     StorageManager.saveRawStorage(models);
   }
 
-  // 以下方法 (getTotalXP, addModel, importLegacyModels 等) 保持不变...
   static getTotalXP(): number {
     let xp = StorageManager.getLegacyXP();
     this.getAllModels().forEach(m => m.tasks.forEach(t => {
@@ -109,20 +102,24 @@ export class ModelManager {
     return models;
   }
 
-  static importLegacyModels(inputText: string): { models: Model[], count: number } {
-    const lines = inputText.split('\n').filter(l => l.trim().length > 0);
+  // 新增：批量导入历史对象
+  static importLegacyModelsFromList(items: { name: { en: string; zh: string }, grade: string, series: { en: string; zh: string } }[]): { models: Model[], count: number } {
     const models = this.getAllModels();
     let count = 0;
-    lines.forEach(line => {
-      const parts = line.split(',');
-      const nameStr = parts[0].trim();
-      const grade = parts.length > 1 ? parts[1].trim().toUpperCase() : 'HG';
-      if (nameStr) {
-        const modelId = crypto.randomUUID();
-        models.push({ id: modelId, name: { en: nameStr, zh: nameStr }, series: { en: 'Imported', zh: '导入' }, grade, status: 'Completed', tasks: [generateLegacyTask(modelId)] });
-        count++;
-      }
+
+    items.forEach(item => {
+      const modelId = crypto.randomUUID();
+      models.push({
+        id: modelId,
+        name: item.name,
+        series: item.series,
+        grade: item.grade,
+        status: 'Completed',
+        tasks: [generateLegacyTask(modelId)]
+      });
+      count++;
     });
+
     if (count > 0) {
       let legacyXp = 0;
       if (count >= 100) legacyXp = 1500; else if (count >= 51) legacyXp = 1200; else if (count >= 26) legacyXp = 800; else if (count >= 11) legacyXp = 500; else if (count >= 6) legacyXp = 250; else if (count >= 1) legacyXp = 100;

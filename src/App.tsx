@@ -367,9 +367,9 @@ function App() {
     setBgImage(tempBgUrl);
     try {
       StorageManager.setBgImage(tempBgUrl);
-      showToast("Background Applied!");
+      alert("✅ 背景图应用成功！\n(如果没看到变化，请确认图片链接有效)");
     } catch (err) {
-      alert("本地存储空间不足，无法保存背景图！请尝试更小的图片。");
+      alert("❌ 本地存储空间不足，无法保存背景图！请尝试更小的图片。");
     }
   };
 
@@ -379,18 +379,18 @@ function App() {
       try {
         const base64 = await compressImage(file, 800, 0.4);
         if (base64.length > 1.5 * 1024 * 1024) {
-          alert("图片压缩后仍然过大（>1.5MB），无法存入本地。请更换图片或使用网络URL。");
+          alert("❌ 图片压缩后仍然过大（>1.5MB），无法存入本地。请更换图片或使用网络URL。");
           return;
         }
         setTempBgUrl(base64); 
-        setBgImage(base64); // 选图直接应用
+        setBgImage(base64);
         try {
           StorageManager.setBgImage(base64);
-          showToast("Background Applied!");
+          alert("✅ 本地背景图应用成功！");
         } catch (e) {
-          alert("本地存储空间已满，背景图未能保存。请前往“数据备份”导出数据后，清理旧图片。");
+          alert("❌ 本地存储空间已满，背景图未能保存。请前往“数据备份”导出数据后，清理旧数据。");
         }
-      } catch (err) { alert("Image processing failed"); }
+      } catch (err) { alert("❌ 图片处理失败"); }
     }
     e.target.value = '';
   };

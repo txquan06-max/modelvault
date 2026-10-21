@@ -22,7 +22,7 @@ const compressImage = (file: File): Promise<string> => {
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1920; // 背景图支持更大分辨率
+        const MAX_WIDTH = 1920;
         let width = img.width;
         let height = img.height;
         if (width > MAX_WIDTH) {
@@ -63,7 +63,6 @@ const FocusPanel = ({
     e.target.value = '';
   };
 
-  // 根据状态应用不同的悬浮窗 class
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
 
   return (
@@ -221,7 +220,7 @@ function App() {
     setEarnedTitles(StorageManager.getEarnedTitles());
     setEquippedTitle(StorageManager.getEquippedTitle());
     setAudioSettings(StorageManager.getAudioSettings());
-    setCustomAudios(StorageManager.getCustomAudios()); // 加载自定义音效
+    setCustomAudios(StorageManager.getCustomAudios());
     setBgImage(StorageManager.getBgImage());
     setTempBgUrl(StorageManager.getBgImage());
     const allModels = ModelManager.getAllModels();
@@ -360,10 +359,14 @@ function App() {
     if (style !== 'off') AudioManager.previewSound(type as any); 
   };
 
-  // 应用背景图
   const applyBackground = () => {
     setBgImage(tempBgUrl);
-    StorageManager.setBgImage(tempBgUrl);
+    try {
+      StorageManager.setBgImage(tempBgUrl);
+      showToast("Background Applied!");
+    } catch (err) {
+      alert("本地存储空间不足，无法保存背景图！");
+    }
   };
 
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -371,20 +374,27 @@ function App() {
     if (file) {
       try {
         const base64 = await compressImage(file);
+        // 简单的大小校验
+        if (base64.length > 4 * 1024 * 1024) {
+          alert("图片压缩后仍然过大，请换一张分辨率较小的图片。");
+          return;
+        }
         setTempBgUrl(base64); 
         setBgImage(base64); 
-        StorageManager.setBgImage(base64);
+        try {
+          StorageManager.setBgImage(base64);
+        } catch (e) {
+          alert("本地存储空间已满，背景图未能保存。");
+        }
         showToast("Background Applied!");
       } catch (err) { alert("Image processing failed"); }
     }
     e.target.value = '';
   };
 
-  // 自定义音效上传
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // 限制大小 1MB 以内
     if (file.size > 1024 * 1024) { alert("Audio file too large (max 1MB)"); return; }
     
     const reader = new FileReader();
@@ -392,10 +402,12 @@ function App() {
       const base64 = event.target?.result as string;
       const newAudios = { ...customAudios, [type]: base64 };
       setCustomAudios(newAudios);
-      StorageManager.setCustomAudios(newAudios);
-      
-      // 切换为自定义模式
-      updateAudioSetting(type, 'custom');
+      try {
+        StorageManager.setCustomAudios(newAudios);
+        updateAudioSetting(type, 'custom');
+      } catch (err) {
+        alert("本地存储空间不足，音效保存失败。");
+      }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -455,11 +467,17 @@ function App() {
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
   return (
-    <div className="app-container" style={{ backgroundImage: bgImage ? `url(${bgImage})` : 'none' }}>
+    <div className="app-container">
+      {/* 改用 img 标签作为背景，兼容性更好 */}
+      {bgImage && (
+        <img src={bgImage} alt="background" className="app-bg-img" />
+      )}
       {bgImage && <div className="bg-overlay" />}
+      
       {toastMsg && <div className="toast">{toastMsg}</div>}
 
       <div className="mini-window">
+        {/* ... 保持内部 UI 完全不变 ... */}
         {viewingModel ? (
           <div className="profile-topbar">
             <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); }}>← {t('backToHangar')}</button>

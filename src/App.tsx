@@ -360,9 +360,13 @@ function App() {
   };
 
   const applyBackground = () => {
+    if (!tempBgUrl || tempBgUrl.trim() === '') {
+      alert("请输入图片链接或上传本地图片。");
+      return;
+    }
+    setBgImage(tempBgUrl);
     try {
       StorageManager.setBgImage(tempBgUrl);
-      setBgImage(tempBgUrl);
       showToast("Background Applied!");
     } catch (err) {
       alert("本地存储空间不足，无法保存背景图！请尝试更小的图片或清理旧数据。");
@@ -373,9 +377,7 @@ function App() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        // 极限压缩：宽度最大 800，质量 0.4
         const base64 = await compressImage(file, 800, 0.4);
-        // 如果压缩后依然大于 1.5MB，直接拒绝
         if (base64.length > 1.5 * 1024 * 1024) {
           alert("图片压缩后仍然过大（>1.5MB），无法存入本地。请更换图片或使用网络URL。");
           return;
@@ -470,7 +472,16 @@ function App() {
   return (
     <div className="app-container">
       {bgImage && (
-        <img src={bgImage} alt="background" className="app-bg-img" />
+        <img 
+          src={bgImage} 
+          alt="background" 
+          className="app-bg-img" 
+          onError={() => {
+            alert("图片加载失败，请检查 URL 是否有效，或文件是否损坏。");
+            setBgImage('');
+            StorageManager.setBgImage('');
+          }}
+        />
       )}
       {bgImage && <div className="bg-overlay" />}
       

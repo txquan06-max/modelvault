@@ -12,8 +12,10 @@ const KEYS = {
   EQUIPPED_TITLE: 'mv_equipped_title',
   EARNED_TITLES: 'mv_earned_titles',
   AUDIO_SETTINGS: 'mv_audio_settings',
-  CUSTOM_AUDIOS: 'mv_custom_audios', // 新增
+  CUSTOM_AUDIOS: 'mv_custom_audios',
   BG_IMAGE: 'mv_bg_image',
+  BG_SIZE: 'mv_bg_size', // 新增
+  BG_POSITION: 'mv_bg_position', // 新增
   LEGACY_XP: 'mv_legacy_xp',
   LEGACY_IMPORTED: 'mv_legacy_imported',
 };
@@ -53,8 +55,10 @@ export const StorageManager = {
   getEquippedTitle: () => localStorage.getItem(KEYS.EQUIPPED_TITLE) || '',
   getEarnedTitles: () => JSON.parse(localStorage.getItem(KEYS.EARNED_TITLES) || '[]'),
   getAudioSettings: () => JSON.parse(localStorage.getItem(KEYS.AUDIO_SETTINGS) || '{"click":"default","stage":"default","timebox":"default","complete":"default"}'),
-  getCustomAudios: () => JSON.parse(localStorage.getItem(KEYS.CUSTOM_AUDIOS) || '{}'), // 新增
+  getCustomAudios: () => JSON.parse(localStorage.getItem(KEYS.CUSTOM_AUDIOS) || '{}'),
   getBgImage: () => localStorage.getItem(KEYS.BG_IMAGE) || '',
+  getBgSize: () => localStorage.getItem(KEYS.BG_SIZE) || 'cover', // 默认 cover
+  getBgPosition: () => localStorage.getItem(KEYS.BG_POSITION) || 'center', // 默认 center
   getLegacyXP: () => Number(localStorage.getItem(KEYS.LEGACY_XP)) || 0,
   isLegacyImported: () => localStorage.getItem(KEYS.LEGACY_IMPORTED) === 'true',
 
@@ -68,13 +72,15 @@ export const StorageManager = {
   setEquippedTitle: (val: string) => localStorage.setItem(KEYS.EQUIPPED_TITLE, val),
   setEarnedTitles: (val: string[]) => localStorage.setItem(KEYS.EARNED_TITLES, JSON.stringify(val)),
   setAudioSettings: (val: any) => localStorage.setItem(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
-  setCustomAudios: (val: any) => localStorage.setItem(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)), // 新增
+  setCustomAudios: (val: any) => localStorage.setItem(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
   setBgImage: (val: string) => localStorage.setItem(KEYS.BG_IMAGE, val),
+  setBgSize: (val: string) => localStorage.setItem(KEYS.BG_SIZE, val), // 新增
+  setBgPosition: (val: string) => localStorage.setItem(KEYS.BG_POSITION, val), // 新增
   setLegacyXP: (val: number) => localStorage.setItem(KEYS.LEGACY_XP, val.toString()),
   setLegacyImported: () => localStorage.setItem(KEYS.LEGACY_IMPORTED, 'true'),
 
   exportAll: () => {
-    const data: any = { version: 5, coreData: localStorage.getItem(DATA_KEY) };
+    const data: any = { version: 6, coreData: localStorage.getItem(DATA_KEY) };
     Object.entries(KEYS).forEach(([key, storageKey]) => {
       data[key.toLowerCase()] = localStorage.getItem(storageKey);
     });

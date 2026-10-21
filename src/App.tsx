@@ -13,7 +13,6 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
-// 极限压缩：背景图宽 800，质量 0.4；照片宽 800，质量 0.6
 const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -47,7 +46,7 @@ const FocusPanel = ({
   timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t
+  currentModel, getModelName, t, bgImage, bgSize, bgPosition
 }: any) => {
   const currentTaskName = currentTask ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -65,8 +64,64 @@ const FocusPanel = ({
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
 
+  if (isPip) {
+    return (
+      <div className={pipClass}>
+        {/* 悬浮窗内的背景图 */}
+        {bgImage && (
+          <img 
+            src={bgImage} 
+            alt="bg" 
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: -1, opacity: 0.9 }} 
+          />
+        )}
+        {/* 悬浮窗内的遮罩层，保证文字清晰 */}
+        {bgImage && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 0 }} />}
+        
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+          <div className="selector-group" style={{ marginBottom: '0' }}>
+            <div className="selector-row">
+              <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
+                {models.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
+              </select>
+            </div>
+            <div className="selector-row">
+              <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
+                {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="task-header" style={{ justifyContent: 'center' }}>
+            <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
+          </div>
+
+          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
+
+          {lastSession ? (
+            <div className="inline-confirm">
+              <div className="confirm-text" style={{ fontSize: '12px' }}>{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
+              <div className="confirm-actions" style={{ flexDirection: 'column' }}>
+                <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
+                <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="controls" style={{ flexDirection: 'column' }}>
+              {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId || currentTask?.status === 'Completed'}>{currentTask?.status === 'Completed' ? t('statusCompleted') : t('start')}</button>}
+              {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
+              {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
+            </div>
+          )}
+          {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
+        </div>
+      </div>
+    );
+  }
+
+  // --- 主界面渲染 ---
   return (
-    <div className={isPip ? pipClass : "view-content focus-panel"}>
+    <div className="view-content focus-panel">
       <div className="selector-group">
         <div className="selector-row">
           <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
@@ -166,6 +221,11 @@ function App() {
   const [customAudios, setCustomAudios] = useState<any>({});
   const [bgImage, setBgImage] = useState('');
   const [tempBgUrl, setTempBgUrl] = useState('');
+  
+  // 新增：背景图适配与预览
+  const [bgSize, setBgSize] = useState(() => StorageManager.getBgSize());
+  const [bgPosition, setBgPosition] = useState(() => StorageManager.getBgPosition());
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const [models, setModels] = useState<Model[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string>('');
@@ -223,6 +283,8 @@ function App() {
     setCustomAudios(StorageManager.getCustomAudios());
     setBgImage(StorageManager.getBgImage());
     setTempBgUrl(StorageManager.getBgImage());
+    setBgSize(StorageManager.getBgSize());
+    setBgPosition(StorageManager.getBgPosition());
     const allModels = ModelManager.getAllModels();
     setModels(allModels);
     if (!currentModelId && allModels.length > 0) setCurrentModelId(allModels[0].id);
@@ -359,18 +421,24 @@ function App() {
     if (style !== 'off') AudioManager.previewSound(type as any); 
   };
 
+  const openPreview = () => {
+    setTempBgUrl(bgImage);
+    setBgSize(StorageManager.getBgSize());
+    setBgPosition(StorageManager.getBgPosition());
+    setIsPreviewOpen(true);
+  };
+
   const applyBackground = () => {
     if (!tempBgUrl || tempBgUrl.trim() === '') {
       alert("请输入图片链接或上传本地图片。");
       return;
     }
     setBgImage(tempBgUrl);
-    try {
-      StorageManager.setBgImage(tempBgUrl);
-      alert("✅ 背景图应用成功！");
-    } catch (err) {
-      alert("❌ 本地存储空间不足，无法保存背景图！请尝试更小的图片。");
-    }
+    StorageManager.setBgImage(tempBgUrl);
+    StorageManager.setBgSize(bgSize);
+    StorageManager.setBgPosition(bgPosition);
+    setIsPreviewOpen(false);
+    alert("✅ 背景图与适配设置应用成功！");
   };
 
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -384,12 +452,12 @@ function App() {
         }
         setTempBgUrl(base64); 
         setBgImage(base64);
-        try {
-          StorageManager.setBgImage(base64);
-          alert("✅ 本地背景图应用成功！");
-        } catch (e) {
-          alert("❌ 本地存储空间已满，背景图未能保存。请前往“数据备份”导出数据后，清理旧数据。");
-        }
+        StorageManager.setBgImage(base64);
+        setBgSize('cover');
+        setBgPosition('center');
+        StorageManager.setBgSize('cover');
+        StorageManager.setBgPosition('center');
+        alert("✅ 本地背景图上传成功！点击“预览适配”进行调整。");
       } catch (err) { alert("❌ 图片处理失败"); }
     }
     e.target.value = '';
@@ -423,7 +491,7 @@ function App() {
     AudioManager.playClick();
     if (!('documentPictureInPicture' in window)) { alert("Your browser does not support PiP. Please use Chrome/Edge."); return; }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 }); // 固定长宽 2:3
       [...document.styleSheets].forEach((styleSheet) => {
         try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
         catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
@@ -434,6 +502,7 @@ function App() {
       pipWin.document.body.style.justifyContent = 'center';
       pipWin.document.body.style.alignItems = 'center';
       pipWin.document.body.style.height = '100vh';
+      pipWin.document.body.style.overflow = 'hidden';
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
     } catch (err) { console.error(err); }
   };
@@ -463,7 +532,8 @@ function App() {
     timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete, 
     handleConfirmStageDone, handleCancelDone, handleFinishPart,
     isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-    currentModel, getModelName, t
+    currentModel, getModelName, t,
+    bgImage, bgSize, bgPosition // 传入给悬浮窗
   };
 
   const viewingModel = models.find(m => m.id === viewingModelId);
@@ -471,9 +541,9 @@ function App() {
 
   return (
     <div className="app-wrapper">
-      {/* 直接渲染背景图，彻底移除黑色遮罩层 */}
+      {/* 主屏幕背景图 */}
       {bgImage && (
-        <img src={bgImage} alt="background" className="app-bg-img" />
+        <img src={bgImage} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
       )}
       
       {toastMsg && <div className="toast">{toastMsg}</div>}
@@ -513,6 +583,7 @@ function App() {
 
         {viewingModel ? (
           <div className="detail-view">
+             {/* ... 详情页保持不变 ... */}
             <div className="detail-hero" style={{ backgroundImage: viewingModel.coverImage ? `url(${viewingModel.coverImage})` : 'none' }}>
               <div className="detail-hero-info">
                 <div className="detail-title">{getModelName(viewingModel)}</div>
@@ -616,6 +687,7 @@ function App() {
               </div>
             )}
 
+            {/* ... Journal / Hangar 保持不变 ... */}
             {activeTab === 'journal' && (
               <div className="view-content journal-view">
                 <div className="journal-list">
@@ -713,13 +785,16 @@ function App() {
                   <h4>⚙️ {t('customization')}</h4>
                   <div className="custom-row">
                     <span>{t('bgUrl')}:</span>
-                    <div style={{display:'flex', gap:'8px', width:'100%'}}>
+                    <div style={{display:'flex', gap:'8px', width:'100%', flexWrap:'wrap'}}>
                       <input id="bg-url-input" type="text" value={tempBgUrl.startsWith('data:') ? t('localImageSelected') : tempBgUrl} onChange={e => setTempBgUrl(e.target.value)} placeholder="https://..." className="url-input" disabled={tempBgUrl.startsWith('data:')} />
-                      <button className="mini-btn" onClick={applyBackground}>{t('apply')}</button>
-                      <label className="mini-btn" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
-                        📁<input type="file" accept="image/*" onChange={handleBgFileUpload} style={{ display: 'none' }} />
-                      </label>
-                      {bgImage && <button className="mini-btn" onClick={() => { setBgImage(''); setTempBgUrl(''); StorageManager.setBgImage(''); }}>{t('clear')}</button>}
+                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                        <button className="mini-btn" onClick={openPreview}>预览适配</button>
+                        <label className="mini-btn" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
+                          📁 上传
+                          <input type="file" accept="image/*" onChange={handleBgFileUpload} style={{ display: 'none' }} />
+                        </label>
+                        {bgImage && <button className="mini-btn" style={{color: '#ef4444'}} onClick={() => { setBgImage(''); setTempBgUrl(''); StorageManager.setBgImage(''); }}>清除</button>}
+                      </div>
                     </div>
                   </div>
                   
@@ -798,6 +873,58 @@ function App() {
           </>
         )}
       </div>
+
+      {/* 预览与适配弹窗 */}
+      {isPreviewOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ width: '400px' }}>
+            <h3>背景图预览与编辑</h3>
+            <p style={{ fontSize: '12px', color: '#aaa' }}>左侧为手机屏幕比例，右侧为悬浮窗比例（固定 320x480）。</p>
+            
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', justifyContent: 'center' }}>
+              {/* 主屏幕预览 */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '160px', height: '280px', backgroundColor: '#1e1e1e', border: '1px solid #444', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+                  {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 'bold' }}>Main</div>
+                </div>
+              </div>
+              {/* 悬浮窗预览 */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: '160px', height: '240px', backgroundColor: '#1e1e1e', border: '2px solid #3b82f6', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+                  {tempBgUrl && <img src={tempBgUrl} style={{ width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition }} />}
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#fff', fontWeight: 'bold' }}>PiP (2:3)</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="custom-row">
+              <span>填充模式 (Object-Fit):</span>
+              <select value={bgSize} onChange={e => setBgSize(e.target.value)} style={{ padding: '6px', marginBottom: '10px' }}>
+                <option value="cover">Cover (覆盖并裁切)</option>
+                <option value="contain">Contain (包含并留边)</option>
+                <option value="fill">Fill (拉伸填满)</option>
+              </select>
+              
+              <span>对齐位置 (Object-Position):</span>
+              <select value={bgPosition} onChange={e => setBgPosition(e.target.value)} style={{ padding: '6px' }}>
+                <option value="center">居中 (Center)</option>
+                <option value="top">顶部对齐 (Top)</option>
+                <option value="bottom">底部对齐 (Bottom)</option>
+                <option value="left">左对齐 (Left)</option>
+                <option value="right">右对齐 (Right)</option>
+              </select>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button onClick={() => setIsPreviewOpen(false)} style={{ background: 'transparent', color: '#aaa' }}>取消</button>
+              <button className="btn start" style={{ flex: 1, maxWidth: '120px' }} onClick={applyBackground}>确认应用</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pipWindow && createPortal(<FocusPanel {...panelProps} isPip={true} />, pipWindow.document.body)}
     </div>

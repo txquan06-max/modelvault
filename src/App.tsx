@@ -400,6 +400,15 @@ function App() {
     }
   };
 
+  useEffect(() => {
+  const handleFirstInteraction = () => {
+    AudioManager.unlock();
+    document.removeEventListener('click', handleFirstInteraction);
+  };
+  document.addEventListener('click', handleFirstInteraction);
+  return () => document.removeEventListener('click', handleFirstInteraction);
+  }, []);
+
   useEffect(() => { refreshData(); }, []);
   useEffect(() => {
     const handleStorageChange = () => refreshData();

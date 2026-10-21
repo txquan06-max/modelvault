@@ -1,7 +1,11 @@
+import { createUISFX } from 'uisfx';
 import { StorageManager } from './StorageManager';
 
 type SoundType = 'click' | 'stage' | 'timebox' | 'complete';
 type AudioStyle = 'default' | 'chiptune' | 'soft' | 'off' | 'custom';
+
+// 1. 初始化 uisfx，并设置为“街机”风格以获得上头感
+const ui = createUISFX({ pack: 'arcade' });
 
 export class AudioManager {
   private static ctx: AudioContext | null = null;
@@ -12,23 +16,16 @@ export class AudioManager {
     return this.ctx;
   }
 
-  private static playTone(freq: number, type: OscillatorType, duration: number, vol: number = 0.1, delay: number = 0) {
+  // 用户首次交互时解锁音频（必须）
+  static async unlock() {
     try {
-      const ctx = this.getCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
-      gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
-      osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + duration);
+      await ui.unlock();
     } catch (e) {
-      // 忽略音频并发或未交互拦截报错
+      console.warn('Audio unlock failed', e);
     }
   }
 
+  // --- 自定义音效部分（保持你原有的逻辑，这里略作精简）---
   private static playCustom(type: SoundType): boolean {
     const customAudios = StorageManager.getCustomAudios();
     const base64 = customAudios[type];
@@ -46,19 +43,20 @@ export class AudioManager {
     return settings[type] || 'default';
   }
 
+  // --- 使用 uisfx 的全新音效方法 ---
+
   static playClick() {
     const style = this.getStyle('click');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('click')) return;
-    
-    if (style === 'chiptune') this.playTone(1200, 'square', 0.03, 0.04);
-    else if (style === 'soft') this.playTone(600, 'sine', 0.05, 0.04);
-    else this.playTone(900, 'sine', 0.04, 0.05);
+
+    // 使用 uisfx 的“点击”音效，清脆短促
+    ui.play('tap'); 
   }
 
   static playStart() { 
-    this.playTone(600, 'sine', 0.08, 0.08); 
-    this.playTone(900, 'sine', 0.15, 0.08, 0.08); 
+    // 开始计时用“上升”音效，充满能量
+    ui.play('toggle-on'); 
   }
 
   static playComplete() {
@@ -66,12 +64,8 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('complete')) return;
 
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((f, i) => {
-      if (style === 'chiptune') this.playTone(f * 2, 'square', 0.15, 0.06, i * 0.08);
-      else if (style === 'soft') this.playTone(f, 'sine', 0.3, 0.06, i * 0.08);
-      else this.playTone(f, 'triangle', 0.2, 0.08, i * 0.08);
-    });
+    // 完成计时用“成功”音效，悦耳且有满足感
+    ui.play('success');
   }
 
   static playStageDone() {
@@ -79,20 +73,18 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('stage')) return;
 
-    const notes = [1046.50, 1318.51, 1567.98];
-    notes.forEach((f, i) => {
-      if (style === 'chiptune') this.playTone(f, 'square', 0.1, 0.06, i * 0.05);
-      else if (style === 'soft') this.playTone(f, 'sine', 0.2, 0.05, i * 0.05);
-      else this.playTone(f, 'triangle', 0.15, 0.08, i * 0.05);
-    });
+    // 阶段完成用“升级”音效，更有成就感
+    ui.play('level-up');
   }
 
   static playFinishPart() { 
-    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'triangle', 0.3, 0.1, i * 0.06)); 
+    // 完成整个部位，使用更隆重的“成就”音效
+    ui.play('achievement');
   }
   
   static playAchievement() { 
-    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, i) => this.playTone(f, 'sine', 0.4, 0.1, i * 0.08)); 
+    // 成就解锁，同样使用隆重的音效
+    ui.play('achievement');
   }
 
   static playTimeboxEnd() {
@@ -100,12 +92,8 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('timebox')) return;
 
-    const notes = [880, 1108.73, 1318.51];
-    notes.forEach((f, i) => {
-      if (style === 'chiptune') this.playTone(f, 'square', 0.15, 0.08, i * 0.15);
-      else if (style === 'soft') this.playTone(f, 'sine', 0.6, 0.06, i * 0.15);
-      else this.playTone(f, 'sine', 0.5, 0.08, i * 0.15);
-    });
+    // 番茄钟结束/提醒，用“通知”音效，既引人注意又不刺耳
+    ui.play('notify');
   }
 
   static previewSound(type: SoundType) {

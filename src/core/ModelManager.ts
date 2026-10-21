@@ -107,21 +107,6 @@ export class ModelManager {
     return models;
   }
 
-  // 更新历史模型的流程完成状态
-  static updateImportedModelStatus(modelId: string, completedStageKeys: string[]): Model[] {
-    const models = this.getAllModels();
-    const model = models.find(m => m.id === modelId);
-    if (model) {
-      model.tasks.forEach(task => {
-        task.stages.forEach(stage => {
-          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
-        });
-      });
-      this.saveModels(models);
-    }
-    return models;
-  }
-
   static getTotalXP(): number {
     let xp = StorageManager.getLegacyXP();
     this.getAllModels().forEach(m => m.tasks.forEach(t => {
@@ -168,6 +153,67 @@ export class ModelManager {
       this.saveModels(models);
     }
     return { models, count };
+  }
+
+  // 开始历史模型的改造（勾选流程后调用）
+  static startLegacyRebuild(modelId: string, completedStageKeys: string[]): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      model.isRebuilding = true;
+      model.status = 'InProgress';
+      
+      // 如果之前只有默认的历史任务，补齐默认部位，方便用户做其他部位
+      if (model.tasks.length <= 1) {
+         DEFAULT_TASK_KEYS.forEach(key => {
+           // 避免重复添加同名部位
+           if (!model.tasks.some(t => t.name === key)) {
+             model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() });
+           }
+         });
+      }
+
+      // 更新 part_legacy 的阶段状态
+      const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
+      if (legacyTask) {
+        legacyTask.status = 'InProgress'; // 变为改造中
+        legacyTask.stages.forEach(stage => {
+          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+        });
+        // 强制素组为完成
+        const assembly = legacyTask.stages.find(s => s.nameKey === 'stage_assembly');
+        if (assembly) assembly.status = 'Completed';
+      }
+      this.saveModels(models);
+    }
+    return models;
+  }
+
+  // 强制完成整个模型
+  static finishModel(modelId: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      model.status = 'Completed';
+      model.isRebuilding = false;
+      model.tasks.forEach(t => t.status = 'Completed');
+      this.saveModels(models);
+    }
+    return models;
+  }
+
+  static updateImportedModelStatus(modelId: string, completedStageKeys: string[]): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      model.tasks.forEach(task => {
+        task.stages.forEach(stage => {
+          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+        });
+      });
+      this.saveModels(models);
+    }
+    return models;
   }
 
   static addTask(modelId: string, name: string): Model[] {

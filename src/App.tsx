@@ -13,7 +13,6 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
-// 检测微信环境
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
 const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
@@ -73,6 +72,8 @@ const FocusPanel = ({
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
 
+  const availableModels = models.filter((m: any) => m.status !== 'Completed');
+
   if (isPip) {
     return (
       <div className={pipClass}>
@@ -85,7 +86,7 @@ const FocusPanel = ({
           <div className="selector-group" style={{ marginBottom: '0' }}>
             <div className="selector-row">
               <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
-                {models.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
+                {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
               </select>
             </div>
             <div className="selector-row">
@@ -97,7 +98,6 @@ const FocusPanel = ({
 
           <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
             <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
-            {/* 悬浮窗增加“完成该部位”按钮 */}
             {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
               <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
             )}
@@ -148,7 +148,7 @@ const FocusPanel = ({
       <div className="selector-group">
         <div className="selector-row">
           <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
-            {models.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : m.status === 'Completed' ? '✅' : ''}</option>)}
+            {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
           </select>
         </div>
         <div className="selector-row">
@@ -257,6 +257,11 @@ function App() {
   const [isEditingImportedStatus, setIsEditingImportedStatus] = useState(false);
   const [importedStages, setImportedStages] = useState<string[]>([]);
   const [isEditingCover, setIsEditingCover] = useState(false);
+  const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
+  const [pendingRebuildTask, setPendingRebuildTask] = useState<string | null>(null);
+  
+  const [showCompleteModelConfirm, setShowCompleteModelConfirm] = useState(false);
+  const [completeModelId, setCompleteModelId] = useState<string | null>(null);
 
   const [journalFilterMonth, setJournalFilterMonth] = useState('');
 
@@ -307,7 +312,6 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 拦截意外刷新，防止计时丢失
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (timerState === 'Running') {
@@ -407,7 +411,6 @@ function App() {
   const handleComplete = () => {
     const result = engineRef.current.complete();
     if (result) {
-      // 将限制从 60 秒降低到 10 秒，方便测试体验
       if (result.activeSeconds < 10) {
         showToast(i18n.language === 'zh' ? '计时太短，无法记录（至少10秒）。' : 'Time too short, not saved (min 10s).');
         return;
@@ -449,6 +452,24 @@ function App() {
     setModels(result.models); refreshData(); processAchievements();
     setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
     setIsFinishingPart(false);
+
+    // 检查是否整个模型都完成了
+    const currentModel = result.models.find(m => m.tasks.some(t => t.id === currentTaskId));
+    if (currentModel && currentModel.tasks.every(t => t.status === 'Completed')) {
+      setShowCompleteModelConfirm(true);
+      setCompleteModelId(currentModel.id);
+    }
+  };
+
+  const handleConfirmCompleteModel = () => {
+    if (!completeModelId) return;
+    AudioManager.playFinishPart();
+    const updated = ModelManager.finishModel(completeModelId);
+    setModels(updated);
+    refreshData();
+    setShowCompleteModelConfirm(false);
+    setCompleteModelId(null);
+    showToast(i18n.language === 'zh' ? '🎉 模型已收入格纳库！' : '🎉 Model added to Hangar!');
   };
 
   const handleAddModel = () => {
@@ -514,7 +535,7 @@ function App() {
 
   const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
     AudioManager.playClick();
-    if (viewingModel?.status === 'Completed') {
+    if (viewingModel?.status === 'Completed' || viewingModel?.isRebuilding) {
       const updated = ModelManager.reopenModel(viewingModel.id);
       setModels(updated);
     }
@@ -523,6 +544,31 @@ function App() {
     if (stageId) setCurrentStageId(stageId);
     setActiveTab('focus');
     setViewingModelId(null);
+  };
+
+  // 启动历史模型改造的确认逻辑
+  const handleStartRebuild = (taskId: string) => {
+    setPendingRebuildTask(taskId);
+    const stages = viewingModel?.tasks.find(t => t.name === 'part_legacy')?.stages.filter(s => s.status === 'Completed').map(s => s.nameKey) || ['stage_assembly'];
+    setImportedStages(stages);
+    setIsEditingImportedStatus(true);
+  };
+
+  const handleConfirmRebuild = () => {
+    if (!viewingModel) return;
+    AudioManager.playStageDone();
+    const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages);
+    setModels(updated);
+    setIsEditingImportedStatus(false);
+    setShowRebuildConfirm(true);
+  };
+
+  const handleDoRebuild = () => {
+    setShowRebuildConfirm(false);
+    if (pendingRebuildTask) {
+      handleJumpToFocus(pendingRebuildTask);
+      setPendingRebuildTask(null);
+    }
   };
 
   const handleSaveImportedStages = () => {
@@ -725,7 +771,7 @@ function App() {
       <div className="mini-window">
         {viewingModel ? (
           <div className="profile-topbar">
-            <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); }}>← {t('backToHangar')}</button>
+            <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); setShowRebuildConfirm(false); }}>← {t('backToHangar')}</button>
             <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {confirmDeleteId === viewingModel.id ? (
                 <>
@@ -801,42 +847,42 @@ function App() {
               </div>
             )}
 
-            {viewingModel.isImported && (
+            {isEditingImportedStatus && (
               <div className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
                 <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 历史模型进度录入</h4>
-                {!isEditingImportedStatus ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: '#ccc' }}>点击右侧按钮修改完成的流程</span>
-                    <button className="mini-btn" onClick={() => {
-                      const stages = viewingModel.tasks[0].stages.filter(s => s.status === 'Completed').map(s => s.nameKey);
-                      setImportedStages(stages);
-                      setIsEditingImportedStatus(true);
-                    }}>修改</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#ccc' }}>勾选你当时已经完成的流程：</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                    {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
+                      <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={importedStages.includes(stageKey)} 
+                          disabled={stageKey === 'stage_assembly'}
+                          onChange={(e) => {
+                            if (e.target.checked) setImportedStages([...importedStages, stageKey]);
+                            else setImportedStages(importedStages.filter(k => k !== stageKey));
+                          }}
+                        />
+                        {t(stageKey)}
+                      </label>
+                    ))}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#ccc' }}>勾选你当时已经完成的流程：</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
-                      {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
-                        <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={importedStages.includes(stageKey)} 
-                            onChange={(e) => {
-                              if (e.target.checked) setImportedStages([...importedStages, stageKey]);
-                              else setImportedStages(importedStages.filter(k => k !== stageKey));
-                            }}
-                          />
-                          {t(stageKey)}
-                        </label>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleSaveImportedStages}>保存进度</button>
-                      <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setIsEditingImportedStatus(false)}>取消</button>
-                    </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleConfirmRebuild}>确认并开始改造</button>
+                    <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => setIsEditingImportedStatus(false)}>取消</button>
                   </div>
-                )}
+                </div>
+              </div>
+            )}
+
+            {showRebuildConfirm && (
+              <div className="inline-confirm" style={{ border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                <div className="confirm-text" style={{ fontSize: '14px' }}>改造状态已激活！<br/><span>是否直接跳转至专注页面开始制作？</span></div>
+                <div className="confirm-actions">
+                  <button className="btn yes" onClick={handleDoRebuild}>是，前往专注</button>
+                  <button className="btn no" onClick={() => setShowRebuildConfirm(false)}>留在详情页</button>
+                </div>
               </div>
             )}
 
@@ -870,9 +916,15 @@ function App() {
                         <button 
                           className="mini-btn" 
                           style={{ width: '100%', marginTop: '8px', background: '#3b82f6', color: '#fff', border: 'none', padding: '8px' }}
-                          onClick={() => handleJumpToFocus(task.id, task.stages.find(s => s.status !== 'Completed')?.id || task.stages[0].id)}
+                          onClick={() => {
+                            if (viewingModel.isImported && !viewingModel.isRebuilding) {
+                              handleStartRebuild(task.id);
+                            } else {
+                              handleJumpToFocus(task.id, task.stages.find(s => s.status !== 'Completed')?.id || task.stages[0].id);
+                            }
+                          }}
                         >
-                          {viewingModel.isRebuilding || viewingModel.status === 'Completed' ? `🔧 ${t('continueRebuild')}` : `⏱ ${t('focus')}`}
+                          {viewingModel.isImported && !viewingModel.isRebuilding ? `🔧 开始继续改造` : `⏱ ${t('focus')}`}
                         </button>
                       </div>
                     )}
@@ -1212,6 +1264,21 @@ function App() {
           </>
         )}
       </div>
+
+      {showCompleteModelConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ width: '320px', textAlign: 'center' }}>
+            <h3 style={{ color: '#10b981' }}>🎉 所有部位已完成！</h3>
+            <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px' }}>
+              该模型的所有部位均已拼装完毕，是否直接完成并收入格纳库？
+            </p>
+            <div className="modal-actions" style={{ justifyContent: 'center' }}>
+              <button className="btn yes" style={{ flex: 1 }} onClick={handleConfirmCompleteModel}>收入格纳库</button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => setShowCompleteModelConfirm(false)}>稍后再说</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPreviewOpen && (
         <div className="modal-overlay">

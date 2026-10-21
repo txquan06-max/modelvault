@@ -45,7 +45,7 @@ const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<strin
 const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
   models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession,
-  timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
+  timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget
@@ -324,6 +324,7 @@ function App() {
   const [showTimeDetails, setShowTimeDetails] = useState(false);
   const engineRef = useRef(new TimerEngine());
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
@@ -400,15 +401,6 @@ function App() {
     }
   };
 
-  useEffect(() => {
-  const handleFirstInteraction = () => {
-    AudioManager.unlock();
-    document.removeEventListener('click', handleFirstInteraction);
-  };
-  document.addEventListener('click', handleFirstInteraction);
-  return () => document.removeEventListener('click', handleFirstInteraction);
-  }, []);
-
   useEffect(() => { refreshData(); }, []);
   useEffect(() => {
     const handleStorageChange = () => refreshData();
@@ -452,7 +444,6 @@ function App() {
     }
   }, [timeboxElapsed, timeboxTarget, hasPlayedTimeboxSound, timerState]);
 
-  // 定期提醒逻辑 (基于累计专注时长)
   useEffect(() => {
     if (timerState === 'Running' && reminderInterval > 0) {
       if (activeSeconds > 0 && activeSeconds % reminderInterval === 0 && activeSeconds !== lastRemindedAt) {
@@ -662,15 +653,6 @@ function App() {
     }
   };
 
-  const handleSaveImportedStages = () => {
-    if (!viewingModelId) return;
-    AudioManager.playStageDone();
-    const updated = ModelManager.updateImportedModelStatus(viewingModelId, importedStages);
-    setModels(updated);
-    setIsEditingImportedStatus(false);
-    checkAndPromptCompleteModel(updated, viewingModelId);
-  };
-
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); StorageManager.setUsername(e.target.value); };
   
@@ -806,13 +788,15 @@ function App() {
     e.target.value = ''; 
   };
 
-  const handleResetData = () => {
+  const handleResetData = async () => {
     AudioManager.playClick();
-    localStorage.clear();
-    if (window.indexedDB) {
-      window.indexedDB.deleteDatabase('ModelVault');
+    setIsResetting(true);
+    try {
+      await StorageManager.resetAll();
+    } catch (e) {
+      console.error(e);
     }
-    window.location.reload();
+    window.location.href = window.location.origin + window.location.pathname;
   };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -847,7 +831,7 @@ function App() {
   const panelProps = {
     currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession,
-    timeboxTarget, setTimeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete, 
+    timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete, 
     handleConfirmStageDone, handleCancelDone, handleFinishPart,
     isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
     currentModel, getModelName, t,
@@ -1388,8 +1372,10 @@ function App() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>确定要清空所有模型、时间记录和成就吗？此操作不可逆！</p>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData}>确认清空</button>
-                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }}>取消</button>
+                          <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData} disabled={isResetting}>
+                            {isResetting ? '清理中...' : '确认清空'}
+                          </button>
+                          <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>取消</button>
                         </div>
                       </div>
                     )}

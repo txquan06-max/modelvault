@@ -68,7 +68,6 @@ export class ModelManager {
       };
     });
 
-    // 移除了默认的 DEFAULT_DATA，让新用户进来是干净的
     return models;
   }
 
@@ -242,10 +241,7 @@ export class ModelManager {
         changedModelId = m.id; break;
       }
     }
-    if (changedModelId) { 
-      const model = models.find(m => m.id === changedModelId)!; 
-      // 注意：阶段完成不代表部位完成，部位完成才是通过 finishTask
-    }
+    // 删除了未使用的 const model = ...
     this.saveModels(models); 
     if (isStageCompletedNow) UserManager.addCoins(10); 
     return models;

@@ -4,19 +4,11 @@ import { StorageManager } from './StorageManager';
 type SoundType = 'click' | 'stage' | 'timebox' | 'complete';
 type AudioStyle = 'default' | 'chiptune' | 'soft' | 'off' | 'custom';
 
-// 1. 初始化 uisfx，并设置为“街机”风格以获得上头感
+// 初始化 uisfx，使用 arcade (街机) 风格，清脆且上头
 const ui = createUISFX({ pack: 'arcade' });
 
 export class AudioManager {
-  private static ctx: AudioContext | null = null;
-
-  private static getCtx(): AudioContext {
-    if (!this.ctx) this.ctx = new AudioContext();
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    return this.ctx;
-  }
-
-  // 用户首次交互时解锁音频（必须）
+  // 用户首次交互时解锁音频
   static async unlock() {
     try {
       await ui.unlock();
@@ -25,7 +17,6 @@ export class AudioManager {
     }
   }
 
-  // --- 自定义音效部分（保持你原有的逻辑，这里略作精简）---
   private static playCustom(type: SoundType): boolean {
     const customAudios = StorageManager.getCustomAudios();
     const base64 = customAudios[type];
@@ -43,20 +34,17 @@ export class AudioManager {
     return settings[type] || 'default';
   }
 
-  // --- 使用 uisfx 的全新音效方法 ---
-
   static playClick() {
     const style = this.getStyle('click');
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('click')) return;
-
-    // 使用 uisfx 的“点击”音效，清脆短促
-    ui.play('tap'); 
+    
+    // 替换为 uisfx 支持的 press
+    ui.play('press'); 
   }
 
   static playStart() { 
-    // 开始计时用“上升”音效，充满能量
-    ui.play('toggle-on'); 
+    ui.play('start'); 
   }
 
   static playComplete() {
@@ -64,8 +52,7 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('complete')) return;
 
-    // 完成计时用“成功”音效，悦耳且有满足感
-    ui.play('success');
+    ui.play('complete');
   }
 
   static playStageDone() {
@@ -73,18 +60,15 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('stage')) return;
 
-    // 阶段完成用“升级”音效，更有成就感
-    ui.play('level-up');
+    ui.play('select');
   }
 
   static playFinishPart() { 
-    // 完成整个部位，使用更隆重的“成就”音效
-    ui.play('achievement');
+    ui.play('double-click'); 
   }
   
   static playAchievement() { 
-    // 成就解锁，同样使用隆重的音效
-    ui.play('achievement');
+    ui.play('long-press'); 
   }
 
   static playTimeboxEnd() {
@@ -92,8 +76,8 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('timebox')) return;
 
-    // 番茄钟结束/提醒，用“通知”音效，既引人注意又不刺耳
-    ui.play('notify');
+    // 替换为 uisfx 支持的 focus (通常用于引起注意)
+    ui.play('focus');
   }
 
   static previewSound(type: SoundType) {

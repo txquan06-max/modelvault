@@ -61,6 +61,23 @@ export const StorageManager = {
     }
   },
 
+  // 新增：安全重置所有数据
+  async resetAll() {
+    try {
+      // 1. 清空 localforage 中的数据库
+      await localforage.clear();
+      // 2. 断开连接，否则浏览器会阻塞后续的删除或刷新操作
+      await localforage.dropInstance({ name: 'ModelVault' });
+    } catch (e) {
+      console.warn('Failed to clear IndexedDB', e);
+    }
+    // 3. 清空 localStorage
+    localStorage.clear();
+    // 4. 清空内存缓存
+    Object.keys(memoryCache).forEach((key) => delete memoryCache[key]);
+    isInit = false;
+  },
+
   getRawStorage(): { schemaVersion: number; models: any[] } {
     const raw = memoryCache[DATA_KEY];
     if (raw) return JSON.parse(raw);

@@ -610,7 +610,7 @@ function App() {
               <div className="view-content journal-view">
                 <div className="journal-list">
                   {getHistoryLogs().length === 0 ? (
-                    <div className="empty-state">{t('emptyJournal').split('\n').map((line, i) => <span key={i}>{line}<br/></span>)}</div>
+                    <div className="empty-state">{t('emptyJournal').split('\n').map((line: string, i: number) => <span key={i}>{line}<br/></span>)}</div>
                   ) : (
                     getHistoryLogs().map(session => {
                       const modelName = session.details?.modelName 

@@ -13,7 +13,8 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
-const compressImage = (file: File): Promise<string> => {
+// 极限压缩：背景图宽 800，质量 0.4；照片宽 800，质量 0.6
+const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -22,18 +23,17 @@ const compressImage = (file: File): Promise<string> => {
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1920;
         let width = img.width;
         let height = img.height;
-        if (width > MAX_WIDTH) {
-          height = Math.round((height * MAX_WIDTH) / width);
-          width = MAX_WIDTH;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
         }
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = (err) => reject(err);
     };
@@ -57,7 +57,7 @@ const FocusPanel = ({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try { const base64 = await compressImage(file); setFinishPartPhoto(base64); } 
+      try { const base64 = await compressImage(file, 800, 0.6); setFinishPartPhoto(base64); } 
       catch (err) { alert("Image processing failed"); }
     }
     e.target.value = '';
@@ -360,12 +360,12 @@ function App() {
   };
 
   const applyBackground = () => {
-    setBgImage(tempBgUrl);
     try {
       StorageManager.setBgImage(tempBgUrl);
+      setBgImage(tempBgUrl);
       showToast("Background Applied!");
     } catch (err) {
-      alert("本地存储空间不足，无法保存背景图！");
+      alert("本地存储空间不足，无法保存背景图！请尝试更小的图片或清理旧数据。");
     }
   };
 
@@ -373,20 +373,21 @@ function App() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const base64 = await compressImage(file);
-        // 简单的大小校验
-        if (base64.length > 4 * 1024 * 1024) {
-          alert("图片压缩后仍然过大，请换一张分辨率较小的图片。");
+        // 极限压缩：宽度最大 800，质量 0.4
+        const base64 = await compressImage(file, 800, 0.4);
+        // 如果压缩后依然大于 1.5MB，直接拒绝
+        if (base64.length > 1.5 * 1024 * 1024) {
+          alert("图片压缩后仍然过大（>1.5MB），无法存入本地。请更换图片或使用网络URL。");
           return;
         }
         setTempBgUrl(base64); 
-        setBgImage(base64); 
         try {
           StorageManager.setBgImage(base64);
+          setBgImage(base64);
+          showToast("Background Applied!");
         } catch (e) {
-          alert("本地存储空间已满，背景图未能保存。");
+          alert("本地存储空间已满，背景图未能保存。请前往“数据备份”导出数据后，清理旧图片。");
         }
-        showToast("Background Applied!");
       } catch (err) { alert("Image processing failed"); }
     }
     e.target.value = '';
@@ -468,7 +469,6 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* 改用 img 标签作为背景，兼容性更好 */}
       {bgImage && (
         <img src={bgImage} alt="background" className="app-bg-img" />
       )}
@@ -477,7 +477,6 @@ function App() {
       {toastMsg && <div className="toast">{toastMsg}</div>}
 
       <div className="mini-window">
-        {/* ... 保持内部 UI 完全不变 ... */}
         {viewingModel ? (
           <div className="profile-topbar">
             <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); }}>← {t('backToHangar')}</button>

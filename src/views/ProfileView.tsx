@@ -221,7 +221,7 @@ export const ProfileView = (props: any) => {
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
           <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.0</p>
-          <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 遇到 Bug？点击提交反馈</a>
+          <a href="https://github.com/txquan06-max/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 遇到 Bug？点击提交反馈</a>
         </div>
       </div>
     </div>

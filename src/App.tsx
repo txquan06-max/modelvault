@@ -24,9 +24,16 @@ import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
 
-import { BOTS, type BotType } from './core/QuoteEngine';
+import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+
+interface ChatMessage {
+  id: string;
+  botId: BotType;
+  text: string;
+  timestamp: number;
+}
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -99,7 +106,6 @@ function App() {
   const [isCheckedIn, setIsCheckedIn] = useState(() => CheckinManager.isCheckedInToday());
   const [checkinStreak, setCheckinStreak] = useState(() => StorageManager.getCheckinStreak());
 
-  // 🌟 新增：聊天频率状态
   const [webChatInterval, setWebChatInterval] = useState(() => StorageManager.getWebChatInterval());
   const [pipChatInterval, setPipChatInterval] = useState(() => StorageManager.getPipChatInterval());
 
@@ -112,6 +118,75 @@ function App() {
     const saved = localStorage.getItem('mv_current_bot') as BotType;
     return (saved && BOTS[saved]) ? saved : 'tu';
   });
+
+  // 🌟 新增：全局聊天记录状态
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mv_chat_messages');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return []; 
+  });
+
+  // 同步聊天记录到 sessionStorage
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
+    }
+  }, [chatMessages]);
+
+  // 初始化第一条消息
+  useEffect(() => {
+    QuoteEngine.setBot(currentBot);
+    if (chatMessages.length === 0) {
+      const initText = QuoteEngine.getStartQuote(i18n.language);
+      setChatMessages([{ id: crypto.randomUUID(), botId: currentBot, text: initText, timestamp: Date.now() }]);
+    }
+  }, [currentBot, i18n.language, chatMessages.length]);
+
+  // 🌟 核心：全局统一发声逻辑
+  useEffect(() => {
+    let chatTimer: any;
+
+    const tick = () => {
+      const newText = QuoteEngine.getRandom(i18n.language);
+      setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }].slice(-5));
+    };
+
+    const updateTimer = () => {
+      if (chatTimer) clearInterval(chatTimer);
+      
+      let interval = 0;
+      // 如果悬浮窗存在，只使用悬浮窗频率（避免两个窗口各自说话）
+      if (pipWindow) {
+        interval = pipChatInterval;
+      } 
+      // 如果没有悬浮窗，且网页在焦点状态，使用网页频率
+      else if (document.visibilityState === 'visible') {
+        interval = webChatInterval;
+      }
+
+      if (interval > 0) {
+        chatTimer = setInterval(tick, interval);
+      }
+    };
+
+    updateTimer();
+    document.addEventListener('visibilitychange', updateTimer);
+
+    return () => {
+      if (chatTimer) clearInterval(chatTimer);
+      document.removeEventListener('visibilitychange', updateTimer);
+    };
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow]);
+
+  // 手动触发新消息（开始/暂停/完成）
+  const pushChatMessage = (type: 'start' | 'pause' | 'complete') => {
+    const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
+               : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
+               : QuoteEngine.getCompleteQuote(i18n.language);
+    setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
+  };
 
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
@@ -263,10 +338,25 @@ function App() {
     AudioManager.playClick(); setTimeboxTarget(min * 60); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
   };
 
-  const handleStart = () => { AudioManager.playStart(); engineRef.current.start(); setModels(ModelManager.startStage(currentTaskId, currentStageId)); setHasPlayedTimeboxSound(false); refreshData(); };
-  const handlePause = () => { AudioManager.playPause(); engineRef.current.pause(); };
-  const handleResume = () => { AudioManager.playStart(); engineRef.current.resume(); };
-  
+  // 🌟 在操作中触发全局消息
+  const handleStart = () => { 
+    AudioManager.playStart(); 
+    engineRef.current.start(); 
+    setModels(ModelManager.startStage(currentTaskId, currentStageId)); 
+    setHasPlayedTimeboxSound(false); 
+    refreshData(); 
+    pushChatMessage('start');
+  };
+  const handlePause = () => { 
+    AudioManager.playPause(); 
+    engineRef.current.pause(); 
+    pushChatMessage('pause');
+  };
+  const handleResume = () => { 
+    AudioManager.playStart(); 
+    engineRef.current.resume(); 
+    pushChatMessage('start');
+  };
   const handleComplete = () => {
     const result = engineRef.current.complete();
     if (result) {
@@ -274,6 +364,7 @@ function App() {
       AudioManager.playComplete();
       SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
       refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId });
+      pushChatMessage('complete');
     }
   };
 
@@ -591,8 +682,9 @@ function App() {
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
     setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
     currentBot,
-    // 🌟 将动态频率传递给组件
-    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval
+    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
+    // 🌟 传递全局聊天记录
+    chatMessages
   };
 
   return (
@@ -695,6 +787,7 @@ function App() {
         applyBackground={applyBackground}
       />
 
+      {/* 🌟 悬浮窗渲染 */}
       {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
     </div>
   );

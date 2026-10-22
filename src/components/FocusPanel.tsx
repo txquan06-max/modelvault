@@ -1,14 +1,7 @@
 // src/components/FocusPanel.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-import { QuoteEngine, BOTS, type BotType } from '../core/QuoteEngine';
-
-interface ChatMessage {
-  id: string;
-  botId: BotType;
-  text: string;
-  timestamp: number;
-}
+import { BOTS, type BotType } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -18,104 +11,24 @@ export const FocusPanel = ({
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
-  currentBot,
-  webChatInterval, pipChatInterval
+  currentBot, chatMessages // 🌟 从 props 接收全局消息
 }: any) => {
   
-  // 🌟 1. 从 sessionStorage 恢复聊天记录，防止切 Tab 丢失
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = sessionStorage.getItem('mv_chat_messages');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return []; 
-  });
-
-  // 🌟 2. 改用 charIndex 记录当前打出的字数，彻底修复掉字 Bug
+  // 🌟 仅保留打字机动画状态
   const [charIndex, setCharIndex] = useState(0);
-  
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastMsgIdRef = useRef<string | null>(null);
   const botData = BOTS[currentBot as keyof typeof BOTS];
 
-  // 每次 messages 更新，同步到 sessionStorage
+  // 🌟 打字机动画逻辑
   useEffect(() => {
-    if (messages.length > 0) {
-      sessionStorage.setItem('mv_chat_messages', JSON.stringify(messages));
-    }
-  }, [messages]);
-
-  // 初始化第一条消息（仅在完全为空时）
-  useEffect(() => {
-    QuoteEngine.setBot(currentBot);
-    if (messages.length === 0) {
-      const initText = QuoteEngine.getStartQuote(i18n.language);
-      setMessages([{ id: crypto.randomUUID(), botId: currentBot, text: initText, timestamp: Date.now() }]);
-    }
-  }, [currentBot, i18n.language, messages.length]);
-
-  // 🌟 3. 动态频率、页面隐藏停止、防重复机制
-  useEffect(() => {
-    let chatTimer: any;
-
-    const startTimer = () => {
-      const interval = isPip ? pipChatInterval : webChatInterval;
-      chatTimer = setInterval(() => {
-        // 再次检查是否可见，双重保险
-        if (document.visibilityState !== 'visible' && !isPip) return;
-        
-        const newText = QuoteEngine.getRandom(i18n.language); // 引擎自带防重复洗牌
-        setMessages(prev => {
-          const newMsgs = [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }];
-          return newMsgs.slice(-5); // 保持最近5条
-        });
-      }, interval);
-    };
-
-    const stopTimer = () => {
-      if (chatTimer) clearInterval(chatTimer);
-    };
-
-    const handleVisibilityChange = () => {
-      if (isPip) return; // 悬浮窗不受此限制
-      if (document.visibilityState === 'visible') {
-        startTimer();
-      } else {
-        stopTimer(); // 最小化或切后台时停止
-      }
-    };
-
-    if (isPip || document.visibilityState === 'visible') {
-      startTimer();
-    }
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      stopTimer();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [currentBot, i18n.language, isPip, webChatInterval, pipChatInterval]);
-
-  const pushMessage = (type: 'start' | 'pause' | 'complete') => {
-    const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
-               : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
-               : QuoteEngine.getCompleteQuote(i18n.language);
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
-  };
-
-  const lastMsgIdRef = useRef<string | null>(null);
-  
-  // 🌟 4. 修复第一个字消失的核心逻辑
-  useEffect(() => {
-    const lastMsg = messages[messages.length - 1];
+    const lastMsg = chatMessages[chatMessages.length - 1];
     if (!lastMsg) return;
     
-    // 如果是同一条消息，且打字机正在运行，不重新开始
     if (lastMsgIdRef.current === lastMsg.id) return;
     lastMsgIdRef.current = lastMsg.id;
 
-    // 重置索引
     setCharIndex(0);
     let currentIdx = 0;
     const textLength = lastMsg.text.length;
@@ -124,21 +37,17 @@ export const FocusPanel = ({
     
     typingRef.current = setInterval(() => {
       currentIdx++;
-      setCharIndex(currentIdx); // 直接赋值索引，不需要依赖 prev 拼接
+      setCharIndex(currentIdx);
       
       if (currentIdx < textLength) {
-        if (currentIdx % 3 === 0) AudioManager.playTypeTick(); // 每3个字响一次
+        if (currentIdx % 3 === 0) AudioManager.playTypeTick(); 
       } else {
         clearInterval(typingRef.current);
       }
-    }, 100); // 100ms 一个字，手感更舒适
+    }, 100); 
     
     return () => { if (typingRef.current) clearInterval(typingRef.current); };
-  }, [messages]);
-
-  const handleLocalStart = () => { pushMessage('start'); handleStart(); };
-  const handleLocalPause = () => { pushMessage('pause'); handlePause(); };
-  const handleLocalComplete = () => { pushMessage('complete'); handleComplete(); };
+  }, [chatMessages]);
 
   const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -193,12 +102,11 @@ export const FocusPanel = ({
       maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)',
       WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)'
     }}>
-      {messages.map((msg, idx) => {
-        const isLatest = idx === messages.length - 1;
-        const msgBotData = BOTS[msg.botId];
+      {chatMessages.map((msg: any, idx: number) => {
+        const isLatest = idx === chatMessages.length - 1;
+        const msgBotData = BOTS[msg.botId as BotType] || BOTS['tu'];
         const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
         
-        // 🌟 核心修复：如果是最新一条，按 charIndex 截取字符显示
         const displayTxt = isLatest ? msg.text.slice(0, charIndex) : msg.text;
         
         return (
@@ -218,7 +126,6 @@ export const FocusPanel = ({
               </div>
               <div style={{ fontSize: isPipView ? '12px' : '14px', color: '#e2e8f0', lineHeight: '1.5', fontFamily: 'system-ui, -apple-system, sans-serif', wordBreak: 'break-word' }}>
                 {displayTxt}
-                {/* 只有最新的一条且没打完时才显示下划线 */}
                 {isLatest && charIndex < msg.text.length && (
                   <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>
                 )}
@@ -294,12 +201,12 @@ export const FocusPanel = ({
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
-                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalPause}>{t('pause')}</button>}
+                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handlePause}>{t('pause')}</button>}
                     {timerState === 'Paused' && (
                       <>
                         <button className="btn resume" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleResume}>{t('resume')}</button>
-                        <button className="btn complete" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalComplete}>{t('complete')}</button>
+                        <button className="btn complete" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleComplete}>{t('complete')}</button>
                       </>
                     )}
                   </div>
@@ -429,12 +336,12 @@ export const FocusPanel = ({
           </div>
         ) : (
           <div className="controls" style={{ width: '100%', marginTop: '20px' }}>
-            {timerState === 'Idle' && <button className="btn start" style={{ padding: '16px', fontSize: '18px' }} onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
-            {timerState === 'Running' && <button className="btn pause" style={{ padding: '16px', fontSize: '18px' }} onClick={handleLocalPause}>{t('pause')}</button>}
-            {timerState === 'Paused' && (<><button className="btn resume" style={{ padding: '16px', fontSize: '18px' }} onClick={handleResume}>{t('resume')}</button><button className="btn complete" style={{ padding: '16px', fontSize: '18px' }} onClick={handleLocalComplete}>{t('complete')}</button></>)}
+            {timerState === 'Idle' && <button className="btn start" style={{ padding: '16px', fontSize: '18px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+            {timerState === 'Running' && <button className="btn pause" style={{ padding: '16px', fontSize: '18px' }} onClick={handlePause}>{t('pause')}</button>}
+            {timerState === 'Paused' && (<><button className="btn resume" style={{ padding: '16px', fontSize: '18px' }} onClick={handleResume}>{t('resume')}</button><button className="btn complete" style={{ padding: '16px', fontSize: '18px' }} onClick={handleComplete}>{t('complete')}</button></>)}
           </div>
         )}
-        {timerState === 'Running' && <button className="btn complete-outline" style={{ padding: '12px', marginTop: '12px' }} onClick={handleLocalComplete}>{t('complete')}</button>}
+        {timerState === 'Running' && <button className="btn complete-outline" style={{ padding: '12px', marginTop: '12px' }} onClick={handleComplete}>{t('complete')}</button>}
       </div>
     </div>
   );

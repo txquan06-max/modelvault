@@ -718,3 +718,63 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+/* ... 保留之前的样式 ... */
+
+/* =========================================
+   PC 横屏布局 (Media Query)
+   ========================================= */
+@media (min-width: 768px) {
+  body {
+    align-items: center;
+  }
+  
+  .mini-window {
+    width: 900px !important;
+    max-width: 95vw;
+    min-height: 600px;
+    max-height: 85vh;
+    height: auto;
+    padding: 24px !important;
+  }
+
+  .focus-layout {
+    display: flex;
+    gap: 32px;
+    width: 100%;
+    height: 100%;
+    align-items: stretch;
+  }
+
+  .focus-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    padding-right: 32px;
+  }
+
+  .focus-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .add-controls {
+    justify-content: center;
+    gap: 16px;
+  }
+  .add-btn-large {
+    max-width: 200px;
+    margin-bottom: 0;
+  }
+  
+  .journal-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hangar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

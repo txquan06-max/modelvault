@@ -99,7 +99,7 @@ function App() {
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   
-  // 新增：本地系统时间状态
+  // 本地时间
   const [localTime, setLocalTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
   // ================= 全局副作用 (Effects) =================
@@ -111,11 +111,11 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 实时更新本地时间
+  // 实时更新本地时间，为了优化性能我们只需要每分钟刷新一次显示即可
   useEffect(() => {
     const timer = setInterval(() => {
       setLocalTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000);
+    }, 1000 * 10); // 每 10 秒检查一次，避免不必要的渲染
     return () => clearInterval(timer);
   }, []);
 
@@ -580,12 +580,12 @@ function App() {
               <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
+            
             <div className="top-bar">
               <span>{t('xp')}: {totalXp} | 🪙 {coinsBalance}</span>
-              <div className="top-right">
-                {/* 新增本地时间显示，使用 tabular-nums 防止数字跳动导致宽度变化 */}
-                <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.8, marginRight: '4px' }}>{localTime}</span>
-                <span>{t('today')}: {formatTime(todayTotal)}</span>
+              <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.9 }} title="本地时间">🕒 {localTime}</span>
+                <span style={{ color: '#10b981' }} title="今日拼装时长">⏳ {t('today')}: {formatTime(todayTotal)}</span>
                 <button className="icon-btn" onClick={handleOpenPiP}>📺</button>
                 <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
               </div>

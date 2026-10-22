@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-import { QuoteEngine, BOTS } from '../core/QuoteEngine';
+// 🌟 导入 BotType
+import { QuoteEngine, BOTS, type BotType } from '../core/QuoteEngine';
+
+interface ChatMessage {
+  id: string;
+  botId: BotType; // 🌟 将 any 改为具体的 BotType，解决 TS 索引报错
+  text: string;
+  timestamp: number;
+}
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -13,53 +21,68 @@ export const FocusPanel = ({
   currentBot
 }: any) => {
   
-  const [quote, setQuote] = useState(() => {
-    QuoteEngine.setBot(currentBot);
-    return QuoteEngine.getRandom(i18n.language);
-  });
-  const [displayedQuote, setDisplayedQuote] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typingText, setTypingText] = useState('');
   const typingRef = useRef<any>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const botData = BOTS[currentBot as keyof typeof BOTS];
-  const botName = i18n.language === 'zh' ? botData.name : botData.enName;
 
+  // 初始化第一条消息
   useEffect(() => {
     QuoteEngine.setBot(currentBot);
-    setQuote(QuoteEngine.getRandom(i18n.language));
+    const initText = QuoteEngine.getStartQuote(i18n.language);
+    setMessages([{ id: crypto.randomUUID(), botId: currentBot, text: initText, timestamp: Date.now() }]);
   }, [currentBot, i18n.language]);
 
+  // 8秒自动发送新消息
   useEffect(() => {
-    setDisplayedQuote('');
-    let currentIndex = 0;
-    if (typingRef.current) clearInterval(typingRef.current);
-    const safeQuote = String(quote || '');
+    const timer = setInterval(() => {
+      const newText = QuoteEngine.getRandom(i18n.language);
+      setMessages(prev => {
+        // 保持最多 5 条消息，防止内存溢出
+        const newMsgs = [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }];
+        return newMsgs.slice(-5); 
+      });
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [currentBot, i18n.language]);
 
+  // 手动触发新消息（用于开始、暂停、结束时）
+  const pushMessage = (type: 'start' | 'pause' | 'complete') => {
+    const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
+               : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
+               : QuoteEngine.getCompleteQuote(i18n.language);
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
+  };
+
+  // 打字机效果（永远只对最新一条消息生效）
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg) return;
+    
+    setTypingText('');
+    let index = 0;
+    const text = lastMsg.text;
+    
+    if (typingRef.current) clearInterval(typingRef.current);
+    
     typingRef.current = setInterval(() => {
-      if (currentIndex < safeQuote.length) {
-        const char = safeQuote.charAt(currentIndex);
-        setDisplayedQuote((prev) => prev + char);
-        if (currentIndex % 2 === 0) AudioManager.playTypeTick();
-        currentIndex++;
+      if (index < text.length) {
+        setTypingText(prev => prev + text.charAt(index));
+        if (index % 2 === 0) AudioManager.playTypeTick();
+        index++;
       } else {
         clearInterval(typingRef.current);
       }
-    }, 80);
-
+    }, 60); 
+    
     return () => { if (typingRef.current) clearInterval(typingRef.current); };
-  }, [quote]);
+  }, [messages]);
 
-  useEffect(() => {
-    if (timerState === 'Running') {
-      const timer = setInterval(() => setQuote(QuoteEngine.getRandom(i18n.language)), 25000);
-      return () => clearInterval(timer);
-    } else if (timerState === 'Idle' && activeSeconds === 0) {
-      setQuote(QuoteEngine.getRandom(i18n.language));
-    }
-  }, [timerState, activeSeconds, i18n.language]);
-
-  const handleLocalStart = () => { setQuote(QuoteEngine.getStartQuote(i18n.language)); handleStart(); };
-  const handleLocalPause = () => { setQuote(QuoteEngine.getPauseQuote(i18n.language)); handlePause(); };
-  const handleLocalComplete = () => { setQuote(QuoteEngine.getCompleteQuote(i18n.language)); handleComplete(); };
+  const handleLocalStart = () => { pushMessage('start'); handleStart(); };
+  const handleLocalPause = () => { pushMessage('pause'); handlePause(); };
+  const handleLocalComplete = () => { pushMessage('complete'); handleComplete(); };
 
   const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -93,6 +116,60 @@ export const FocusPanel = ({
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // 通用渲染消息组件的函数
+  const renderChatHistory = (isPipView: boolean) => (
+    <div style={{ 
+      background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
+      border: `1px solid ${botData.color}50`, 
+      borderRadius: '16px', 
+      padding: '12px 16px', 
+      display: 'flex', 
+      flexDirection: 'column',
+      justifyContent: 'flex-end', 
+      gap: '12px',
+      boxShadow: `0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px ${botData.color}15`,
+      backdropFilter: 'blur(12px)',
+      transition: 'all 0.3s',
+      flex: isPipView ? 'none' : 1,
+      height: isPipView ? '120px' : '220px', 
+      overflow: 'hidden', 
+      position: 'relative',
+      maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)',
+      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)'
+    }}>
+      {messages.map((msg, idx) => {
+        const isLatest = idx === messages.length - 1;
+        const msgBotData = BOTS[msg.botId]; // 🌟 现在 msg.botId 是 BotType，这里不会再报错
+        const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
+        const displayTxt = isLatest ? typingText : msg.text;
+        
+        return (
+          <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <div style={{ 
+              width: isPipView ? '24px' : '32px', 
+              height: isPipView ? '24px' : '32px', 
+              borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+              border: `2px solid ${msgBotData.color}`, boxShadow: `0 0 8px ${msgBotData.color}60`,
+              background: '#111'
+            }}>
+              <img src={msgBotData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <div style={{ flex: 1, marginTop: '2px' }}>
+              <div style={{ color: msgBotData.color, fontWeight: 'bold', fontSize: isPipView ? '11px' : '13px', marginBottom: '4px' }}>
+                {msgBotName}
+              </div>
+              <div style={{ fontSize: isPipView ? '12px' : '14px', color: '#e2e8f0', lineHeight: '1.5', fontFamily: 'system-ui, -apple-system, sans-serif', wordBreak: 'break-word' }}>
+                {displayTxt}
+                {isLatest && <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div ref={chatEndRef} />
+    </div>
+  );
 
   // =========================================================================
   // 悬浮窗 (PiP) 视图
@@ -171,41 +248,7 @@ export const FocusPanel = ({
                   </div>
                 )}
 
-                {/* 🌟 悬浮窗现代聊天气泡样式 */}
-                <div style={{ 
-                  background: 'rgba(20, 25, 35, 0.7)', 
-                  border: `1px solid ${botData.color}40`, 
-                  borderRadius: '12px', 
-                  padding: '10px', 
-                  fontSize: '12px', 
-                  color: '#e2e8f0', 
-                  minHeight: '60px', 
-                  boxShadow: `0 8px 32px rgba(0,0,0,0.5), inset 0 0 15px ${botData.color}10`, 
-                  position: 'relative',
-                  wordBreak: 'break-word',
-                  lineHeight: '1.6',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <div style={{ 
-                    width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                    border: `2px solid ${botData.color}`, boxShadow: `0 0 8px ${botData.color}80`,
-                    background: '#111'
-                  }}>
-                    <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: botData.color, fontWeight: 'bold', fontSize: '11px', marginBottom: '2px' }}>
-                      {botName}
-                    </div>
-                    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                      {displayedQuote}
-                      <span style={{ animation: 'pulse 1s infinite', color: botData.color }}>_</span>
-                    </div>
-                  </div>
-                </div>
+                {renderChatHistory(true)}
               </div>
             </>
           )}
@@ -257,37 +300,8 @@ export const FocusPanel = ({
           )}
         </div>
 
-        {/* 主界面 AI 聊天气泡 */}
-        <div style={{ 
-          background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
-          border: `1px solid ${botData.color}50`, 
-          borderRadius: '16px', 
-          padding: '20px', 
-          display: 'flex', 
-          alignItems: 'flex-start', 
-          gap: '16px', 
-          boxShadow: `0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px ${botData.color}15`,
-          backdropFilter: 'blur(12px)',
-          transition: 'all 0.3s',
-          flex: 1
-        }}>
-          <div style={{ 
-            width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-            border: `2px solid ${botData.color}`, boxShadow: `0 0 15px ${botData.color}60`,
-            background: '#111'
-          }}>
-            <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: botData.color, fontWeight: 'bold', fontSize: '14px', marginBottom: '6px' }}>
-              {botName}
-            </div>
-            <div style={{ fontSize: '15px', color: '#e2e8f0', lineHeight: '1.7', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              {displayedQuote}
-              <span style={{ animation: 'pulse 1s infinite', color: botData.color, fontWeight: 'bold' }}>|</span>
-            </div>
-          </div>
-        </div>
+        {/* 主界面 AI 聊天气泡（滚动列表） */}
+        {renderChatHistory(false)}
       </div>
 
       {/* 右侧计时与控制栏 */}

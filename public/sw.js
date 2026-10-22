@@ -1,4 +1,4 @@
-const CACHE_NAME = 'modelvault-v1';
+const CACHE_NAME = 'modeljourney-v3'; // 🌟 把版本号改大，强制更新
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -6,12 +6,26 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // 🌟 强制新 SW 立即接管
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName); // 🌟 清理旧版本缓存
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // 🌟 立即控制所有页面
+  );
 });
 
 self.addEventListener('fetch', (event) => {

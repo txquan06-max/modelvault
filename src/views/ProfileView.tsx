@@ -1,3 +1,4 @@
+// src/views/ProfileView.tsx
 import { AudioManager } from '../core/AudioManager';
 
 export const ProfileView = (props: any) => {
@@ -8,7 +9,9 @@ export const ProfileView = (props: any) => {
     bgMain, bgPip, handleBgFileUpload, reminderInterval, setReminderInterval, openPreview, audioSettings, updateAudioSetting,
     customAudios, handleAudioUpload, titles, earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle,
     earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
-    storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager
+    storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
+    // 🌟 接收新增的发言频率属性
+    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval
   } = props;
 
   return (
@@ -123,6 +126,29 @@ export const ProfileView = (props: any) => {
             <option value={60 * 60}>60m</option>
           </select>
         </div>
+
+        {/* 🌟 新增：发言频率设置 */}
+        <div className="custom-row">
+          <span>{i18n.language === 'zh' ? '网页AI发言频率' : 'Web AI Chat Freq'}:</span>
+          <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); StorageManager.setWebChatInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
+            <option value={5000}>5s</option>
+            <option value={8000}>8s ({i18n.language === 'zh' ? '默认' : 'Default'})</option>
+            <option value={15000}>15s</option>
+            <option value={30000}>30s</option>
+            <option value={60000}>60s</option>
+          </select>
+        </div>
+
+        <div className="custom-row">
+          <span>{i18n.language === 'zh' ? '悬浮窗AI发言频率' : 'PiP AI Chat Freq'}:</span>
+          <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); StorageManager.setPipChatInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
+            <option value={30000}>30s</option>
+            <option value={60000}>60s ({i18n.language === 'zh' ? '默认' : 'Default'})</option>
+            <option value={120000}>120s</option>
+            <option value={300000}>300s</option>
+          </select>
+        </div>
+        {/* 🌟 新增结束 */}
 
         <div className="custom-row">
           <span>{t('bgMain')}:</span>

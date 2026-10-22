@@ -1,3 +1,4 @@
+// src/core/AudioManager.ts
 import { createUISFX } from 'uisfx';
 import { StorageManager } from './StorageManager';
 
@@ -97,21 +98,21 @@ export class AudioManager {
 
   static previewSound(type: SoundType) { this.play(type); }
 
-  // 🌟 新增：打字机微音效
+  // 🌟 优化：打字机微音效，更柔和
   static playTypeTick() {
     const settings = StorageManager.getAudioSettings();
-    if (settings['click'] === 'off') return; // 共用点击音效的开关
+    if (settings['click'] === 'off') return;
     try {
       const ctx = this.getCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(1800, ctx.currentTime); // 更高频，更清脆
-      gain.gain.setValueAtTime(0.03, ctx.currentTime); // 音量很小
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02); // 极短
+      osc.type = 'sine'; // 改为sine波，更顺滑
+      osc.frequency.setValueAtTime(1600, ctx.currentTime); 
+      gain.gain.setValueAtTime(0.015, ctx.currentTime); // 音量减半
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03); 
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.02);
+      osc.stop(ctx.currentTime + 0.03);
     } catch (e) {}
   }
 }

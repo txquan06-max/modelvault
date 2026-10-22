@@ -1,11 +1,11 @@
+// src/components/FocusPanel.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-// 🌟 导入 BotType
 import { QuoteEngine, BOTS, type BotType } from '../core/QuoteEngine';
 
 interface ChatMessage {
   id: string;
-  botId: BotType; // 🌟 将 any 改为具体的 BotType，解决 TS 索引报错
+  botId: BotType;
   text: string;
   timestamp: number;
 }
@@ -18,37 +18,81 @@ export const FocusPanel = ({
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
-  currentBot
+  currentBot,
+  // 🌟 接收动态频率
+  webChatInterval, pipChatInterval
 }: any) => {
   
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mv_chat_messages');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return []; 
+  });
+
   const [typingText, setTypingText] = useState('');
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
   const botData = BOTS[currentBot as keyof typeof BOTS];
 
-  // 初始化第一条消息
+  useEffect(() => {
+    sessionStorage.setItem('mv_chat_messages', JSON.stringify(messages));
+  }, [messages]);
+
   useEffect(() => {
     QuoteEngine.setBot(currentBot);
-    const initText = QuoteEngine.getStartQuote(i18n.language);
-    setMessages([{ id: crypto.randomUUID(), botId: currentBot, text: initText, timestamp: Date.now() }]);
-  }, [currentBot, i18n.language]);
+    if (messages.length === 0) {
+      const initText = QuoteEngine.getStartQuote(i18n.language);
+      setMessages([{ id: crypto.randomUUID(), botId: currentBot, text: initText, timestamp: Date.now() }]);
+    }
+  }, [currentBot, i18n.language, messages.length]);
 
-  // 8秒自动发送新消息
+  // 🌟 核心修改：动态频率、页面隐藏停止、防重复机制
   useEffect(() => {
-    const timer = setInterval(() => {
-      const newText = QuoteEngine.getRandom(i18n.language);
-      setMessages(prev => {
-        // 保持最多 5 条消息，防止内存溢出
-        const newMsgs = [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }];
-        return newMsgs.slice(-5); 
-      });
-    }, 8000);
-    return () => clearInterval(timer);
-  }, [currentBot, i18n.language]);
+    let chatTimer: any;
 
-  // 手动触发新消息（用于开始、暂停、结束时）
+    const startTimer = () => {
+      const interval = isPip ? pipChatInterval : webChatInterval;
+      chatTimer = setInterval(() => {
+        // 再次检查是否可见，双重保险
+        if (document.visibilityState !== 'visible' && !isPip) return;
+        
+        const newText = QuoteEngine.getRandom(i18n.language); // 引擎自带防重复洗牌
+        setMessages(prev => {
+          const newMsgs = [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }];
+          return newMsgs.slice(-5); // 保持最近5条
+        });
+      }, interval);
+    };
+
+    const stopTimer = () => {
+      if (chatTimer) clearInterval(chatTimer);
+    };
+
+    // 页面可见性变化处理
+    const handleVisibilityChange = () => {
+      if (isPip) return; // 悬浮窗不受此限制
+      if (document.visibilityState === 'visible') {
+        startTimer();
+      } else {
+        stopTimer(); // 最小化或切后台时停止
+      }
+    };
+
+    // 初始启动
+    if (isPip || document.visibilityState === 'visible') {
+      startTimer();
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentBot, i18n.language, isPip, webChatInterval, pipChatInterval]);
+
   const pushMessage = (type: 'start' | 'pause' | 'complete') => {
     const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
                : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
@@ -56,11 +100,16 @@ export const FocusPanel = ({
     setMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
   };
 
-  // 打字机效果（永远只对最新一条消息生效）
+  const lastMsgIdRef = useRef<string | null>(null);
+  
+  // 🌟 核心修改：打字速度降低（100ms），音效频率降低（每3个字响一次）
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg) return;
     
+    if (lastMsgIdRef.current === lastMsg.id) return;
+    lastMsgIdRef.current = lastMsg.id;
+
     setTypingText('');
     let index = 0;
     const text = lastMsg.text;
@@ -70,12 +119,13 @@ export const FocusPanel = ({
     typingRef.current = setInterval(() => {
       if (index < text.length) {
         setTypingText(prev => prev + text.charAt(index));
-        if (index % 2 === 0) AudioManager.playTypeTick();
+        // 每 3 个字符响一次，不显得急促
+        if (index % 3 === 0) AudioManager.playTypeTick();
         index++;
       } else {
         clearInterval(typingRef.current);
       }
-    }, 60); 
+    }, 100); // 从 60ms 改为 100ms，速度明显放慢，更优雅
     
     return () => { if (typingRef.current) clearInterval(typingRef.current); };
   }, [messages]);
@@ -117,7 +167,6 @@ export const FocusPanel = ({
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // 通用渲染消息组件的函数
   const renderChatHistory = (isPipView: boolean) => (
     <div style={{ 
       background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
@@ -140,9 +189,9 @@ export const FocusPanel = ({
     }}>
       {messages.map((msg, idx) => {
         const isLatest = idx === messages.length - 1;
-        const msgBotData = BOTS[msg.botId]; // 🌟 现在 msg.botId 是 BotType，这里不会再报错
+        const msgBotData = BOTS[msg.botId];
         const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
-        const displayTxt = isLatest ? typingText : msg.text;
+        const displayTxt = (isLatest && typingText.length < msg.text.length) ? typingText : msg.text;
         
         return (
           <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -161,7 +210,9 @@ export const FocusPanel = ({
               </div>
               <div style={{ fontSize: isPipView ? '12px' : '14px', color: '#e2e8f0', lineHeight: '1.5', fontFamily: 'system-ui, -apple-system, sans-serif', wordBreak: 'break-word' }}>
                 {displayTxt}
-                {isLatest && <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>}
+                {isLatest && typingText.length < msg.text.length && (
+                  <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>
+                )}
               </div>
             </div>
           </div>
@@ -171,9 +222,6 @@ export const FocusPanel = ({
     </div>
   );
 
-  // =========================================================================
-  // 悬浮窗 (PiP) 视图
-  // =========================================================================
   if (isPip) {
     return (
       <div className={pipClass}>
@@ -257,16 +305,11 @@ export const FocusPanel = ({
     );
   }
 
-  // =========================================================================
-  // 主界面专注页视图 (PC 端使用左右分栏)
-  // =========================================================================
   return (
     <div className="focus-layout">
       
-      {/* 左侧信息与对话框栏 */}
       <div className="focus-left">
         
-        {/* 玩家卡片 */}
         <div className="profile-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
           <div style={{ 
             width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden',
@@ -286,7 +329,6 @@ export const FocusPanel = ({
           <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>🕒 {localTime}</div>
         </div>
 
-        {/* 今日与打卡 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
             ⏳ {t('today')}: {formatTime(todayTotal)}
@@ -300,11 +342,9 @@ export const FocusPanel = ({
           )}
         </div>
 
-        {/* 主界面 AI 聊天气泡（滚动列表） */}
         {renderChatHistory(false)}
       </div>
 
-      {/* 右侧计时与控制栏 */}
       <div className="focus-right">
         <div className="selector-group" style={{ marginBottom: '20px' }}>
           <div className="selector-row">

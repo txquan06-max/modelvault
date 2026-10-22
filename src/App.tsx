@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -98,7 +99,10 @@ function App() {
   const [isCheckedIn, setIsCheckedIn] = useState(() => CheckinManager.isCheckedInToday());
   const [checkinStreak, setCheckinStreak] = useState(() => StorageManager.getCheckinStreak());
 
-  // 🌟 全局机器人状态
+  // 🌟 新增：聊天频率状态
+  const [webChatInterval, setWebChatInterval] = useState(() => StorageManager.getWebChatInterval());
+  const [pipChatInterval, setPipChatInterval] = useState(() => StorageManager.getPipChatInterval());
+
   const [unlockedBots, setUnlockedBots] = useState<BotType[]>(() => {
     const saved = localStorage.getItem('mv_unlocked_bots');
     return saved ? JSON.parse(saved) : ['tu'];
@@ -586,7 +590,9 @@ function App() {
     showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, addToLegacyList, legacyList, setLegacyList, removeLegacyItem, handleLegacyCoverUpload, handleLegacyImport,
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
     setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
-    currentBot
+    currentBot,
+    // 🌟 将动态频率传递给组件
+    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval
   };
 
   return (

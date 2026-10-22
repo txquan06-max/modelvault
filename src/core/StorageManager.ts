@@ -1,6 +1,7 @@
+// src/core/StorageManager.ts
 import localforage from 'localforage';
 
-const CURRENT_SCHEMA_VERSION = 3; // 版本号升级
+const CURRENT_SCHEMA_VERSION = 3;
 const DATA_KEY = 'modelvault_core_data';
 
 const KEYS = {
@@ -24,6 +25,9 @@ const KEYS = {
   CHECKIN_STREAK: 'mv_checkin_streak',
   LAST_CHECKIN_DATE: 'mv_last_checkin_date',
   TOTAL_CHECKIN_DAYS: 'mv_total_checkin_days',
+  // 🌟 新增：发言频率设置
+  WEB_CHAT_INTERVAL: 'mv_web_chat_interval',
+  PIP_CHAT_INTERVAL: 'mv_pip_chat_interval',
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
@@ -54,7 +58,6 @@ export const StorageManager = {
       if (val !== null) memoryCache[key] = val;
     }
 
-    // 数据迁移
     try {
       const rawData = memoryCache[DATA_KEY];
       if (rawData) {
@@ -65,10 +68,6 @@ export const StorageManager = {
           console.log(`🔄 数据迁移: v${storedVersion} -> v${CURRENT_SCHEMA_VERSION}`);
           await localforage.setItem('modelvault_backup_before_migration', rawData);
           let migratedModels = parsed.models || [];
-
-          if (storedVersion < 3) {
-            // v3 新增字段 (无，主要是新存储键)
-          }
 
           const newData = { schemaVersion: CURRENT_SCHEMA_VERSION, models: migratedModels };
           memoryCache[DATA_KEY] = JSON.stringify(newData);
@@ -136,6 +135,10 @@ export const StorageManager = {
   getCheckinStreak: () => Number(memoryCache[KEYS.CHECKIN_STREAK]) || 0,
   getLastCheckinDate: () => memoryCache[KEYS.LAST_CHECKIN_DATE] || '',
   getTotalCheckinDays: () => Number(memoryCache[KEYS.TOTAL_CHECKIN_DAYS]) || 0,
+  
+  // 🌟 新增Getter，默认网页8秒，悬浮窗60秒
+  getWebChatInterval: () => Number(memoryCache[KEYS.WEB_CHAT_INTERVAL]) || 8000,
+  getPipChatInterval: () => Number(memoryCache[KEYS.PIP_CHAT_INTERVAL]) || 60000,
 
   // Setter
   setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
@@ -158,6 +161,10 @@ export const StorageManager = {
   setCheckinStreak: (val: number) => StorageManager._set(KEYS.CHECKIN_STREAK, val.toString()),
   setLastCheckinDate: (val: string) => StorageManager._set(KEYS.LAST_CHECKIN_DATE, val),
   setTotalCheckinDays: (val: number) => StorageManager._set(KEYS.TOTAL_CHECKIN_DAYS, val.toString()),
+  
+  // 🌟 新增Setter
+  setWebChatInterval: (val: number) => StorageManager._set(KEYS.WEB_CHAT_INTERVAL, val.toString()),
+  setPipChatInterval: (val: number) => StorageManager._set(KEYS.PIP_CHAT_INTERVAL, val.toString()),
 
   exportAll: () => {
     const data: any = { version: CURRENT_SCHEMA_VERSION, coreData: memoryCache[DATA_KEY] || null };
@@ -168,7 +175,6 @@ export const StorageManager = {
   importAll(data: any) {
     if (!data || !data.version) return false;
     try {
-      // 合并逻辑保持不变
       const coreDataRaw = data.coreData;
       if (coreDataRaw) {
         const importedCore = typeof coreDataRaw === 'string' ? JSON.parse(coreDataRaw) : coreDataRaw;

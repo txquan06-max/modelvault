@@ -14,7 +14,6 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
-// 引入拆分后的模块
 import { FocusView } from './views/FocusView';
 import { JournalView } from './views/JournalView';
 import { HangarView } from './views/HangarView';
@@ -27,8 +26,6 @@ const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
 function App() {
   const { t, i18n } = useTranslation();
-  
-  // ================= 状态区 =================
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -38,12 +35,8 @@ function App() {
   const [activeSeconds, setActiveSeconds] = useState(0);
   const [timerState, setTimerState] = useState<'Idle' | 'Running' | 'Paused'>('Idle');
   const [todayTotal, setTodayTotal] = useState(0);
-  
-  // 新增：等级与经验
-  const [totalXp, setTotalXp] = useState(0);
   const [level, setLevel] = useState(1);
   const [levelProgress, setLevelProgress] = useState({ current: 0, next: 100, percent: 0 });
-
   const [coinsBalance, setCoinsBalance] = useState(0);
   const [earnedTitles, setEarnedTitles] = useState<string[]>([]);
   const [equippedTitle, setEquippedTitle] = useState('');
@@ -65,7 +58,6 @@ function App() {
   const [completeModelId, setCompleteModelId] = useState<string | null>(null);
 
   const [journalFilterMonth, setJournalFilterMonth] = useState('');
-
   const [models, setModels] = useState<Model[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -74,10 +66,8 @@ function App() {
 
   const [lastSession, setLastSession] = useState<{ duration: number; stageId: string | null } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
-
   const [isAddingModel, setIsAddingModel] = useState(false);
   const [newModelNameInput, setNewModelNameInput] = useState(''); 
   const [selectedGunpla, setSelectedGunpla] = useState<GunplaItem | null>(null); 
@@ -87,12 +77,10 @@ function App() {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [searchResults, setSearchResults] = useState<GunplaItem[]>([]);
-
   const [legacyInput, setLegacyInput] = useState('');
   const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
   const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
-
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
   const [timeboxElapsed, setTimeboxElapsed] = useState(() => StorageManager.getTimeboxElapsed());
   const [hasPlayedTimeboxSound, setHasPlayedTimeboxSound] = useState(false);
@@ -104,29 +92,15 @@ function App() {
   const engineRef = useRef(new TimerEngine());
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  
-  // 本地时间
-  const [localTime, setLocalTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-  // 打卡状态
   const [isCheckedIn, setIsCheckedIn] = useState(() => CheckinManager.isCheckedInToday());
   const [checkinStreak, setCheckinStreak] = useState(() => StorageManager.getCheckinStreak());
 
-  // ================= 全局副作用 (Effects) =================
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
 
   useEffect(() => {
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
     GunplaSearch.init();
-  }, []);
-
-  // 实时更新本地时间
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setLocalTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000 * 10); 
-    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -165,7 +139,6 @@ function App() {
 
   const refreshData = () => {
     const xp = ModelManager.getTotalXP();
-    setTotalXp(xp);
     setLevel(UserManager.getLevel(xp));
     setLevelProgress(UserManager.getLevelProgress(xp));
     setTodayTotal(SessionManager.getTodayTotalSeconds());
@@ -183,7 +156,6 @@ function App() {
 
     const allModels = ModelManager.getAllModels();
     setModels(allModels);
-    
     const available = allModels.filter(m => m.status !== 'Completed');
     if (available.length > 0) {
       if (!currentModelId || !available.some(m => m.id === currentModelId)) setCurrentModelId(available[0].id);
@@ -246,8 +218,6 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
-
-  // ================= 核心逻辑区 (Handlers) =================
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
 
@@ -581,8 +551,7 @@ function App() {
     storageUsage: StorageManager.getStorageUsage(), exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, addToLegacyList, legacyList, setLegacyList, removeLegacyItem, handleLegacyCoverUpload, handleLegacyImport,
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
-    setBgMain, setBgPip, StorageManager,
-    level, levelProgress // 新增传给 ProfileView 的属性
+    setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin
   };
 
   return (
@@ -610,7 +579,7 @@ function App() {
           <div className="profile-topbar">
             <button className="back-btn" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>{t('backToFocus')}</button>
             <div className="top-right">
-              <button className="icon-btn" onClick={handleOpenPiP}>📺</button>
+              <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗模式</button>
               <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
             </div>
           </div>
@@ -621,24 +590,6 @@ function App() {
               <button className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
               <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
-            </div>
-            <div className="top-bar">
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span>👤 {username}</span>
-                <span title={`Level ${level}`} style={{ color: '#f59e0b', fontWeight: 'bold' }}>Lv.{level}</span>
-                <span>{t('xp')}: {totalXp}</span>
-                <span style={{ color: '#10b981', fontWeight: 'bold' }}>⏳ {t('today')}: {formatTime(todayTotal)}</span>
-              </div>
-              <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {!isCheckedIn ? (
-                  <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold' }} onClick={handleCheckin}>📅 打卡</button>
-                ) : (
-                  <span style={{ color: '#10b981', fontSize: '12px' }}>✅ 已打卡 ({checkinStreak}天)</span>
-                )}
-                <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.8, fontSize: '12px' }}>🕒 {localTime}</span>
-                <button className="icon-btn" onClick={handleOpenPiP}>📺</button>
-                <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
-              </div>
             </div>
           </>
         )}

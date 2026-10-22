@@ -56,17 +56,16 @@ export class AudioManager {
     return false;
   }
 
-  // 纯 Web Audio 合成清脆的点击声，替换掉沉闷的 uisfx 默认音
   private static playCrispClick() {
     try {
       const ctx = this.getCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine'; // 正弦波最清脆
-      osc.frequency.setValueAtTime(1400, ctx.currentTime); // 高频
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, ctx.currentTime);
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // 极短
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.05);
     } catch (e) {}
@@ -78,7 +77,6 @@ export class AudioManager {
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom(type)) return;
     
-    // 如果是普通点击，使用我们自己写的清脆声
     if (type === 'click' && style === 'default') {
       this.playCrispClick();
       return;
@@ -98,4 +96,22 @@ export class AudioManager {
   static playAchievement() { this.play('achievement'); }
 
   static previewSound(type: SoundType) { this.play(type); }
+
+  // 🌟 新增：打字机微音效
+  static playTypeTick() {
+    const settings = StorageManager.getAudioSettings();
+    if (settings['click'] === 'off') return; // 共用点击音效的开关
+    try {
+      const ctx = this.getCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1800, ctx.currentTime); // 更高频，更清脆
+      gain.gain.setValueAtTime(0.03, ctx.currentTime); // 音量很小
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02); // 极短
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.02);
+    } catch (e) {}
+  }
 }

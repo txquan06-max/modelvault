@@ -4,14 +4,15 @@ import { QuoteEngine } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-  models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession, // 🌟 删除了 todayTotal
+  models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession, todayTotal,
   timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget
+  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
+  username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus
 }: any) => {
   
-  // 🌟 打字机效果核心逻辑
+  // 🌟 打字机效果与音效
   const [quote, setQuote] = useState(QuoteEngine.getRandom());
   const [displayedQuote, setDisplayedQuote] = useState('');
   const typingRef = useRef<any>(null);
@@ -24,6 +25,10 @@ export const FocusPanel = ({
     typingRef.current = setInterval(() => {
       if (currentIndex < quote.length) {
         setDisplayedQuote((prev) => prev + quote[currentIndex]);
+        // 每打 2 个字响一次，避免太吵
+        if (currentIndex % 2 === 0) {
+           AudioManager.playTypeTick();
+        }
         currentIndex++;
       } else {
         clearInterval(typingRef.current);
@@ -46,7 +51,7 @@ export const FocusPanel = ({
   const handleLocalPause = () => { setQuote(QuoteEngine.getPauseQuote()); handlePause(); };
   const handleLocalComplete = () => { setQuote(QuoteEngine.getCompleteQuote()); handleComplete(); };
 
-  const currentTaskName = currentTask ? t(currentTask.name) : t('noTask');
+  const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - timeboxElapsed) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && timeboxElapsed > 0;
@@ -75,41 +80,40 @@ export const FocusPanel = ({
     e.target.value = '';
   };
 
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
-  };
-
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
+  const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // =========================================================================
+  // 悬浮窗 (PiP) 视图
+  // =========================================================================
   if (isPip) {
     return (
       <div className={pipClass}>
         {bgImage && <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: 0, opacity: 1 }} />}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1 }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(30, 30, 30, 0.8)', zIndex: 1, backdropFilter: 'blur(10px)' }} />
         
         <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', boxSizing: 'border-box' }}>
-          
           {availableModels.length === 0 ? (
             <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px' }}>{t('noActiveModel')}</div>
           ) : (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', fontSize: '12px' }}>
+                <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.4)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '12px', outline: 'none' }}>
                   {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
                 </select>
-                <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', fontSize: '12px' }}>
+                <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.4)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '12px', outline: 'none' }}>
                   {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
                 </select>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px' }}>
-                <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '36px' }}>{formatTime(activeSeconds)}</div>
+                <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '42px', fontWeight: 300, textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>{formatTime(activeSeconds)}</div>
                 
                 {timerState === 'Idle' && !lastSession && (
-                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                     {[0, 15, 30, 60].map(min => (
-                      <button key={min} style={{ background: timeboxTarget === min * 60 ? '#3b82f6' : '#333', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }} onClick={() => handleSetTimeboxTarget(min)}>
+                      <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => handleSetTimeboxTarget(min)}>
                         {min === 0 ? t('timeboxNone') : `${min}m`}
                       </button>
                     ))}
@@ -117,9 +121,9 @@ export const FocusPanel = ({
                 )}
                 
                 {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: '4px' }}>
                     {currentTask.stages.map((stage: any) => (
-                      <button key={stage.id} style={{ background: stage.id === currentStageId ? '#3b82f6' : '#333', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: '1px solid #555', padding: '2px 4px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
+                      <button key={stage.id} style={{ background: stage.id === currentStageId ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: 'none', padding: '4px 6px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
                         {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
                       </button>
                     ))}
@@ -127,44 +131,54 @@ export const FocusPanel = ({
                 )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {isFinishingPart ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '11px', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px' }} disabled={finishPartPhoto.startsWith('data:')} />
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn yes" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
-                      <button className="btn no" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '11px', padding: '6px', background: 'rgba(0,0,0,0.4)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} />
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
+                      <button className="btn no" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
                     </div>
                   </div>
                 ) : lastSession ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontSize: '11px', color: '#10b981', textAlign: 'center' }}>{t('saved')}: {formatTime(lastSession.duration)}</div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn yes" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleConfirmStageDone}>{t('yesDone')}</button>
-                      <button className="btn no" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleCancelDone}>{t('keepWorking')}</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', color: '#10b981', textAlign: 'center', fontWeight: 'bold' }}>{t('saved')}: {formatTime(lastSession.duration)}</div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleConfirmStageDone}>{t('yesDone')}</button>
+                      <button className="btn no" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleCancelDone}>{t('keepWorking')}</button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
-                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalPause}>{t('pause')}</button>}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
+                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalPause}>{t('pause')}</button>}
                     {timerState === 'Paused' && (
                       <>
-                        <button className="btn resume" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleResume}>{t('resume')}</button>
-                        <button className="btn complete" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalComplete}>{t('complete')}</button>
+                        <button className="btn resume" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleResume}>{t('resume')}</button>
+                        <button className="btn complete" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleLocalComplete}>{t('complete')}</button>
                       </>
                     )}
                   </div>
                 )}
 
+                {/* 🌟 悬浮窗对话框：磨砂+发光边框 */}
                 <div style={{ 
-                  background: '#000', border: '1px solid #10b981', borderRadius: '4px', padding: '6px', 
-                  fontFamily: 'monospace', fontSize: '11px', color: '#10b981', minHeight: '40px', 
-                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.2)', position: 'relative'
+                  background: 'rgba(20, 25, 35, 0.85)', 
+                  border: '1px solid rgba(59, 130, 246, 0.3)', 
+                  borderRadius: '8px', 
+                  padding: '10px', 
+                  fontFamily: 'monospace', 
+                  fontSize: '12px', 
+                  color: '#e2e8f0', 
+                  minHeight: '50px', 
+                  boxShadow: '0 0 15px rgba(59, 130, 246, 0.2), inset 0 0 10px rgba(0,0,0,0.5)', 
+                  position: 'relative',
+                  wordBreak: 'break-word',
+                  lineHeight: '1.5'
                 }}>
-                  <span style={{ opacity: 0.5 }}>root@modelvault:~$ </span>
+                  <span style={{ color: '#3b82f6', opacity: 0.8, marginRight: '6px' }}>AI:</span>
                   <span>{displayedQuote}</span>
-                  <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < quote.length ? 0 : 1 }}>_</span>
+                  <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < quote.length ? 0 : 1, color: '#3b82f6' }}>_</span>
                 </div>
               </div>
             </>
@@ -174,8 +188,44 @@ export const FocusPanel = ({
     );
   }
 
+  // =========================================================================
+  // 主界面专注页视图
+  // =========================================================================
   return (
     <div className="view-content focus-panel">
+      {/* 🌟 游戏化头部信息栏 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px', boxShadow: '0 4px 10px rgba(59, 130, 246, 0.4)' }}>
+            🧑‍🔧
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+              {username} <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '6px', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
+            </div>
+            <div style={{ width: '120px', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', borderRadius: '3px', transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums', background: 'rgba(0,0,0,0.3)', padding: '4px 10px', borderRadius: '6px' }}>
+          🕒 {localTime}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '12px' }}>
+        <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+          ⏳ {t('today')}: {formatTime(todayTotal)}
+        </div>
+        {!isCheckedIn ? (
+          <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>
+            📅 打卡
+          </button>
+        ) : (
+          <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 10px', borderRadius: '6px' }}>✅ 已打卡 ({checkinStreak}天)</span>
+        )}
+      </div>
+
       {availableModels.length === 0 ? (
          <div className="empty-state" style={{ marginTop: '20px' }}>
            {t('noActiveModelDesc')}<br/>
@@ -183,22 +233,35 @@ export const FocusPanel = ({
          </div>
       ) : (
         <>
-          <div style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)' }}>
-            <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none' }}>🤖</div>
-            <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.4' }}>
+          {/* 🌟 主界面对话框：磨砂+发光边框 */}
+          <div style={{ 
+            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))', 
+            border: '1px solid rgba(59, 130, 246, 0.4)', 
+            borderRadius: '12px', 
+            padding: '12px 16px', 
+            marginBottom: '16px', 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: '12px', 
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 15px rgba(59, 130, 246, 0.1)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none', marginTop: '2px' }}>🤖</div>
+            <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.6', flex: 1, wordBreak: 'break-word' }}>
+              <span style={{ color: '#3b82f6', fontWeight: 'bold', marginRight: '6px' }}>AI:</span>
               {displayedQuote}
-              <span style={{ animation: 'pulse 1s infinite' }}>|</span>
+              <span style={{ animation: 'pulse 1s infinite', color: '#3b82f6' }}>|</span>
             </div>
           </div>
 
           <div className="selector-group">
             <div className="selector-row">
-              <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
+              <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none' }}>
                 {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
               </select>
             </div>
             <div className="selector-row">
-              <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
+              <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none' }}>
                 {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
               </select>
             </div>
@@ -222,7 +285,7 @@ export const FocusPanel = ({
               ))}
             </div>
           )}
-          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`}>{formatTime(activeSeconds)}</div>
+          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ textShadow: '0 0 20px rgba(255,255,255,0.2)' }}>{formatTime(activeSeconds)}</div>
           {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
             <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
           )}
@@ -236,11 +299,11 @@ export const FocusPanel = ({
             </div>
           )}
           {isFinishingPart ? (
-            <div className="inline-confirm">
+            <div className="inline-confirm" style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '12px' }}>
               <div className="confirm-text">🎉 {t('finishPart')}!</div>
               <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1 }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
-                <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
+                <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '8px', borderRadius: '6px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
+                <label className="btn no" style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, borderRadius: '6px' }}>
                   📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
               </div>
@@ -251,7 +314,7 @@ export const FocusPanel = ({
               </div>
             </div>
           ) : lastSession ? (
-            <div className="inline-confirm">
+            <div className="inline-confirm" style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '12px' }}>
               <div className="confirm-text">{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
               <div className="confirm-actions">
                 <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>

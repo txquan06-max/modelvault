@@ -37,7 +37,8 @@ const QUOTES = [
 
 export class QuoteEngine {
   static getRandom(): string {
-    return QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    const randomIndex = Math.floor(Math.random() * QUOTES.length);
+    return QUOTES[randomIndex] || "开始你的专注吧！";
   }
   static getStartQuote(): string { return "开始专注！今天做哪个部位呢？"; }
   static getPauseQuote(): string { return "休息一下，喝口水吧。"; }

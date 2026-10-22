@@ -1,46 +1,106 @@
-const QUOTES = [
-  "素组是男人的浪漫，慢慢来，别着急。", "注意剪水口，留一点余地打磨。", "刻线要轻，就像抚摸你的钱包。",
-  "渗线液别流得太宽，小心溢出来。", "补色的时候，记得先调好色调。", "保护漆记得要在通风的地方喷哦！",
-  "做胶的时候，时间总是过得很快。", "累了吗？休息一下，揉揉眼睛。", "这个模型的骨架设计很扎实，注意关节方向。",
-  "听说组完这个，你就是群里的素组大师了。", "别忘了，水贴是在保护漆之后贴的。", "今天的进度不错，继续保持！",
-  "剪钳钝了记得换，别伤了水口。", "打磨膏用完了吗？可以试试抛光布。", "刻线针要垂直，不要歪。",
-  "渗线的时候深呼吸，手稳住。", "如果觉得无聊，可以放点喜欢的音乐。", "你的每一次打磨，都是对模型的尊重。",
-  "很多大佬都是从素组开始的，别急。", "这个分色很复杂，做之前先假组一下。", "贴纸没贴好？用棉签压一压。",
-  "模型的细节决定了最终的效果。", "不要追求完美，那会让你失去乐趣。", "记住，是你玩模型，不是模型玩你。",
-  "做胶的时候，手机最好放远一点。", "听说做高达能让内心平静。", "今天的目标是做哪个部位？",
-  "清理一下桌子吧，乱糟糟的影响心情。", "用爱去制作，模型会感受到的。", "修水口的时候，用笔刀切平。",
-  "渗线液干了之后，用棉签擦掉多余的。", "保护漆一定要等干透再碰。", "水贴泡水时间不要太长。",
-  "模型做累了，去看看别人的作品吧。", "这个关节要注意，别用力过猛断了。", "组装的时候，听到“咔哒”一声就对了。",
-  "内构如果看不见，可以适当省略细节。", "做的慢没关系，做得好才重要。", "有没有发现，做胶的时候时间会消失？",
-  "你今天的专注力很惊人。", "进度稳定，是大佬的必备素养。", "如果手抖，可以喝口温水。",
-  "别忘记给模型摆个帅气的姿势！", "拍照的时候用纯色背景会更好看。", "你的格纳库又要多一位新成员了。",
-  "剪下来的废件不要扔，可以用来改造。", "马克笔补色后记得等干了再喷保护漆。", "遮盖带用完了，记得补货。",
-  "如果有气泡，用针挑破再压平。", "不要怕做坏，做坏也是经验。", "在拼装中寻找内心的宁静。",
-  "慢慢来，比较快。", "今天是适合做胶的好天气。", "刀片要换得勤快，切出来才平整。",
-  "旧化做得好，模型质感直接翻倍。", "做无缝的时候，记得留一点余量。", "用胶水的时候，少即是多。",
-  "你的努力，模型全都知道。", "如果你感觉有些枯燥，试试换个部位做。", "看说明书是基本功。",
-  "记得检查一下零件有没有少。", "收工前，把桌面收拾干净。", "做胶不仅仅是拼装，更是创作。",
-  "万代的设计还是很巧妙的，多观察。", "这个机体非常经典，值得好好做。", "慢工出细活，别着急赶工。",
-  "保持桌面整洁，心情也会变好。", "找一个光线充足的地方做胶。", "不要熬夜做胶，对眼睛不好。",
-  "今天的你，比昨天更懂模型了。", "做胶是一个不断学习的过程。", "模型做完了，记得给朋友们看看。",
-  "不要被别人的进度影响，你有自己的节奏。", "那些做坏的模型，都是你的勋章。", "用心做出来的作品，是有灵魂的。",
-  "不要盲目追求大比例，小比例也很精致。", "做胶时把猫关在门外，别问我怎么知道的。", "不小心掉件了？别慌，地毯式搜索。",
-  "透明件打磨要小心，容易发白。", "如果是电镀件，水口处理要格外用心。", "骨架可以试着涂装一下，细节拉满。",
-  "尝试使用不同的工具，会发现新大陆。", "不要让堆积成为负担，享受过程。", "今天的专注时间很棒。",
-  "做胶能让人忘掉烦恼。", "你的模型里，藏着你走过的路。", "有没有想过，自己设计一个专属模型？",
-  "用最舒服的姿势做胶。", "如果觉得难，先停下来看看说明书。", "每次拼装，都是一次修行。",
-  "保护好你的手指，不要被笔刀划伤。", "新买的模型，别急着一刀剪完。", "素组也是需要技术的，不要小看。",
-  "做好一个模型，成就感满满。", "你的格纳库，就是你的荣耀。", "时间在指尖流淌，模型在手中成型。",
-  "专注的你，是最帅的。", "有没有觉得，做胶比打游戏还上头？", "模型也是一种表达自己的方式。",
-  "别人笑我太疯癫，我笑他人看不穿。", "做胶是一件很快乐的事。", "今天也是努力做胶的一天。"
-];
+export type BotType = 'tu' | 'milkfoam' | 'xiaoran';
+
+export interface BotData {
+  id: BotType;
+  name: string;
+  enName: string; // 🌟 新增英文名
+  color: string;
+  start: string;
+  pause: string;
+  complete: string;
+  quotes: string[];
+}
+
+export const BOTS: Record<BotType, BotData> = {
+  tu: {
+    id: 'tu',
+    name: '途酱',
+    enName: 'Tia',
+    color: '#3b82f6', // 蓝色
+    start: "旅途开始，今天做哪个部位呢？ / Let's start the journey. Which part today?",
+    pause: "休息一下，喝口水，看看窗外的风景吧。 / Take a break, hydrate, and look out the window.",
+    complete: "记录完毕，每一秒都是你留下的足迹。 / Recorded. Every second is a footprint you've left.",
+    quotes: [
+      "素组是男人的浪漫，慢慢来，别着急。 / Straight build is romance. Take your time.",
+      "注意剪水口，留一点余地打磨。 / Watch the nub marks, leave room for sanding.",
+      "刻线要轻，就像抚摸你的钱包。 / Scribe lightly, like touching your wallet.",
+      "渗线液别流得太宽，小心溢出来。 / Don't let the panel line wash run too wide.",
+      "做胶的时候，时间总是过得很快。 / Time flies when you're building.",
+      "你的每一次打磨，都是对模型的尊重。 / Every sanding is a sign of respect to the model.",
+      "很多大佬都是从素组开始的，别急。 / Many pros started with straight builds. Don't rush.",
+      "用爱去制作，模型会感受到的。 / Build with love, the model will feel it.",
+      "不要被别人的进度影响，你有自己的节奏。 / Don't be influenced by others' pace. You have your own.",
+      "用心做出来的作品，是有灵魂的。 / A work made with heart has a soul.",
+      "做胶能让人忘掉烦恼。 / Building helps you forget your worries.",
+      "每次拼装，都是一次修行。 / Every build is a practice."
+    ]
+  },
+  milkfoam: {
+    id: 'milkfoam',
+    name: '奶盖',
+    enName: 'Boba',
+    color: '#ec4899', // 粉色/红色
+    start: "磨蹭什么呢？还不快点开始！ / Stop dawdling, let's go!",
+    pause: "这就累了？现在的胶佬体力真差。 / Tired already? Modelers these days...",
+    complete: "总算搞定一段了，勉强夸你一下吧。 / Finally done with a section. I guess I'll give you some credit.",
+    quotes: [
+      "就这？水口都没剪平，你管这叫拼模型？ / That's it? Nubs aren't even flat. You call this building?",
+      "刻线歪了！你的手是借来的吗？ / The scribing is crooked! Did you borrow those hands?",
+      "渗线渗得跟个鬼画符一样，重来！ / Panel lines look like scribbles. Redo it!",
+      "你这补色，狗看了都摇头。 / Even a dog would shake its head at your paint job.",
+      "别以为坐得久就能出好作品，效率呢？ / Don't think sitting longer makes a good work. What about efficiency?",
+      "保护漆喷得跟下雪似的，真行啊你。 / Topcoat looks like falling snow. Great job... not.",
+      "你这机体要是会说话，早就骂你了。 / If this mobile suit could talk, it would have cursed you out by now.",
+      "听好了，砂纸从低目数到高目数，别跳！ / Listen, sandpaper goes from low grit to high grit. Don't skip!",
+      "再摸鱼，我就顺着网线过去帮你把模型扔了。 / Slack off again, and I'll throw your model out through the internet.",
+      "啧，进度这么慢，万代出新胶的速度都比你快。 / Tsk, Bandai releases new kits faster than your progress.",
+      "手稳一点行不行？你是得了帕金森吗？ / Can you steady your hands? Do you have Parkinson's?",
+      "别盯着看了，看能把它看成完美素组吗？ / Stop staring. Will staring make it a perfect straight build?"
+    ]
+  },
+  xiaoran: {
+    id: 'xiaoran',
+    name: '小燃',
+    enName: 'Blaze',
+    color: '#10b981', // 绿色
+    start: "全军出击！今天的目标是哪台机体？！ / All forces attack! What's our target today?!",
+    pause: "原地待命！补充一点能量再战！ / Stand by! Replenish energy before the next battle!",
+    complete: "战报已记录！你的战果将被载入史册！ / Battle report recorded! Your results will be written in history!",
+    quotes: [
+      "燃起来！为了人类的可能性，注入灵魂吧！ / Burn bright! Inject your soul for the possibility of humanity!",
+      "这把剪钳，就是你斩断烦恼的利刃！ / These nippers are the blade to cut through your worries!",
+      "刻线！这是赋予机甲灵魂的回路！ / Scribing! This is the circuit that gives the mecha a soul!",
+      "渗线的瞬间，机甲就拥有了呼吸！ / At the moment of panel lining, the mecha breathes!",
+      "补色完成！这就是艺术家的觉醒！ / Paint complete! This is the artist's awakening!",
+      "保护漆！为我们的杰作披上无敌的装甲！ / Topcoat! Clad our masterpiece in invincible armor!",
+      "不要停下来！前面的道路还有无尽的星辰大海！ / Don't stop! The road ahead has endless stars and seas!",
+      "感受到指尖的震动了吗？那是机甲在回应你！ / Feel the vibration on your fingertips? That's the mecha responding!",
+      "每一次拼装，都是一场史诗级的战斗！ / Every build is an epic battle!",
+      "太棒了！你的动作堪比王牌机师！ / Awesome! Your movements are like an ace pilot!",
+      "哪怕是不起眼的内构，也藏着无限的可能！ / Even the hidden inner frame holds infinite possibilities!",
+      "来吧！让这台机体爆发出最耀眼的光芒！ / Come on! Let this suit unleash its most dazzling light!"
+    ]
+  }
+};
 
 export class QuoteEngine {
-  static getRandom(): string {
-    const randomIndex = Math.floor(Math.random() * QUOTES.length);
-    return QUOTES[randomIndex] || "开始你的专注吧！";
+  private static currentBot: BotType = 'tu';
+
+  static setBot(bot: BotType) {
+    this.currentBot = bot;
   }
-  static getStartQuote(): string { return "开始专注！今天做哪个部位呢？"; }
-  static getPauseQuote(): string { return "休息一下，喝口水吧。"; }
-  static getCompleteQuote(): string { return "记录完毕！每一秒都是心血。"; }
+
+  static getBotData(): BotData {
+    return BOTS[this.currentBot];
+  }
+
+  static getRandom(): string {
+    const botData = BOTS[this.currentBot];
+    const randomIndex = Math.floor(Math.random() * botData.quotes.length);
+    return botData.quotes[randomIndex] || "开始专注吧！ / Let's focus!";
+  }
+
+  static getStartQuote(): string { return BOTS[this.currentBot].start; }
+  static getPauseQuote(): string { return BOTS[this.currentBot].pause; }
+  static getCompleteQuote(): string { return BOTS[this.currentBot].complete; }
 }

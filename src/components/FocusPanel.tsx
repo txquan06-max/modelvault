@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-import { QuoteEngine } from '../core/QuoteEngine';
+// 🌟 这里加上 type 关键字
+import { QuoteEngine, BOTS, type BotType } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -8,34 +9,56 @@ export const FocusPanel = ({
   timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
+  currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus
 }: any) => {
   
-  // 🌟 打字机效果与音效
-  const [quote, setQuote] = useState(QuoteEngine.getRandom());
+  const [currentBot, setCurrentBot] = useState<BotType>(() => {
+    const saved = localStorage.getItem('mv_current_bot') as BotType;
+    return (saved && BOTS[saved]) ? saved : 'tu';
+  });
+
+  const [quote, setQuote] = useState(() => {
+    QuoteEngine.setBot(currentBot);
+    return QuoteEngine.getRandom();
+  });
   const [displayedQuote, setDisplayedQuote] = useState('');
   const typingRef = useRef<any>(null);
+
+  const botData = BOTS[currentBot];
+  // 🌟 动态双语名字
+  const botName = i18n.language === 'zh' ? botData.name : botData.enName;
+
+  const switchBot = () => {
+    AudioManager.playClick();
+    const botKeys = Object.keys(BOTS) as BotType[];
+    const nextIndex = (botKeys.indexOf(currentBot) + 1) % botKeys.length;
+    const nextBot = botKeys[nextIndex];
+    
+    setCurrentBot(nextBot);
+    localStorage.setItem('mv_current_bot', nextBot);
+    QuoteEngine.setBot(nextBot);
+    setQuote(QuoteEngine.getStartQuote());
+  };
 
   useEffect(() => {
     setDisplayedQuote('');
     let currentIndex = 0;
-    clearInterval(typingRef.current);
+    if (typingRef.current) clearInterval(typingRef.current);
+    const safeQuote = String(quote || '');
 
     typingRef.current = setInterval(() => {
-      if (currentIndex < quote.length) {
-        setDisplayedQuote((prev) => prev + quote[currentIndex]);
-        // 每打 2 个字响一次，避免太吵
-        if (currentIndex % 2 === 0) {
-           AudioManager.playTypeTick();
-        }
+      if (currentIndex < safeQuote.length) {
+        const char = safeQuote.charAt(currentIndex);
+        setDisplayedQuote((prev) => prev + char);
+        if (currentIndex % 2 === 0) AudioManager.playTypeTick();
         currentIndex++;
       } else {
         clearInterval(typingRef.current);
       }
     }, 80);
 
-    return () => clearInterval(typingRef.current);
+    return () => { if (typingRef.current) clearInterval(typingRef.current); };
   }, [quote]);
 
   useEffect(() => {
@@ -84,9 +107,6 @@ export const FocusPanel = ({
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // =========================================================================
-  // 悬浮窗 (PiP) 视图
-  // =========================================================================
   if (isPip) {
     return (
       <div className={pipClass}>
@@ -161,24 +181,24 @@ export const FocusPanel = ({
                   </div>
                 )}
 
-                {/* 🌟 悬浮窗对话框：磨砂+发光边框 */}
                 <div style={{ 
                   background: 'rgba(20, 25, 35, 0.85)', 
-                  border: '1px solid rgba(59, 130, 246, 0.3)', 
+                  border: `1px solid ${botData.color}50`, 
                   borderRadius: '8px', 
                   padding: '10px', 
                   fontFamily: 'monospace', 
                   fontSize: '12px', 
                   color: '#e2e8f0', 
                   minHeight: '50px', 
-                  boxShadow: '0 0 15px rgba(59, 130, 246, 0.2), inset 0 0 10px rgba(0,0,0,0.5)', 
+                  boxShadow: `0 0 15px ${botData.color}30, inset 0 0 10px rgba(0,0,0,0.5)`, 
                   position: 'relative',
                   wordBreak: 'break-word',
-                  lineHeight: '1.5'
-                }}>
-                  <span style={{ color: '#3b82f6', opacity: 0.8, marginRight: '6px' }}>AI:</span>
+                  lineHeight: '1.5',
+                  cursor: 'pointer'
+                }} onClick={switchBot} title="点击切换 AI 助手">
+                  <span style={{ color: botData.color, opacity: 1, marginRight: '6px', fontWeight: 'bold' }}>{botName}:</span>
                   <span>{displayedQuote}</span>
-                  <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < quote.length ? 0 : 1, color: '#3b82f6' }}>_</span>
+                  <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < (quote || '').length ? 0 : 1, color: botData.color }}>_</span>
                 </div>
               </div>
             </>
@@ -188,23 +208,19 @@ export const FocusPanel = ({
     );
   }
 
-  // =========================================================================
-  // 主界面专注页视图
-  // =========================================================================
   return (
     <div className="view-content focus-panel">
-      {/* 🌟 游戏化头部信息栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px', boxShadow: '0 4px 10px rgba(59, 130, 246, 0.4)' }}>
-            🧑‍🔧
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={switchBot} title="点击切换 AI 助手">
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `linear-gradient(135deg, ${botData.color}, #8b5cf6)`, display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px', boxShadow: `0 4px 10px ${botData.color}60`, transition: 'all 0.3s' }}>
+            {currentBot === 'tu' ? '🤖' : currentBot === 'milkfoam' ? '😈' : '⚡️'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
               {username} <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '6px', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
             </div>
             <div style={{ width: '120px', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', borderRadius: '3px', transition: 'width 0.3s' }} />
+              <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
           </div>
         </div>
@@ -233,24 +249,26 @@ export const FocusPanel = ({
          </div>
       ) : (
         <>
-          {/* 🌟 主界面对话框：磨砂+发光边框 */}
           <div style={{ 
-            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))', 
-            border: '1px solid rgba(59, 130, 246, 0.4)', 
+            background: `linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))`, 
+            border: `1px solid ${botData.color}80`, 
             borderRadius: '12px', 
             padding: '12px 16px', 
             marginBottom: '16px', 
             display: 'flex', 
             alignItems: 'flex-start', 
             gap: '12px', 
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 15px rgba(59, 130, 246, 0.1)',
-            backdropFilter: 'blur(10px)'
+            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.3), 0 0 15px ${botData.color}30`,
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.3s'
           }}>
-            <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none', marginTop: '2px' }}>🤖</div>
+            <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none', marginTop: '2px' }}>
+              {currentBot === 'tu' ? '🤖' : currentBot === 'milkfoam' ? '😈' : '⚡️'}
+            </div>
             <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.6', flex: 1, wordBreak: 'break-word' }}>
-              <span style={{ color: '#3b82f6', fontWeight: 'bold', marginRight: '6px' }}>AI:</span>
+              <span style={{ color: botData.color, fontWeight: 'bold', marginRight: '6px' }}>{botName}:</span>
               {displayedQuote}
-              <span style={{ animation: 'pulse 1s infinite', color: '#3b82f6' }}>|</span>
+              <span style={{ animation: 'pulse 1s infinite', color: botData.color }}>|</span>
             </div>
           </div>
 

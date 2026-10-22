@@ -138,20 +138,82 @@ export const StorageManager = {
     return data;
   },
 
-  importAll: (data: any) => {
-    if (!data.version) return false;
-    if (data.coreData) StorageManager._set(DATA_KEY, data.coreData);
-    Object.entries(KEYS).forEach(([key, storageKey]) => {
-      const val = data[key.toLowerCase()];
-      if (val) StorageManager._set(storageKey, val);
-    });
-    return true;
+  // 🌟 改为普通函数写法，解决 this 可能为 undefined 的问题
+  importAll(data: any) {
+    if (!data || !data.version) return false;
+    
+    try {
+      // 1. 合并核心模型数据
+      const coreDataRaw = data.coreData;
+      if (coreDataRaw) {
+        const importedCore = typeof coreDataRaw === 'string' ? JSON.parse(coreDataRaw) : coreDataRaw;
+        if (importedCore && Array.isArray(importedCore.models)) {
+          
+          // 使用 StorageManager 代替 this，彻底消除 TS 警告
+          const localCore = StorageManager.getRawStorage();
+          const localModels = localCore && Array.isArray(localCore.models) ? localCore.models : [];
+          
+          const localModelIds = new Set<string>();
+          for (const m of localModels) {
+            if (m && m.id) localModelIds.add(m.id);
+          }
+          
+          const mergedModels = [...localModels];
+          for (const importedModel of importedCore.models) {
+            if (importedModel && importedModel.id && !localModelIds.has(importedModel.id)) {
+              mergedModels.push(importedModel);
+            }
+          }
+          StorageManager.saveRawStorage(mergedModels);
+        }
+      }
+
+      // 2. 合并 Sessions（时间记录）
+      const sessionsRaw = data.sessions;
+      if (sessionsRaw) {
+        const importedSessions = typeof sessionsRaw === 'string' ? JSON.parse(sessionsRaw) : sessionsRaw;
+        if (Array.isArray(importedSessions)) {
+          
+          const localSessions = JSON.parse(StorageManager.getSessions() || '[]');
+          const localSessionIds = new Set<string>();
+          
+          for (const s of localSessions) {
+            if (s && s.id) localSessionIds.add(s.id);
+          }
+          
+          for (const session of importedSessions) {
+            if (session && session.id && !localSessionIds.has(session.id)) {
+              localSessions.push(session);
+            }
+          }
+          StorageManager.setSessions(JSON.stringify(localSessions));
+        }
+      }
+
+      // 3. 其他的简单数据按需覆盖
+      for (const [key, storageKey] of Object.entries(KEYS)) {
+        if (key === 'SESSIONS') continue;
+        
+        const lowerKey = key.toLowerCase();
+        const val = data[lowerKey];
+        
+        if (val !== undefined && val !== null && typeof val === 'string') {
+           StorageManager._set(storageKey, val);
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Import merge failed', e);
+      return false;
+    }
   },
 
   getStorageUsage: () => {
     let total = 0;
-    for (let x in memoryCache) {
-      if (memoryCache[x]) total += (memoryCache[x].length * 2);
+    for (const x in memoryCache) {
+      const val = memoryCache[x];
+      if (val) total += (val.length * 2);
     }
     return (total / 1024 / 1024).toFixed(2);
   }

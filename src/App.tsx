@@ -13,7 +13,6 @@ import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
-// 引入拆分后的模块
 import { FocusView } from './views/FocusView';
 import { JournalView } from './views/JournalView';
 import { HangarView } from './views/HangarView';
@@ -27,7 +26,6 @@ const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 function App() {
   const { t, i18n } = useTranslation();
   
-  // ================= 状态区 =================
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -98,11 +96,8 @@ function App() {
   const engineRef = useRef(new TimerEngine());
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  
-  // 本地时间
   const [localTime, setLocalTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-  // ================= 全局副作用 (Effects) =================
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
 
@@ -111,11 +106,10 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 实时更新本地时间，为了优化性能我们只需要每分钟刷新一次显示即可
   useEffect(() => {
     const timer = setInterval(() => {
       setLocalTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    }, 1000 * 10); // 每 10 秒检查一次，避免不必要的渲染
+    }, 1000 * 10);
     return () => clearInterval(timer);
   }, []);
 
@@ -230,8 +224,6 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
-
-  // ================= 核心逻辑区 (Handlers) =================
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
 
@@ -487,22 +479,62 @@ function App() {
   const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); };
 
-  const generateShareCard = (model: Model, totalTime: number) => {
+  // 🌟 补全战报生成逻辑
+  const generateShareCard = async (model: Model, totalTime: number) => {
     AudioManager.playClick();
     const canvas = document.createElement('canvas');
     canvas.width = 800; canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
     ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, 800, 1000);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
     for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
+    
     ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ModelVault', 400, 80);
     ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '我的拼装战报' : 'My Build Report', 400, 120);
+
+    if (model.coverImage) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = model.coverImage;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        const imgRatio = img.width / img.height;
+        const targetRatio = 600 / 400;
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (imgRatio > targetRatio) {
+          sw = img.height * targetRatio;
+          sx = (img.width - sw) / 2;
+        } else {
+          sh = img.width / targetRatio;
+          sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, 100, 160, 600, 400);
+        const gradient = ctx.createLinearGradient(0, 460, 0, 560);
+        gradient.addColorStop(0, 'rgba(30, 30, 30, 0)');
+        gradient.addColorStop(1, 'rgba(30, 30, 30, 1)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(100, 460, 600, 100);
+      } catch (e) {
+        ctx.fillStyle = '#333'; ctx.fillRect(100, 160, 600, 400);
+        ctx.fillStyle = '#666'; ctx.font = '32px sans-serif'; ctx.fillText('No Image', 400, 360);
+      }
+    } else {
+      ctx.fillStyle = '#333'; ctx.fillRect(100, 160, 600, 400);
+      ctx.fillStyle = '#666'; ctx.font = '32px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '暂无照片' : 'No Image', 400, 360);
+    }
+
     ctx.fillStyle = '#fff'; ctx.font = 'bold 42px sans-serif'; ctx.fillText(i18n.language === 'zh' ? model.name.zh : model.name.en, 400, 560);
     ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 28px sans-serif'; ctx.fillText(`${model.grade}  |  ${i18n.language === 'zh' ? model.series.zh : model.series.en}`, 400, 610);
+    
     ctx.fillStyle = '#10b981'; ctx.font = 'bold 64px monospace'; ctx.fillText(formatTime(totalTime), 400, 700);
     ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '总专注时长' : 'Total Focus Time', 400, 745);
     ctx.fillStyle = '#555'; ctx.font = '20px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '用热爱与耐心，铸造属于你的杰作。' : 'Built with love and patience.', 400, 850);
+
     const url = canvas.toDataURL('image/jpeg', 0.9);
     const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
     showToast(i18n.language === 'zh' ? '✅ 战报已保存到相册/下载' : '✅ Report saved!');
@@ -580,7 +612,6 @@ function App() {
               <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
-            
             <div className="top-bar">
               <span>{t('xp')}: {totalXp} | 🪙 {coinsBalance}</span>
               <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

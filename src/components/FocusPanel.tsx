@@ -19,10 +19,10 @@ export const FocusPanel = ({
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
   currentBot,
-  // 🌟 接收动态频率
   webChatInterval, pipChatInterval
 }: any) => {
   
+  // 🌟 1. 从 sessionStorage 恢复聊天记录，防止切 Tab 丢失
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('mv_chat_messages');
@@ -31,15 +31,21 @@ export const FocusPanel = ({
     return []; 
   });
 
-  const [typingText, setTypingText] = useState('');
+  // 🌟 2. 改用 charIndex 记录当前打出的字数，彻底修复掉字 Bug
+  const [charIndex, setCharIndex] = useState(0);
+  
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const botData = BOTS[currentBot as keyof typeof BOTS];
 
+  // 每次 messages 更新，同步到 sessionStorage
   useEffect(() => {
-    sessionStorage.setItem('mv_chat_messages', JSON.stringify(messages));
+    if (messages.length > 0) {
+      sessionStorage.setItem('mv_chat_messages', JSON.stringify(messages));
+    }
   }, [messages]);
 
+  // 初始化第一条消息（仅在完全为空时）
   useEffect(() => {
     QuoteEngine.setBot(currentBot);
     if (messages.length === 0) {
@@ -48,7 +54,7 @@ export const FocusPanel = ({
     }
   }, [currentBot, i18n.language, messages.length]);
 
-  // 🌟 核心修改：动态频率、页面隐藏停止、防重复机制
+  // 🌟 3. 动态频率、页面隐藏停止、防重复机制
   useEffect(() => {
     let chatTimer: any;
 
@@ -70,7 +76,6 @@ export const FocusPanel = ({
       if (chatTimer) clearInterval(chatTimer);
     };
 
-    // 页面可见性变化处理
     const handleVisibilityChange = () => {
       if (isPip) return; // 悬浮窗不受此限制
       if (document.visibilityState === 'visible') {
@@ -80,7 +85,6 @@ export const FocusPanel = ({
       }
     };
 
-    // 初始启动
     if (isPip || document.visibilityState === 'visible') {
       startTimer();
     }
@@ -102,30 +106,32 @@ export const FocusPanel = ({
 
   const lastMsgIdRef = useRef<string | null>(null);
   
-  // 🌟 核心修改：打字速度降低（100ms），音效频率降低（每3个字响一次）
+  // 🌟 4. 修复第一个字消失的核心逻辑
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg) return;
     
+    // 如果是同一条消息，且打字机正在运行，不重新开始
     if (lastMsgIdRef.current === lastMsg.id) return;
     lastMsgIdRef.current = lastMsg.id;
 
-    setTypingText('');
-    let index = 0;
-    const text = lastMsg.text;
+    // 重置索引
+    setCharIndex(0);
+    let currentIdx = 0;
+    const textLength = lastMsg.text.length;
     
     if (typingRef.current) clearInterval(typingRef.current);
     
     typingRef.current = setInterval(() => {
-      if (index < text.length) {
-        setTypingText(prev => prev + text.charAt(index));
-        // 每 3 个字符响一次，不显得急促
-        if (index % 3 === 0) AudioManager.playTypeTick();
-        index++;
+      currentIdx++;
+      setCharIndex(currentIdx); // 直接赋值索引，不需要依赖 prev 拼接
+      
+      if (currentIdx < textLength) {
+        if (currentIdx % 3 === 0) AudioManager.playTypeTick(); // 每3个字响一次
       } else {
         clearInterval(typingRef.current);
       }
-    }, 100); // 从 60ms 改为 100ms，速度明显放慢，更优雅
+    }, 100); // 100ms 一个字，手感更舒适
     
     return () => { if (typingRef.current) clearInterval(typingRef.current); };
   }, [messages]);
@@ -191,7 +197,9 @@ export const FocusPanel = ({
         const isLatest = idx === messages.length - 1;
         const msgBotData = BOTS[msg.botId];
         const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
-        const displayTxt = (isLatest && typingText.length < msg.text.length) ? typingText : msg.text;
+        
+        // 🌟 核心修复：如果是最新一条，按 charIndex 截取字符显示
+        const displayTxt = isLatest ? msg.text.slice(0, charIndex) : msg.text;
         
         return (
           <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -210,7 +218,8 @@ export const FocusPanel = ({
               </div>
               <div style={{ fontSize: isPipView ? '12px' : '14px', color: '#e2e8f0', lineHeight: '1.5', fontFamily: 'system-ui, -apple-system, sans-serif', wordBreak: 'break-word' }}>
                 {displayTxt}
-                {isLatest && typingText.length < msg.text.length && (
+                {/* 只有最新的一条且没打完时才显示下划线 */}
+                {isLatest && charIndex < msg.text.length && (
                   <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>
                 )}
               </div>

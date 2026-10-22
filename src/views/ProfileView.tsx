@@ -17,7 +17,7 @@ export const ProfileView = (props: any) => {
         <div className="avatar">🧑‍🔧</div>
         <div className="profile-info">
           <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
-          {equippedTitleDef && <div className="equipped-title">[{t(equippedTitleDef.nameKey)}]</div>}
+          {equippedTitleDef && <div className="equipped-title" style={{ color: equippedTitleDef.color }}>[{t(equippedTitleDef.nameKey)}]</div>}
         </div>
       </div>
       
@@ -185,7 +185,9 @@ export const ProfileView = (props: any) => {
             return (
               <div key={title.id} className={`title-item ${isOwned ? 'owned' : ''}`}>
                 <div className="title-info">
-                  <div className="title-name">{t(title.nameKey)}</div>
+                  <div className="title-name" style={{ color: title.color, textShadow: `0 0 10px ${title.color}40` }}>
+                    {t(title.nameKey)}
+                  </div>
                   <div className="title-cond">{t(title.descKey)}</div>
                 </div>
                 {isOwned ? (

@@ -1,30 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { QuoteEngine } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-  models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession,
+  models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession, // 🌟 删除了 todayTotal
   timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget
 }: any) => {
   
-  // 🌟 新增：对话气泡状态
+  // 🌟 打字机效果核心逻辑
   const [quote, setQuote] = useState(QuoteEngine.getRandom());
+  const [displayedQuote, setDisplayedQuote] = useState('');
+  const typingRef = useRef<any>(null);
+
+  useEffect(() => {
+    setDisplayedQuote('');
+    let currentIndex = 0;
+    clearInterval(typingRef.current);
+
+    typingRef.current = setInterval(() => {
+      if (currentIndex < quote.length) {
+        setDisplayedQuote((prev) => prev + quote[currentIndex]);
+        currentIndex++;
+      } else {
+        clearInterval(typingRef.current);
+      }
+    }, 80);
+
+    return () => clearInterval(typingRef.current);
+  }, [quote]);
 
   useEffect(() => {
     if (timerState === 'Running') {
-      // 运行中每 30 秒随机换一句台词
-      const timer = setInterval(() => setQuote(QuoteEngine.getRandom()), 30000);
+      const timer = setInterval(() => setQuote(QuoteEngine.getRandom()), 25000);
       return () => clearInterval(timer);
     } else if (timerState === 'Idle' && activeSeconds === 0) {
       setQuote(QuoteEngine.getRandom());
     }
   }, [timerState, activeSeconds]);
 
-  // 包装动作以触发特定的台词
   const handleLocalStart = () => { setQuote(QuoteEngine.getStartQuote()); handleStart(); };
   const handleLocalPause = () => { setQuote(QuoteEngine.getPauseQuote()); handlePause(); };
   const handleLocalComplete = () => { setQuote(QuoteEngine.getCompleteQuote()); handleComplete(); };
@@ -69,70 +86,86 @@ export const FocusPanel = ({
     return (
       <div className={pipClass}>
         {bgImage && <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: 0, opacity: 1 }} />}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1 }} />
         
-        <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', boxSizing: 'border-box' }}>
+          
           {availableModels.length === 0 ? (
-            <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginTop: '40px' }}>{t('noActiveModel')}</div>
+            <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px' }}>{t('noActiveModel')}</div>
           ) : (
             <>
-              <div className="selector-group" style={{ marginBottom: '0' }}>
-                <div className="selector-row">
-                  <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
-                    {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
-                  </select>
-                </div>
-                <div className="selector-row">
-                  <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart}>
-                    {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
-                  </select>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', fontSize: '12px' }}>
+                  {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
+                </select>
+                <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', fontSize: '12px' }}>
+                  {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
+                </select>
               </div>
 
-              <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
-                <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
-                {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
-                  <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px' }}>
+                <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '36px' }}>{formatTime(activeSeconds)}</div>
+                
+                {timerState === 'Idle' && !lastSession && (
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    {[0, 15, 30, 60].map(min => (
+                      <button key={min} style={{ background: timeboxTarget === min * 60 ? '#3b82f6' : '#333', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }} onClick={() => handleSetTimeboxTarget(min)}>
+                        {min === 0 ? t('timeboxNone') : `${min}m`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', marginTop: '4px' }}>
+                    {currentTask.stages.map((stage: any) => (
+                      <button key={stage.id} style={{ background: stage.id === currentStageId ? '#3b82f6' : '#333', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: '1px solid #555', padding: '2px 4px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
+                        {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {isFinishingPart ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '11px', padding: '4px', background: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px' }} disabled={finishPartPhoto.startsWith('data:')} />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn yes" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
+                      <button className="btn no" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
+                    </div>
+                  </div>
+                ) : lastSession ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '11px', color: '#10b981', textAlign: 'center' }}>{t('saved')}: {formatTime(lastSession.duration)}</div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button className="btn yes" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleConfirmStageDone}>{t('yesDone')}</button>
+                      <button className="btn no" style={{ flex: 1, padding: '4px', fontSize: '12px' }} onClick={handleCancelDone}>{t('keepWorking')}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
+                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalPause}>{t('pause')}</button>}
+                    {timerState === 'Paused' && (
+                      <>
+                        <button className="btn resume" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleResume}>{t('resume')}</button>
+                        <button className="btn complete" style={{ flex: 1, padding: '6px', fontSize: '12px' }} onClick={handleLocalComplete}>{t('complete')}</button>
+                      </>
+                    )}
+                  </div>
+                )}
 
-              {isFinishingPart ? (
-                <div className="inline-confirm">
-                  <div className="confirm-text" style={{ fontSize: '12px' }}>🎉 {t('finishPart')}!</div>
-                  <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, fontSize: '11px', padding: '4px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
-                    <label className="btn no" style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0 }}>
-                      📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-                    </label>
-                  </div>
-                  {finishPartPhoto.startsWith('data:') && <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '60px', objectFit: 'contain', borderRadius: '4px' }} />}
-                  <div className="confirm-actions" style={{ flexDirection: 'column' }}>
-                    <button className="btn yes" onClick={handleConfirmFinishPart}>{t('confirm')}</button>
-                    <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
-                  </div>
+                <div style={{ 
+                  background: '#000', border: '1px solid #10b981', borderRadius: '4px', padding: '6px', 
+                  fontFamily: 'monospace', fontSize: '11px', color: '#10b981', minHeight: '40px', 
+                  boxShadow: '0 0 8px rgba(16, 185, 129, 0.2)', position: 'relative'
+                }}>
+                  <span style={{ opacity: 0.5 }}>root@modelvault:~$ </span>
+                  <span>{displayedQuote}</span>
+                  <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < quote.length ? 0 : 1 }}>_</span>
                 </div>
-              ) : lastSession ? (
-                <div className="inline-confirm">
-                  <div className="confirm-text" style={{ fontSize: '12px' }}>{t('saved')}: {formatTime(lastSession.duration)}<br/><span>{t('confirmStage')}</span></div>
-                  <div className="confirm-actions" style={{ flexDirection: 'column' }}>
-                    <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
-                    <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="controls" style={{ flexDirection: 'column' }}>
-                  {timerState === 'Idle' && <button className="btn start" onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
-                  {timerState === 'Running' && <button className="btn pause" onClick={handleLocalPause}>{t('pause')}</button>}
-                  {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleLocalComplete}>{t('complete')}</button></>)}
-                </div>
-              )}
-              {timerState === 'Running' && <button className="btn complete-outline" onClick={handleLocalComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
-              
-              {/* 🌟 悬浮窗底部：跑马灯字幕 */}
-              <div style={{ color: '#aaa', fontSize: '11px', textAlign: 'center', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                💬 {quote}
               </div>
             </>
           )}
@@ -150,15 +183,11 @@ export const FocusPanel = ({
          </div>
       ) : (
         <>
-          {/* 🌟 主界面：顶部互动气泡 */}
-          <div style={{ 
-            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', borderRadius: '8px', 
-            padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)'
-          }}>
+          <div style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)' }}>
             <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none' }}>🤖</div>
             <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.4' }}>
-              {quote}
+              {displayedQuote}
+              <span style={{ animation: 'pulse 1s infinite' }}>|</span>
             </div>
           </div>
 

@@ -613,7 +613,7 @@ function App() {
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
             <div className="top-bar">
-              <span>{t('xp')}: {totalXp} | 🪙 {coinsBalance}</span>
+              <span>👤 {username} | {t('xp')}: {totalXp} | 🪙 {coinsBalance}</span>
               <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.9 }} title="本地时间">🕒 {localTime}</span>
                 <span style={{ color: '#10b981' }} title="今日拼装时长">⏳ {t('today')}: {formatTime(todayTotal)}</span>

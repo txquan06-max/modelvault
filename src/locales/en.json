@@ -113,5 +113,13 @@
   "ach_speed_desc": "Complete an HG model within 120 minutes",
   "ach_photo_name": "Memory Captured",
   "ach_photo_desc": "Add a photo to a build record",
-  "localImageSelected": "Local Image Selected"
+  "localImageSelected": "Local Image Selected",
+  "audioDefault": "Default",
+  "audio8Bit": "8-Bit",
+  "audioSoft": "Soft",
+  "audioOff": "Off",
+  "audioCustom": "Custom",
+  "totalModels": "Total Models",
+  "totalTime": "Total Time",
+  "achievements": "Achievements"
 }

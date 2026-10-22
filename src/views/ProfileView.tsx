@@ -25,18 +25,30 @@ export const ProfileView = (props: any) => {
         <div className="stat-card" onClick={() => { AudioManager.playClick(); setShowModelDetails(!showModelDetails); }}>
           <div className="stat-label">{t('totalModels')}</div>
           <div className="stat-value">{modelStats.total}</div>
-          {showModelDetails && (<div className="stat-details">{['HG', 'RG', 'MG', 'PG'].map(grade => modelStats[grade] > 0 ? (<div key={grade} className="detail-row"><span>{grade}</span> <span>{modelStats[grade]}</span></div>) : null)}</div>)}
+          {showModelDetails && (
+            <div className="stat-details">
+              {['HG', 'RG', 'MG', 'PG'].map(grade => modelStats[grade] > 0 ? (
+                <div key={grade} className="detail-row"><span>{grade}</span> <span>{modelStats[grade]}</span></div>
+              ) : null)}
+            </div>
+          )}
         </div>
         <div className="stat-card" onClick={() => { AudioManager.playClick(); setShowTimeDetails(!showTimeDetails); }}>
           <div className="stat-label">{t('totalTime')}</div>
           <div className="stat-value">{formatTime(timeStats.totalSeconds)}</div>
-          {showTimeDetails && (<div className="stat-details">{Object.entries(timeStats.stageTime).map(([stageKey, seconds]) => (seconds as number) > 0 ? (<div key={stageKey} className="detail-row"><span>{t(stageKey)}</span> <span>{formatTime(seconds as number)}</span></div>) : null)}</div>)}
+          {showTimeDetails && (
+            <div className="stat-details">
+              {Object.entries(timeStats.stageTime).map(([stageKey, seconds]) => (seconds as number) > 0 ? (
+                <div key={stageKey} className="detail-row"><span>{t(stageKey)}</span> <span>{formatTime(seconds as number)}</span></div>
+              ) : null)}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="custom-section" style={{ border: '1px dashed #3b82f6' }}>
         <h4>📦 {t('legacyImport')}</h4>
-        <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>随时补录旧模型并上传封面。每个奖励 20 XP。</p>
+        <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{t('legacyDesc')}</p>
         {!showLegacyForm ? (
           <button className="btn start" style={{ width: '100%', padding: '8px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(true); }}>{t('legacyImport')}</button>
         ) : (
@@ -102,49 +114,56 @@ export const ProfileView = (props: any) => {
         <h4>⚙️ {t('customization')}</h4>
         
         <div className="custom-row">
-          <span>定期专注提醒音效:</span>
+          <span>{t('reminderInterval')}:</span>
           <select value={reminderInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setReminderInterval(val); StorageManager.setReminderInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
-            <option value={0}>关闭 (Off)</option>
-            <option value={15 * 60}>每 15 分钟</option>
-            <option value={30 * 60}>每 30 分钟</option>
-            <option value={45 * 60}>每 45 分钟</option>
-            <option value={60 * 60}>每 60 分钟</option>
+            <option value={0}>{t('audioOff')}</option>
+            <option value={15 * 60}>15m</option>
+            <option value={30 * 60}>30m</option>
+            <option value={45 * 60}>45m</option>
+            <option value={60 * 60}>60m</option>
           </select>
         </div>
 
         <div className="custom-row">
-          <span>主页背景 (横版):</span>
+          <span>{t('bgMain')}:</span>
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
             <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              📁 上传主页图<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
+              📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
             </label>
-            {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>清除</button>}
+            {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
         <div className="custom-row">
-          <span>悬浮窗背景 (竖版):</span>
+          <span>{t('bgPip')}:</span>
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
             <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              📁 上传悬浮窗图<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
+              📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
             </label>
-            {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>清除</button>}
+            {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
         <div className="custom-row">
-          <button className="mini-btn" onClick={openPreview}>预览主屏适配</button>
+          <button className="mini-btn" onClick={openPreview}>{t('previewBg')}</button>
         </div>
         
         <div className="audio-settings">
           {(['click', 'start', 'pause', 'complete', 'finishPart', 'stage', 'timebox', 'achievement'] as const).map(type => {
-            const labelMap: any = { click: t('audioClick'), start: t('audioStart'), pause: t('audioPause'), complete: t('audioComplete'), finishPart: t('audioFinishPart'), stage: t('audioStage'), timebox: t('audioTimebox'), achievement: t('audioAchievement') };
+            const labelMap: any = { 
+              click: t('audioClick'), start: t('audioStart'), pause: t('audioPause'), complete: t('audioComplete'), 
+              finishPart: t('audioFinishPart'), stage: t('audioStage'), timebox: t('audioTimebox'), achievement: t('audioAchievement') 
+            };
             return (
               <div key={type} className="audio-row">
                 <span>{labelMap[type]}</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <select id={`audio-select-${type}`} value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
-                    <option value="default">Default</option><option value="chiptune">8-Bit</option><option value="soft">Soft</option><option value="off">Off</option>{customAudios[type] && <option value="custom">Custom</option>}
+                    <option value="default">{t('audioDefault')}</option>
+                    <option value="chiptune">{t('audio8Bit')}</option>
+                    <option value="soft">{t('audioSoft')}</option>
+                    <option value="off">{t('audioOff')}</option>
+                    {customAudios[type] && <option value="custom">{t('audioCustom')}</option>}
                   </select>
                   <label className="mini-btn" style={{ padding: '2px 6px', cursor: 'pointer', margin: 0 }} title="Upload MP3/WAV">
                     🎵<input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(type, e)} style={{ display: 'none' }} />
@@ -205,15 +224,15 @@ export const ProfileView = (props: any) => {
         </div>
         
         <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginTop: '8px' }}>
-          <h4 style={{ color: '#ef4444', marginBottom: '8px', fontSize: '12px' }}>⚠️ 危险区域 (测试用)</h4>
+          <h4 style={{ color: '#ef4444', marginBottom: '8px', fontSize: '12px' }}>⚠️ {t('dangerZone')}</h4>
           {!showResetConfirm ? (
-            <button className="backup-btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(true); }}>彻底清空所有数据</button>
+            <button className="backup-btn" style={{ width: '100%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(true); }}>{t('resetData')}</button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>确定要清空所有模型、时间记录和成就吗？此操作不可逆！</p>
+              <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>{t('resetConfirm')}</p>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData} disabled={isResetting}>{isResetting ? '清理中...' : '确认清空'}</button>
-                <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>取消</button>
+                <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData} disabled={isResetting}>{isResetting ? t('clearing') : t('confirm')}</button>
+                <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>{t('cancel')}</button>
               </div>
             </div>
           )}
@@ -221,7 +240,7 @@ export const ProfileView = (props: any) => {
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
           <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.0</p>
-          <a href="https://github.com/txquan06-max/modelvault/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 遇到 Bug？点击提交反馈</a>
+          <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>
     </div>

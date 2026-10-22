@@ -5,14 +5,12 @@ export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' 
 
 const ui = createUISFX({ pack: 'glass' });
 
-// 用户风格 → uisfx pack 名称映射
 const STYLE_TO_PACK: Record<string, string> = {
   'default': 'glass',
   'chiptune': 'arcade',
   'soft': 'soft',
 };
 
-// 语义事件 → uisfx cue 名称映射
 const CUE_MAP: Record<SoundType, string> = {
   click: 'press',
   start: 'start',
@@ -26,16 +24,22 @@ const CUE_MAP: Record<SoundType, string> = {
 
 export class AudioManager {
   private static currentPack = 'glass';
+  private static ctx: AudioContext | null = null;
 
   static async unlock() {
     try { await ui.unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
+  }
+
+  private static getCtx(): AudioContext {
+    if (!this.ctx) this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
   }
 
   private static syncPack(style: string) {
     const targetPack = STYLE_TO_PACK[style] || 'glass';
     if (targetPack !== this.currentPack) {
       this.currentPack = targetPack;
-      // uisfx 的 setPack 类型较严格，用 any 断言以兼容 string 变量
       ui.setPack(targetPack as any);
     }
   }
@@ -46,10 +50,26 @@ export class AudioManager {
     if (base64) {
       const audio = new Audio(base64);
       audio.volume = 0.5;
-      audio.play().catch(e => console.warn('Audio play failed', e));
+      audio.play().catch(e => console.warn("Audio play failed", e));
       return true;
     }
     return false;
+  }
+
+  // 纯 Web Audio 合成清脆的点击声，替换掉沉闷的 uisfx 默认音
+  private static playCrispClick() {
+    try {
+      const ctx = this.getCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; // 正弦波最清脆
+      osc.frequency.setValueAtTime(1400, ctx.currentTime); // 高频
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05); // 极短
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.05);
+    } catch (e) {}
   }
 
   private static play(type: SoundType) {
@@ -57,6 +77,13 @@ export class AudioManager {
     const style = settings[type] || 'default';
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom(type)) return;
+    
+    // 如果是普通点击，使用我们自己写的清脆声
+    if (type === 'click' && style === 'default') {
+      this.playCrispClick();
+      return;
+    }
+
     this.syncPack(style);
     ui.play(CUE_MAP[type] as any);
   }

@@ -113,5 +113,13 @@
   "ach_speed_desc": "在 120 分钟内完成一台 HG 模型",
   "ach_photo_name": "留影纪念",
   "ach_photo_desc": "为一次制作记录添加照片",
-  "localImageSelected": "已选择本地图片"
+  "localImageSelected": "已选择本地图片",
+  "audioDefault": "默认",
+  "audio8Bit": "8-Bit",
+  "audioSoft": "柔和",
+  "audioOff": "关闭",
+  "audioCustom": "自定义",
+  "totalModels": "总模型数",
+  "totalTime": "总时长",
+  "achievements": "成就"
 }

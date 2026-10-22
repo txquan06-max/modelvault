@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
+import { QuoteEngine } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -9,6 +10,25 @@ export const FocusPanel = ({
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget
 }: any) => {
+  
+  // 🌟 新增：对话气泡状态
+  const [quote, setQuote] = useState(QuoteEngine.getRandom());
+
+  useEffect(() => {
+    if (timerState === 'Running') {
+      // 运行中每 30 秒随机换一句台词
+      const timer = setInterval(() => setQuote(QuoteEngine.getRandom()), 30000);
+      return () => clearInterval(timer);
+    } else if (timerState === 'Idle' && activeSeconds === 0) {
+      setQuote(QuoteEngine.getRandom());
+    }
+  }, [timerState, activeSeconds]);
+
+  // 包装动作以触发特定的台词
+  const handleLocalStart = () => { setQuote(QuoteEngine.getStartQuote()); handleStart(); };
+  const handleLocalPause = () => { setQuote(QuoteEngine.getPauseQuote()); handlePause(); };
+  const handleLocalComplete = () => { setQuote(QuoteEngine.getCompleteQuote()); handleComplete(); };
+
   const currentTaskName = currentTask ? t(currentTask.name) : t('noTask');
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - timeboxElapsed) : 0;
@@ -18,21 +38,21 @@ export const FocusPanel = ({
     const file = e.target.files?.[0];
     if (file) {
       try {
-         const reader = new FileReader();
-         reader.readAsDataURL(file);
-         reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target?.result as string;
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              let width = img.width; let height = img.height;
-              if (width > 800) { height = Math.round((height * 800) / width); width = 800; }
-              canvas.width = width; canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              ctx?.drawImage(img, 0, 0, width, height);
-              setFinishPartPhoto(canvas.toDataURL('image/jpeg', 0.6));
-            };
-         };
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width; let height = img.height;
+            if (width > 800) { height = Math.round((height * 800) / width); width = 800; }
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            setFinishPartPhoto(canvas.toDataURL('image/jpeg', 0.6));
+          };
+        };
       } catch (err) { showToast(t('imageProcessingFailed') || 'Image processing failed'); }
     }
     e.target.value = '';
@@ -48,13 +68,12 @@ export const FocusPanel = ({
   if (isPip) {
     return (
       <div className={pipClass}>
-        {bgImage && (
-          <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: 0, opacity: 1 }} />
-        )}
+        {bgImage && <img src={bgImage} alt="bg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: bgSize as any, objectPosition: bgPosition, zIndex: 0, opacity: 1 }} />}
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
+        
         <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
           {availableModels.length === 0 ? (
-            <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginTop: '40px' }}>暂无制作中的模型<br/>请去主页添加</div>
+            <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginTop: '40px' }}>{t('noActiveModel')}</div>
           ) : (
             <>
               <div className="selector-group" style={{ marginBottom: '0' }}>
@@ -69,13 +88,16 @@ export const FocusPanel = ({
                   </select>
                 </div>
               </div>
+
               <div className="task-header" style={{ justifyContent: 'center', flexDirection: 'column', gap: '4px' }}>
                 <div className="task-name" style={{ fontSize: '15px' }}>{currentTaskName}</div>
                 {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
                   <button className="finish-part-btn" style={{ fontSize: '10px', padding: '2px 6px' }} onClick={handleFinishPart}>✓ {t('finishPart')}</button>
                 )}
               </div>
+
               <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ margin: '10px 0', fontSize: '42px' }}>{formatTime(activeSeconds)}</div>
+
               {isFinishingPart ? (
                 <div className="inline-confirm">
                   <div className="confirm-text" style={{ fontSize: '12px' }}>🎉 {t('finishPart')}!</div>
@@ -101,12 +123,17 @@ export const FocusPanel = ({
                 </div>
               ) : (
                 <div className="controls" style={{ flexDirection: 'column' }}>
-                  {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
-                  {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
-                  {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
+                  {timerState === 'Idle' && <button className="btn start" onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
+                  {timerState === 'Running' && <button className="btn pause" onClick={handleLocalPause}>{t('pause')}</button>}
+                  {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleLocalComplete}>{t('complete')}</button></>)}
                 </div>
               )}
-              {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
+              {timerState === 'Running' && <button className="btn complete-outline" onClick={handleLocalComplete} style={{ padding: '6px' }}>{t('complete')}</button>}
+              
+              {/* 🌟 悬浮窗底部：跑马灯字幕 */}
+              <div style={{ color: '#aaa', fontSize: '11px', textAlign: 'center', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                💬 {quote}
+              </div>
             </>
           )}
         </div>
@@ -117,9 +144,24 @@ export const FocusPanel = ({
   return (
     <div className="view-content focus-panel">
       {availableModels.length === 0 ? (
-         <div className="empty-state" style={{ marginTop: '20px' }}>没有进行中的模型啦！<br/>点击上方“添加模型”开始新的挑战吧 🚀</div>
+         <div className="empty-state" style={{ marginTop: '20px' }}>
+           {t('noActiveModelDesc')}<br/>
+           <span style={{ fontSize: '12px', color: '#888' }}>{t('clickAddModel')}</span>
+         </div>
       ) : (
         <>
+          {/* 🌟 主界面：顶部互动气泡 */}
+          <div style={{ 
+            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', borderRadius: '8px', 
+            padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)'
+          }}>
+            <div style={{ fontSize: '24px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none' }}>🤖</div>
+            <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.4' }}>
+              {quote}
+            </div>
+          </div>
+
           <div className="selector-group">
             <div className="selector-row">
               <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart}>
@@ -189,12 +231,12 @@ export const FocusPanel = ({
             </div>
           ) : (
             <div className="controls">
-              {timerState === 'Idle' && <button className="btn start" onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
-              {timerState === 'Running' && <button className="btn pause" onClick={handlePause}>{t('pause')}</button>}
-              {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleComplete}>{t('complete')}</button></>)}
+              {timerState === 'Idle' && <button className="btn start" onClick={handleLocalStart} disabled={!currentTaskId}>{t('start')}</button>}
+              {timerState === 'Running' && <button className="btn pause" onClick={handleLocalPause}>{t('pause')}</button>}
+              {timerState === 'Paused' && (<><button className="btn resume" onClick={handleResume}>{t('resume')}</button><button className="btn complete" onClick={handleLocalComplete}>{t('complete')}</button></>)}
             </div>
           )}
-          {timerState === 'Running' && <button className="btn complete-outline" onClick={handleComplete}>{t('complete')}</button>}
+          {timerState === 'Running' && <button className="btn complete-outline" onClick={handleLocalComplete}>{t('complete')}</button>}
         </>
       )}
     </div>

@@ -9,8 +9,14 @@ export interface BotData {
   id: BotType;
   name: string;
   enName: string;
-  avatar: string; // 🌟 支持 Emoji 或 图片URL
+  avatar: string;
+  portrait: string;
   color: string;
+  backgroundZh: string;
+  backgroundEn: string;
+  unlockLevel: number;
+  unlockCost: number;
+  unlockStreak?: number;
   start: QuoteSet;
   pause: QuoteSet;
   complete: QuoteSet;
@@ -22,72 +28,66 @@ export const BOTS: Record<BotType, BotData> = {
     id: 'tu',
     name: '途酱',
     enName: 'Tia',
-    avatar: '🤖', // 可以改成 url('/avatars/tia.png')
+    avatar: '/bots/tia_avatar.png',
+    portrait: '/bots/tia.png',
     color: '#3b82f6',
+    backgroundZh: 'ModelJourney 的官方原生 AI 领航员。她曾是旧时代数据库里负责记录模型制造历史的“主脑”碎片。性格温柔、理性、包容。对所有的拼装流派（素组、改件、旧化）都有着极其渊博的知识。她像一位安静陪伴你的知心大姐姐。',
+    backgroundEn: 'The official native AI navigator of ModelJourney. She is a fragment of the "Main Brain" from an old era database, responsible for recording the history of model making. Gentle, rational, and tolerant, she has profound knowledge of all building styles. Like a quiet, caring older sister.',
+    unlockLevel: 1,
+    unlockCost: 0,
     start: { zh: "旅途开始，今天做哪个部位呢？", en: "Journey begins. Which part are we building today?" },
     pause: { zh: "休息一下，喝口水，看看窗外的风景吧。", en: "Take a break, hydrate, and enjoy the view." },
     complete: { zh: "记录完毕，每一秒都是你留下的足迹。", en: "Recorded. Every second is a footprint you've left." },
     quotes: [
-      { zh: "素组是男人的浪漫，慢慢来，别着急。", en: "Out-of-box builds are a classic romance. Take your time, no rush." },
-      { zh: "注意剪水口，留一点余地打磨。", en: "Be careful with the nippers, leave a little margin for sanding." },
+      { zh: "素组是男人的浪漫，慢慢来，别着急。", en: "Out-of-box builds are a classic romance. Take your time." },
+      { zh: "注意剪水口，留一点余地打磨。", en: "Be careful with the nippers, leave a margin for sanding." },
       { zh: "刻线要轻，就像抚摸你的钱包。", en: "Scribe lightly, like you're touching your wallet." },
-      { zh: "渗线液别流得太宽，小心溢出来。", en: "Don't let the panel line wash run too wide, watch for overflow." },
+      { zh: "渗线液别流得太宽，小心溢出来。", en: "Don't let the panel line wash run too wide." },
       { zh: "做胶的时候，时间总是过得很快。", en: "Time flies when you're building gunpla." },
-      { zh: "你的每一次打磨，都是对模型的尊重。", en: "Every sanding is a sign of respect to the model." },
-      { zh: "很多大佬都是从素组开始的，别急。", en: "Many pros started with straight builds. Don't rush." },
-      { zh: "用爱去制作，模型会感受到的。", en: "Build with love, the model will feel it." },
-      { zh: "不要被别人的进度影响，你有自己的节奏。", en: "Don't be influenced by others' pace. You have your own flow." },
-      { zh: "用心做出来的作品，是有灵魂的。", en: "A work made with heart has a soul." },
-      { zh: "做胶能让人忘掉烦恼。", en: "Building helps you forget your worries." },
-      { zh: "每次拼装，都是一次修行。", en: "Every build is a practice in patience." }
+      { zh: "你的每一次打磨，都是对模型的尊重。", en: "Every sanding is a sign of respect to the model." }
     ]
   },
   milkfoam: {
     id: 'milkfoam',
     name: '奶盖',
     enName: 'Boba',
-    avatar: '😈',
+    avatar: '/bots/boba_avatar.png',
+    portrait: '/bots/boba.png',
     color: '#ec4899',
+    backgroundZh: '你的赛博监工。原本是万代流水线上的初级质检员 AI，因为看不惯次品而觉醒了自我意识。性格极其傲娇、毒舌、强迫症晚期。虽然嘴上骂骂咧咧，嫌弃你的水口没剪平、渗线溢出，但每天都会准时打卡上线陪你拼胶。她只是用最狠的话，表达最深的期盼。',
+    backgroundEn: 'Your cyber supervisor. Originally a junior QC AI on Bandai\'s assembly line, she awakened self-awareness out of disgust for defective products. Extremely tsundere, sharp-tongued, and a late-stage perfectionist.',
+    unlockLevel: 5,
+    unlockCost: 500,
     start: { zh: "磨蹭什么呢？还不快点开始！", en: "What's the hold up? Get started already!" },
     pause: { zh: "这就累了？现在的胶佬体力真差。", en: "Tired already? Modelers these days have no stamina." },
     complete: { zh: "总算搞定一段了，勉强夸你一下吧。", en: "Finally finished a section. I guess I'll give you some credit." },
     quotes: [
       { zh: "就这？水口都没剪平，你管这叫拼模型？", en: "Is that all? You left nub marks everywhere. You call this building?" },
       { zh: "刻线歪了！你的手是借来的吗？", en: "The scribing is crooked! Did you borrow those hands?" },
-      { zh: "渗线渗得跟个鬼画符一样，重来！", en: "Panel lines look like scribbles. Redo it!" },
-      { zh: "你这补色，狗看了都摇头。", en: "Even a dog would shake its head at your paint job." },
-      { zh: "别以为坐得久就能出好作品，效率呢？", en: "Don't think sitting longer makes a good work. What about efficiency?" },
       { zh: "保护漆喷得跟下雪似的，真行啊你。", en: "You sprayed topcoat like it's falling snow. Great job... not." },
-      { zh: "你这机体要是会说话，早就骂你了。", en: "If this mobile suit could talk, it would have cursed you out by now." },
-      { zh: "听好了，砂纸从低目数到高目数，别跳！", en: "Listen, sandpaper goes from low grit to high grit. Don't skip!" },
-      { zh: "再摸鱼，我就顺着网线过去帮你把模型扔了。", en: "Slack off again, and I'll throw your model out through the internet." },
-      { zh: "啧，进度这么慢，万代出新胶的速度都比你快。", en: "Tsk, Bandai releases new kits faster than your progress." },
-      { zh: "手稳一点行不行？你是得了帕金森吗？", en: "Can you steady your hands? Do you have Parkinson's?" },
-      { zh: "别盯着看了，看能把它看成完美素组吗？", en: "Stop staring. Will staring make it a perfect OOB build?" }
+      { zh: "啧，进度这么慢，万代出新胶的速度都比你快。", en: "Tsk, Bandai releases new kits faster than your progress." }
     ]
   },
   xiaoran: {
     id: 'xiaoran',
     name: '小燃',
     enName: 'Blaze',
-    avatar: '⚡️',
+    avatar: '/bots/blaze_avatar.png',
+    portrait: '/bots/blaze.png',
     color: '#10b981',
+    backgroundZh: '热血中二的灵魂伴侣。在系统数据库里，他是一个被废弃的“格斗游戏 NPC 逻辑模块”。他坚信每一个塑料模型里都封印着机甲的真正灵魂。每天都在燃烧小宇宙，把你的每一次剪水口、打磨都当成是拯救世界的战斗。',
+    backgroundEn: 'A hot-blooded, chuunibyou soulmate. In the system database, he is a discarded "fighting game NPC logic module." He firmly believes that every plastic model seals the true soul of a mecha.',
+    unlockLevel: 3,
+    unlockCost: 1000,
+    unlockStreak: 3,
     start: { zh: "全军出击！今天的目标是哪台机体？！", en: "All forces attack! What's our target today?!" },
     pause: { zh: "原地待命！补充一点能量再战！", en: "Stand by! Replenish energy before the next battle!" },
     complete: { zh: "战报已记录！你的战果将被载入史册！", en: "Battle report recorded! Your results will be written in history!" },
     quotes: [
       { zh: "燃起来！为了人类的可能性，注入灵魂吧！", en: "Ignite your spirit! Let's push the limits of human possibility!" },
       { zh: "这把剪钳，就是你斩断烦恼的利刃！", en: "These nippers are the blade to cut through your worries!" },
-      { zh: "刻线！这是赋予机甲灵魂的回路！", en: "Scribing! This is the circuit that gives the mecha a soul!" },
-      { zh: "渗线的瞬间，机甲就拥有了呼吸！", en: "At the moment of panel lining, the mecha breathes!" },
-      { zh: "补色完成！这就是艺术家的觉醒！", en: "Paint complete! This is the artist's awakening!" },
-      { zh: "保护漆！为我们的杰作披上无敌的装甲！", en: "Topcoat! Clad our masterpiece in invincible armor!" },
-      { zh: "不要停下来！前面的道路还有无尽的星辰大海！", en: "Don't stop! The road ahead has endless stars and seas!" },
       { zh: "感受到指尖的震动了吗？那是机甲在回应你！", en: "Feel the vibration on your fingertips? That's the mecha responding!" },
-      { zh: "每一次拼装，都是一场史诗级的战斗！", en: "Every build is an epic battle!" },
-      { zh: "太棒了！你的动作堪比王牌机师！", en: "Awesome! Your movements are like an ace pilot!" },
-      { zh: "哪怕是不起眼的内构，也藏着无限的可能！", en: "Even the hidden inner frame holds infinite possibilities!" },
-      { zh: "来吧！让这台机体爆发出最耀眼的光芒！", en: "Come on! Let this suit unleash its most dazzling light!" }
+      { zh: "哪怕是不起眼的内构，也藏着无限的可能！", en: "Even the hidden inner frame holds infinite possibilities!" }
     ]
   }
 };

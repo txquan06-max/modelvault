@@ -18,15 +18,18 @@ import { FocusView } from './views/FocusView';
 import { JournalView } from './views/JournalView';
 import { HangarView } from './views/HangarView';
 import { ProfileView } from './views/ProfileView';
+import { BotGalleryView } from './views/BotGalleryView';
 import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
+
+import { BOTS, type BotType } from './core/QuoteEngine';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
 function App() {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile'>('focus');
+  const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile' | 'gallery'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -94,6 +97,17 @@ function App() {
   const [isResetting, setIsResetting] = useState(false);
   const [isCheckedIn, setIsCheckedIn] = useState(() => CheckinManager.isCheckedInToday());
   const [checkinStreak, setCheckinStreak] = useState(() => StorageManager.getCheckinStreak());
+
+  // 🌟 全局机器人状态
+  const [unlockedBots, setUnlockedBots] = useState<BotType[]>(() => {
+    const saved = localStorage.getItem('mv_unlocked_bots');
+    return saved ? JSON.parse(saved) : ['tu'];
+  });
+  
+  const [currentBot, setCurrentBot] = useState<BotType>(() => {
+    const saved = localStorage.getItem('mv_current_bot') as BotType;
+    return (saved && BOTS[saved]) ? saved : 'tu';
+  });
 
   const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
@@ -220,6 +234,26 @@ function App() {
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
+
+  const handleUnlockBot = (botId: BotType, cost: number) => {
+    if (coinsBalance >= cost) {
+      StorageManager.setCoinsBalance(coinsBalance - cost);
+      const newUnlocked = [...unlockedBots, botId];
+      setUnlockedBots(newUnlocked);
+      localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
+      
+      AudioManager.playAchievement();
+      refreshData();
+      showToast(i18n.language === 'zh' ? `🎉 成功解锁 ${BOTS[botId].name}！` : `🎉 Unlocked ${BOTS[botId].enName}!`);
+    }
+  };
+
+  const handleEquipBot = (botId: BotType) => {
+    setCurrentBot(botId);
+    localStorage.setItem('mv_current_bot', botId);
+    AudioManager.playStageDone();
+    showToast(i18n.language === 'zh' ? `✅ 已切换为 ${BOTS[botId].name}` : `✅ Switched to ${BOTS[botId].enName}`);
+  };
 
   const handleSetTimeboxTarget = (min: number) => {
     AudioManager.playClick(); setTimeboxTarget(min * 60); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
@@ -551,7 +585,8 @@ function App() {
     storageUsage: StorageManager.getStorageUsage(), exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, addToLegacyList, legacyList, setLegacyList, removeLegacyItem, handleLegacyCoverUpload, handleLegacyImport,
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
-    setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin
+    setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
+    currentBot
   };
 
   return (
@@ -589,6 +624,7 @@ function App() {
               <button className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
               <button className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
               <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
+              <button className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '图鉴' : 'Gallery'}</button>
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
           </>
@@ -622,6 +658,18 @@ function App() {
             {activeTab === 'focus' && <FocusView {...commonProps} />}
             {activeTab === 'journal' && <JournalView {...commonProps} />}
             {activeTab === 'hangar' && <HangarView {...commonProps} completedModels={ModelManager.getCompletedModels()} setViewingModelId={setViewingModelId} setExpandedTaskId={setExpandedTaskId} />}
+            {activeTab === 'gallery' && (
+              <BotGalleryView 
+                unlockedBots={unlockedBots}
+                currentBot={currentBot}
+                level={level}
+                coins={coinsBalance}
+                checkinStreak={checkinStreak}
+                onUnlock={handleUnlockBot}
+                onEquip={handleEquipBot}
+                i18n={i18n}
+              />
+            )}
             {activeTab === 'profile' && <ProfileView {...commonProps} />}
           </>
         )}

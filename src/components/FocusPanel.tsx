@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-import { QuoteEngine, BOTS, type BotType } from '../core/QuoteEngine';
+import { QuoteEngine, BOTS } from '../core/QuoteEngine';
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -9,14 +9,10 @@ export const FocusPanel = ({
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
-  username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus
+  username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
+  currentBot
 }: any) => {
   
-  const [currentBot, setCurrentBot] = useState<BotType>(() => {
-    const saved = localStorage.getItem('mv_current_bot') as BotType;
-    return (saved && BOTS[saved]) ? saved : 'tu';
-  });
-
   const [quote, setQuote] = useState(() => {
     QuoteEngine.setBot(currentBot);
     return QuoteEngine.getRandom(i18n.language);
@@ -24,26 +20,13 @@ export const FocusPanel = ({
   const [displayedQuote, setDisplayedQuote] = useState('');
   const typingRef = useRef<any>(null);
 
-  const botData = BOTS[currentBot];
+  const botData = BOTS[currentBot as keyof typeof BOTS];
   const botName = i18n.language === 'zh' ? botData.name : botData.enName;
 
-  // 切换机器人
-  const switchBot = () => {
-    AudioManager.playClick();
-    const botKeys = Object.keys(BOTS) as BotType[];
-    const nextIndex = (botKeys.indexOf(currentBot) + 1) % botKeys.length;
-    const nextBot = botKeys[nextIndex];
-    
-    setCurrentBot(nextBot);
-    localStorage.setItem('mv_current_bot', nextBot);
-    QuoteEngine.setBot(nextBot);
-    setQuote(QuoteEngine.getStartQuote(i18n.language));
-  };
-
-  // 切换语言时立刻重置语录
   useEffect(() => {
+    QuoteEngine.setBot(currentBot);
     setQuote(QuoteEngine.getRandom(i18n.language));
-  }, [i18n.language]);
+  }, [currentBot, i18n.language]);
 
   useEffect(() => {
     setDisplayedQuote('');
@@ -110,18 +93,6 @@ export const FocusPanel = ({
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // 公共渲染部分：头像
-  const renderAvatar = (size: string = '40px') => {
-    if (botData.avatar.startsWith('http') || botData.avatar.startsWith('data:')) {
-      return <img src={botData.avatar} alt="avatar" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', boxShadow: `0 4px 10px ${botData.color}60` }} />
-    }
-    return (
-      <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, ${botData.color}, #8b5cf6)`, display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: `calc(${size} * 0.5)`, boxShadow: `0 4px 10px ${botData.color}60`, transition: 'all 0.3s' }}>
-        {botData.avatar}
-      </div>
-    );
-  };
 
   // =========================================================================
   // 悬浮窗 (PiP) 视图
@@ -200,34 +171,39 @@ export const FocusPanel = ({
                   </div>
                 )}
 
-                {/* 🌟 悬浮窗对话框：增加头像 */}
+                {/* 🌟 悬浮窗现代聊天气泡样式 */}
                 <div style={{ 
-                  background: 'rgba(20, 25, 35, 0.85)', 
-                  border: `1px solid ${botData.color}50`, 
-                  borderRadius: '8px', 
+                  background: 'rgba(20, 25, 35, 0.7)', 
+                  border: `1px solid ${botData.color}40`, 
+                  borderRadius: '12px', 
                   padding: '10px', 
                   fontSize: '12px', 
                   color: '#e2e8f0', 
-                  minHeight: '50px', 
-                  boxShadow: `0 0 15px ${botData.color}30, inset 0 0 10px rgba(0,0,0,0.5)`, 
+                  minHeight: '60px', 
+                  boxShadow: `0 8px 32px rgba(0,0,0,0.5), inset 0 0 15px ${botData.color}10`, 
                   position: 'relative',
                   wordBreak: 'break-word',
-                  lineHeight: '1.5',
-                  cursor: 'pointer',
+                  lineHeight: '1.6',
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: '8px'
-                }} onClick={switchBot} title="点击切换 AI 助手">
-                  <div style={{ marginTop: '2px' }}>
-                    {botData.avatar.startsWith('http') || botData.avatar.startsWith('data:') ? 
-                      <img src={botData.avatar} style={{ width: '20px', height: '20px', borderRadius: '50%' }} /> : 
-                      <span style={{ fontSize: '16px' }}>{botData.avatar}</span>
-                    }
+                  gap: '10px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <div style={{ 
+                    width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                    border: `2px solid ${botData.color}`, boxShadow: `0 0 8px ${botData.color}80`,
+                    background: '#111'
+                  }}>
+                    <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
-                  <div style={{ flex: 1, fontFamily: 'monospace' }}>
-                    <span style={{ color: botData.color, fontWeight: 'bold', marginRight: '6px' }}>{botName}:</span>
-                    <span>{displayedQuote}</span>
-                    <span style={{ animation: 'pulse 1s infinite', opacity: displayedQuote.length < (quote || '').length ? 0 : 1, color: botData.color }}>_</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: botData.color, fontWeight: 'bold', fontSize: '11px', marginBottom: '2px' }}>
+                      {botName}
+                    </div>
+                    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      {displayedQuote}
+                      <span style={{ animation: 'pulse 1s infinite', color: botData.color }}>_</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -246,8 +222,16 @@ export const FocusPanel = ({
       
       {/* 左侧信息与对话框栏 */}
       <div className="focus-left">
-        <div className="profile-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', cursor: 'pointer', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }} onClick={switchBot} title="点击切换 AI 助手">
-          {renderAvatar('48px')}
+        
+        {/* 玩家卡片 */}
+        <div className="profile-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+          <div style={{ 
+            width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden',
+            border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`,
+            background: '#111'
+          }}>
+            <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
             <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>
               {username} <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '6px', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
@@ -259,6 +243,7 @@ export const FocusPanel = ({
           <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>🕒 {localTime}</div>
         </div>
 
+        {/* 今日与打卡 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
             ⏳ {t('today')}: {formatTime(todayTotal)}
@@ -272,29 +257,35 @@ export const FocusPanel = ({
           )}
         </div>
 
+        {/* 主界面 AI 聊天气泡 */}
         <div style={{ 
-          background: `linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))`, 
-          border: `1px solid ${botData.color}80`, 
-          borderRadius: '12px', 
-          padding: '16px', 
+          background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
+          border: `1px solid ${botData.color}50`, 
+          borderRadius: '16px', 
+          padding: '20px', 
           display: 'flex', 
           alignItems: 'flex-start', 
-          gap: '12px', 
-          boxShadow: `0 8px 32px rgba(0, 0, 0, 0.3), 0 0 15px ${botData.color}30`,
-          backdropFilter: 'blur(10px)',
+          gap: '16px', 
+          boxShadow: `0 12px 40px rgba(0, 0, 0, 0.5), 0 0 20px ${botData.color}15`,
+          backdropFilter: 'blur(12px)',
           transition: 'all 0.3s',
           flex: 1
         }}>
-          <div style={{ fontSize: '32px', animation: timerState === 'Running' ? 'pulse 2s infinite' : 'none', marginTop: '2px' }}>
-            {botData.avatar.startsWith('http') || botData.avatar.startsWith('data:') ? 
-              <img src={botData.avatar} style={{ width: '32px', height: '32px', borderRadius: '50%' }} /> : 
-              botData.avatar
-            }
+          <div style={{ 
+            width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+            border: `2px solid ${botData.color}`, boxShadow: `0 0 15px ${botData.color}60`,
+            background: '#111'
+          }}>
+            <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <div style={{ fontSize: '14px', color: '#e2e8f0', lineHeight: '1.8', flex: 1, wordBreak: 'break-word' }}>
-            <span style={{ color: botData.color, fontWeight: 'bold', marginRight: '8px', fontSize: '16px' }}>{botName}:</span>
-            {displayedQuote}
-            <span style={{ animation: 'pulse 1s infinite', color: botData.color }}>|</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: botData.color, fontWeight: 'bold', fontSize: '14px', marginBottom: '6px' }}>
+              {botName}
+            </div>
+            <div style={{ fontSize: '15px', color: '#e2e8f0', lineHeight: '1.7', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              {displayedQuote}
+              <span style={{ animation: 'pulse 1s infinite', color: botData.color, fontWeight: 'bold' }}>|</span>
+            </div>
           </div>
         </div>
       </div>

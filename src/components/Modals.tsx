@@ -13,11 +13,16 @@ interface ModalsProps {
   setBgSize: (val: string) => void;
   setBgPosition: (val: string) => void;
   applyBackground: () => void;
+
+  // 🌟 新增：PWA 安装弹窗状态
+  deferredPrompt: any;
+  setDeferredPrompt: (val: any) => void;
 }
 
 export const Modals = ({
   showCompleteModelConfirm, setShowCompleteModelConfirm, handleConfirmCompleteModel,
-  isPreviewOpen, setIsPreviewOpen, bgMain, bgSize, bgPosition, setBgSize, setBgPosition, applyBackground
+  isPreviewOpen, setIsPreviewOpen, bgMain, bgSize, bgPosition, setBgSize, setBgPosition, applyBackground,
+  deferredPrompt, setDeferredPrompt
 }: ModalsProps) => {
   return (
     <>
@@ -73,6 +78,36 @@ export const Modals = ({
             <div className="modal-actions" style={{ marginTop: '20px' }}>
               <button onClick={() => { AudioManager.playClick(); setIsPreviewOpen(false); }} style={{ background: 'transparent', color: '#aaa' }}>取消</button>
               <button className="btn start" style={{ flex: 1, maxWidth: '120px' }} onClick={applyBackground}>确认应用</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 新增：PWA 安装引导 */}
+      {deferredPrompt && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ width: '320px', textAlign: 'center', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.2)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '10px' }}>📱</div>
+            <h3 style={{ color: '#fff', marginBottom: '10px' }}>安装到桌面</h3>
+            <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px', lineHeight: '1.5' }}>
+              将《模途》安装到您的手机或电脑桌面，体验全屏无边框的沉浸式拼装！
+            </p>
+            <div className="modal-actions" style={{ justifyContent: 'center' }}>
+              <button 
+                className="btn start" 
+                style={{ flex: 1, background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }} 
+                onClick={async () => {
+                  AudioManager.playAchievement();
+                  deferredPrompt.prompt();
+                  const { outcome } = await deferredPrompt.userChoice;
+                  if (outcome === 'accepted') {
+                    setDeferredPrompt(null);
+                  }
+                }}
+              >
+                立即安装
+              </button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setDeferredPrompt(null); }}>暂不</button>
             </div>
           </div>
         </div>

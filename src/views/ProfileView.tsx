@@ -1,4 +1,49 @@
 import { AudioManager } from '../core/AudioManager';
+import { SessionManager } from '../core/SessionManager';
+
+// 🌟 新增：赛博风 SVG 柱状图组件
+const WeeklyChart = ({ sessions }: { sessions: any[] }) => {
+  // 获取近7天的日期标签和对应时长
+  const days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().slice(0, 10);
+    const daySessions = sessions.filter(s => new Date(s.startedAt).toISOString().slice(0, 10) === dateStr);
+    const totalSec = daySessions.reduce((sum, s) => sum + s.activeSeconds, 0);
+    return { label: `${d.getMonth() + 1}/${d.getDate()}`, totalSec };
+  });
+
+  const maxSec = Math.max(...days.map(d => d.totalSec), 3600); // 最小刻度1小时
+
+  return (
+    <div style={{ width: '100%', height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 0', marginTop: '10px' }}>
+      {days.map((day, i) => {
+        const heightPercent = (day.totalSec / maxSec) * 100;
+        const isToday = i === 6;
+        return (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+            <div style={{ fontSize: '10px', color: isToday ? '#3b82f6' : '#888', marginBottom: '4px' }}>
+              {day.totalSec > 0 ? `${Math.floor(day.totalSec / 60)}m` : ''}
+            </div>
+            <div style={{ width: '20px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+              <div style={{ 
+                width: '100%', 
+                height: `${Math.max(heightPercent, 2)}%`, 
+                background: isToday ? 'linear-gradient(to top, #3b82f6, #8b5cf6)' : 'rgba(59, 130, 246, 0.4)',
+                boxShadow: isToday ? '0 0 10px rgba(59,130,246,0.8)' : 'none',
+                borderRadius: '4px',
+                transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)'
+              }} />
+            </div>
+            <div style={{ fontSize: '10px', color: isToday ? '#fff' : '#666', marginTop: '6px', fontWeight: isToday ? 'bold' : 'normal' }}>
+              {isToday ? '今日' : day.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const ProfileView = (props: any) => {
   const { 
@@ -13,6 +58,8 @@ export const ProfileView = (props: any) => {
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted
   } = props;
 
+  const allSessions = SessionManager.getAllSessions();
+
   return (
     <div className="view-content profile-view">
       <div className="profile-header">
@@ -21,6 +68,12 @@ export const ProfileView = (props: any) => {
           <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
           {equippedTitleDef && <div className="equipped-title" style={{ color: equippedTitleDef.color }}>[{t(equippedTitleDef.nameKey)}]</div>}
         </div>
+      </div>
+
+      {/* 🌟 新增：近 7 天肝度看板 */}
+      <div className="custom-section" style={{ paddingBottom: '10px' }}>
+        <h4>📊 {i18n.language === 'zh' ? '近 7 天专注势能' : '7-Day Focus Energy'}</h4>
+        <WeeklyChart sessions={allSessions} />
       </div>
       
       <div className="stats-grid">

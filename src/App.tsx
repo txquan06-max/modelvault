@@ -27,6 +27,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
+import { generateShareCard } from './utils/shareCard'; // 🌟 引入抽离出来的工具
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
@@ -237,7 +238,7 @@ function App() {
   useEffect(() => {
     let chatTimer: any;
     const tick = () => {
-      const newText = QuoteEngine.getRandom(i18n.language, currentStageId); // 🌟 传入当前工序
+      const newText = QuoteEngine.getRandom(i18n.language, currentStageId);
       setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }].slice(-5));
     };
     const updateTimer = () => {
@@ -508,7 +509,6 @@ function App() {
     }
   };
 
-  // 🌟 新增：拦截 Tab 切换
   const handleTabChange = (newTab: typeof activeTab) => {
     if (activeTab === 'focus' && timerState === 'Running') {
       setPendingTabChange(newTab);
@@ -518,19 +518,13 @@ function App() {
     }
   };
 
-  // 🌟 新增：全局空格键快捷键控制
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         const target = e.target as HTMLElement;
-        // 如果焦点在输入框/下拉框，则不触发
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) return;
-        
-        // 如果当前正在看详情页、教程、启动页、预览图、弹窗等，屏蔽快捷键
         if (viewingModelId || showTutorial || showSplash || isPreviewOpen || showCompleteModelConfirm || pendingTabChange) return;
-
-        e.preventDefault(); // 阻止空格键导致页面滚动
-
+        e.preventDefault();
         if (timerState === 'Idle') handleStart();
         else if (timerState === 'Running') handlePause();
         else if (timerState === 'Paused') handleResume();
@@ -727,152 +721,41 @@ function App() {
   const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); };
 
-  const generateShareCard = async (model: Model, totalTime: number) => {
+  // 🌟 极度精简后的战报触发函数
+  const triggerShareCard = async (model: Model, totalTime: number) => {
     AudioManager.playClick();
     showToast(isZh ? '🎨 正在渲染专属战报...' : '🎨 Rendering report...');
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     let newWindow: Window | null = null;
 
-    // 🌟 核心修复：如果是移动端，必须在用户点击的"同步"瞬间打开新窗口，否则 100% 会被浏览器拦截
     if (isMobile) {
       newWindow = window.open('', '_blank');
       if (newWindow) {
-        newWindow.document.write(`
-          <html><head><title>${isZh ? '正在生成...' : 'Generating...'}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-          <body style="background:#1e1e1e;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">
-            <div style="text-align:center;">
-              <div style="font-size:40px;margin-bottom:20px;">⏳</div>
-              <p>${isZh ? '正在生成战报，请稍候...' : 'Generating report, please wait...'}</p>
-            </div>
-          </body></html>
-        `);
+        newWindow.document.write(`<html><head><title>生成中...</title></head><body style="background:#1e1e1e;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;"><h1>⏳ 正在生成战报...</h1></body></html>`);
       } else {
-        showToast(isZh ? '❌ 浏览器拦截了新窗口，请允许弹窗' : '❌ Popup blocked, please allow popups');
+        showToast(isZh ? '❌ 浏览器拦截了新窗口，请允许弹窗' : '❌ Popup blocked');
         return;
       }
     }
 
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = 800; canvas.height = 1000;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context failed');
+      const url = await generateShareCard({
+        model, totalTime, isZh, username, level, currentBot, equippedTitle, formatTime, t
+      });
 
-      ctx.fillStyle = '#09090b'; 
-      ctx.fillRect(0, 0, 800, 1000);
-
-      if (model.coverImage) {
-        try {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          let imgUrl = model.coverImage;
-          if (imgUrl.startsWith('local://')) {
-            const blobUrl = await StorageManager.loadLocalFileUrl(imgUrl);
-            if (blobUrl) imgUrl = blobUrl;
-          }
-          
-          // 🌟 增加 2 秒超时保护，防止某些图片加载卡死导致整个战报生成永久挂起
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Image load timeout')), 2000);
-            img.onload = () => { clearTimeout(timeout); resolve(); };
-            img.onerror = () => { clearTimeout(timeout); reject(new Error('Image load error')); };
-            img.src = imgUrl;
-          });
-
-          const scale = Math.max(800 / img.width, 1000 / img.height);
-          const w = img.width * scale; const h = img.height * scale;
-          const x = (800 - w) / 2; const y = (1000 - h) / 2;
-          ctx.drawImage(img, x, y, w, h);
-          
-          ctx.fillStyle = 'rgba(9, 9, 11, 0.85)'; 
-          ctx.fillRect(0, 0, 800, 1000);
-        } catch (e) { console.warn('背景图加载失败或超时，使用纯黑底色', e); }
-      }
-
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)'; 
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); }
-      for (let i = 0; i < 1000; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
-
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillRect(50, 80, 6, 40);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 32px monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText('MODELVAULT // 战报', 70, 110);
-
-      ctx.fillStyle = '#fff'; 
-      ctx.font = 'bold 48px sans-serif'; 
-      ctx.textAlign = 'center'; 
-      ctx.fillText(isZh ? model.name.zh : model.name.en, 400, 600);
-      
-      ctx.fillStyle = '#3b82f6'; 
-      ctx.font = 'bold 24px monospace'; 
-      ctx.fillText(`[ ${model.grade} | ${isZh ? model.series.zh : model.series.en} ]`, 400, 650);
-
-      ctx.fillStyle = '#10b981'; 
-      ctx.font = 'bold 80px monospace'; 
-      ctx.fillText(formatTime(totalTime), 400, 760);
-      ctx.fillStyle = '#888'; 
-      ctx.font = '18px monospace'; 
-      ctx.fillText(isZh ? 'TOTAL FOCUS TIME' : 'TOTAL FOCUS TIME', 400, 790);
-
-      const activeBotData = BOTS[currentBot];
-      const botName = isZh ? activeBotData.name : activeBotData.enName;
-      const title = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
-      const titleName = title ? t(title.nameKey) : (isZh ? '新晋胶佬' : 'New Builder');
-
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
-      ctx.fillRect(50, 850, 700, 80);
-      
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${isZh ? '机师' : 'Builder'}: ${username} (Lv.${level})`, 70, 880);
-      
-      ctx.fillStyle = '#888';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`${isZh ? '称号' : 'Title'}: ${titleName}`, 70, 910);
-
-      ctx.fillStyle = activeBotData.color;
-      ctx.font = 'bold 18px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(isZh ? `由塑灵【${botName}】见证并记录` : `Witnessed by Animold [${botName}]`, 730, 890);
-      
-      ctx.fillStyle = '#555';
-      ctx.font = '14px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Generated by ModelVault / ModelJourney - ${new Date().toLocaleDateString()}`, 400, 970);
-
-      const url = canvas.toDataURL('image/jpeg', 0.9);
-      
       if (isMobile && newWindow) {
-        // 替换之前生成的空白页
         newWindow.document.open();
-        newWindow.document.write(`
-          <html>
-            <head><title>战报 - ModelJourney</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-            <body style="margin:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;">
-              <img src="${url}" style="max-width:100%;max-height:85vh;box-shadow:0 10px 30px rgba(0,0,0,0.5);" />
-              <p style="color:#fff;margin-top:20px;font-family:sans-serif;font-size:16px;font-weight:bold;">📸 ${isZh ? '请长按图片保存到相册' : 'Long press to save image'}</p>
-            </body>
-          </html>
-        `);
+        newWindow.document.write(`<html><body style="margin:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;"><img src="${url}" style="max-width:100%;max-height:85vh;" /><p style="color:#fff;margin-top:20px;">📸 请长按图片保存</p></body></html>`);
         newWindow.document.close();
       } else {
-        const a = document.createElement('a'); 
-        a.href = url; 
-        a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; 
-        a.click();
+        const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
         showToast(isZh ? '✅ 战报已保存' : '✅ Report saved!');
       }
     } catch (err) {
-      console.error('生成战报失败:', err);
-      showToast(isZh ? '❌ 生成战报失败，请重试' : '❌ Failed to generate report');
-      if (newWindow) {
-        newWindow.document.body.innerHTML = `<h2 style="color:red;text-align:center;margin-top:50px;">${isZh ? '生成失败，请关闭重试' : 'Failed, please close and try again'}</h2>`;
-      }
+      console.error(err);
+      showToast(isZh ? '❌ 生成战报失败' : '❌ Failed');
+      if (newWindow) newWindow.close();
     }
   };
 
@@ -916,7 +799,8 @@ function App() {
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
     setActiveTab, ambientType, setAmbientType,
     handleOpenPiP,
-    equippedTitleDef
+    equippedTitleDef,
+    generateShareCard: triggerShareCard // 🌟 替换为调用抽离后的函数
   };
 
   return (
@@ -957,7 +841,6 @@ function App() {
 
           {!viewingModel && (
             <div className="tabs">
-              {/* 🌟 使用 handleTabChange 拦截 */}
               <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => handleTabChange('focus')}>⏱ {t('focus')}</button>
               <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => handleTabChange('journal')}>📖 {t('journal')}</button>
               <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => handleTabChange('hangar')}>📦 {t('hangar')}</button>
@@ -1004,7 +887,7 @@ function App() {
                 handleJumpToFocus={handleJumpToFocus}
                 handleCoverUpload={handleCoverUpload}
                 handleSaveImportedStages={handleSaveImportedStages}
-                generateShareCard={generateShareCard}
+                generateShareCard={triggerShareCard}
                 {...commonProps}
               />
             ) : (
@@ -1022,7 +905,6 @@ function App() {
 
         <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} i18n={i18n} />
 
-        {/* 🌟 新增：防误触拦截弹窗 */}
         {pendingTabChange && (
           <div className="modal-overlay" style={{ zIndex: 9999 }}>
             <div className="modal-content" style={{ width: '280px', textAlign: 'center' }}>

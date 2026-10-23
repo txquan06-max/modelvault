@@ -53,6 +53,7 @@ const LocalImage = ({ src, ...props }: any) => {
 
 function App() {
   const { t, i18n } = useTranslation();
+  const isZh = i18n.language === 'zh';
   
   const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(() => {
@@ -163,17 +164,24 @@ function App() {
   }, [timerState, ambientType]);
 
   const tutorialSteps: TourStep[] = [
-    { targetId: 'tour-welcome', title: '欢迎来到模途', content: '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。', page: 'focus' },
-    { targetId: 'btn-add-model', title: '第一步：建立目标', content: '点击这里【添加模型】。可以搜索你的机体。', page: 'focus' },
-    { targetId: 'btn-add-task', title: '第二步：拆分部位', content: '添加模型后，点击【添加部位】，比如“头部”。', page: 'focus' },
-    { targetId: 'btn-pip', title: '悬浮窗模式', content: '点击这里开启悬浮窗，边看视频边拼胶！', page: 'focus' },
-    { targetId: 'tour-timer', title: '番茄钟与专注', content: '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！', page: 'focus' },
-    { targetId: 'tab-gundam', title: '机体图鉴', content: '你收集的机体都在这里，看看还有哪些没拼！', page: 'gundam' },
-    { targetId: 'tab-journal', title: '制作日程', content: '在【日志】里回顾每一分专注。', page: 'journal' },
-    { targetId: 'tab-hangar', title: '格纳库', content: '拼完的模型都会陈列在这里。', page: 'hangar' },
-    { targetId: 'tab-gallery', title: '塑灵', content: '解锁不同的【塑灵】陪你聊天。', page: 'gallery' },
-    { targetId: 'tab-profile', title: '个人中心', content: '换背景、补录历史模型、导出备份都在这里。', page: 'profile' },
-    { targetId: 'tour-install', title: '安装至桌面', content: '强烈建议安装！\n💻 电脑端：点击浏览器地址栏右侧的“安装”图标，或通过菜单选择“安装页面为应用”。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！', page: 'profile' }
+    { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
+    { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
+    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如“头部”。' : 'After adding a model, click Add Part.', page: 'focus' },
+    { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
+    { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
+    { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
+    { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
+    { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
+    { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
+    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' },
+    { 
+      targetId: 'tour-install', 
+      title: isZh ? '安装至桌面' : 'Install to Desktop', 
+      content: isZh 
+        ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！' 
+        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app (or click the install icon in the address bar).\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!', 
+      page: 'profile' 
+    }
   ];
 
   useEffect(() => {
@@ -242,12 +250,12 @@ function App() {
     setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
   };
 
-  const getModelName = (m: Model) => i18n.language === 'zh' ? m.name.zh : m.name.en;
-  const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
+  const getModelName = (m: Model) => isZh ? m.name.zh : m.name.en;
+  const getModelSeries = (m: Model) => isZh ? m.series.zh : m.series.en;
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (timerState === 'Running') { e.preventDefault(); e.returnValue = '你有正在进行的计时，刷新或关闭将丢失当前计时！Are you sure?'; }
+      if (timerState === 'Running') { e.preventDefault(); e.returnValue = isZh ? '你有正在进行的计时，刷新或关闭将丢失当前计时！Are you sure?' : 'You have an active timer. Refresh or close will lose data!'; }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -352,7 +360,7 @@ function App() {
     if (timerState === 'Running' && reminderInterval > 0) {
       if (activeSeconds > 0 && activeSeconds % reminderInterval === 0 && activeSeconds !== lastRemindedAt) {
         AudioManager.playTimeboxEnd();
-        showToast(i18n.language === 'zh' ? `⏰ 已专注 ${reminderInterval / 60} 分钟，记得休息一下！` : `⏰ Focused for ${reminderInterval / 60} min. Take a break!`);
+        showToast(isZh ? `⏰ 已专注 ${reminderInterval / 60} 分钟，记得休息一下！` : `⏰ Focused for ${reminderInterval / 60} min. Take a break!`);
         setLastRemindedAt(activeSeconds);
       }
     }
@@ -361,7 +369,7 @@ function App() {
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
-  const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
+  const toggleLanguage = () => { AudioManager.playClick(); const next = isZh ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
 
   const processImageUpload = async (file: File, type: 'main' | 'pip' | 'cover') => {
     return new Promise<string>(async (resolve) => {
@@ -392,12 +400,12 @@ function App() {
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
     const file = e.target.files?.[0];
     if (file) {
-      showToast('处理图片中...');
+      showToast(isZh ? '处理图片中...' : 'Processing...');
       const result = await processImageUpload(file, type);
       if (result) {
         if (type === 'main') { setBgMain(result); StorageManager.setBgMain(result); } 
         else { setBgPip(result); StorageManager.setBgPip(result); }
-        showToast('✅ 背景图上传成功！');
+        showToast(isZh ? '✅ 背景图上传成功！' : '✅ Background uploaded!');
         triggerAutoBackup();
       }
     }
@@ -407,12 +415,12 @@ function App() {
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && viewingModelId) {
-      showToast('处理图片中...');
+      showToast(isZh ? '处理图片中...' : 'Processing...');
       const result = await processImageUpload(file, 'cover');
       if (result) {
         const updated = ModelManager.updateModelCover(viewingModelId, result);
         setModels(updated); setIsEditingCover(false);
-        showToast('✅ 封面修改成功！');
+        showToast(isZh ? '✅ 封面修改成功！' : '✅ Cover updated!');
         triggerAutoBackup();
       }
     }
@@ -422,7 +430,7 @@ function App() {
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) { showToast('音频文件太大（最大1MB）'); return; }
+    if (file.size > 1024 * 1024) { showToast(isZh ? '音频文件太大（最大1MB）' : 'Audio file too large (max 1MB)'); return; }
     
     const filename = `audio_${type}_${Date.now()}.mp3`;
     StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
@@ -435,7 +443,7 @@ function App() {
       setCustomAudios(newAudios);
       StorageManager.setCustomAudios(newAudios);
       updateAudioSetting(type, 'custom');
-      showToast('✅ 音效上传成功！');
+      showToast(isZh ? '✅ 音效上传成功！' : '✅ Audio uploaded!');
       triggerAutoBackup();
     });
     e.target.value = '';
@@ -448,14 +456,14 @@ function App() {
       setUnlockedBots(newUnlocked);
       localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
       AudioManager.playAchievement(); refreshData();
-      showToast(i18n.language === 'zh' ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`);
+      showToast(isZh ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`);
     }
   };
 
   const handleEquipBot = (botId: BotType) => {
     setCurrentBot(botId); localStorage.setItem('mv_current_bot', botId);
     AudioManager.playStageDone();
-    showToast(i18n.language === 'zh' ? `✅ 已切换为 ${BOTS[botId].name}` : `✅ Switched to ${BOTS[botId].enName}`);
+    showToast(isZh ? `✅ 已切换为 ${BOTS[botId].name}` : `✅ Switched to ${BOTS[botId].enName}`);
   };
 
   const handleSetTimeboxTarget = (min: number) => {
@@ -472,7 +480,7 @@ function App() {
   const handleComplete = () => {
     const result = engineRef.current.complete();
     if (result) {
-      if (result.activeSeconds < 10) { showToast('计时太短，无法记录（至少10秒）。'); return; }
+      if (result.activeSeconds < 10) { showToast(isZh ? '计时太短，无法记录（至少10秒）。' : 'Time too short, not saved (min 10s).'); return; }
       AudioManager.playComplete();
       SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
       refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId }); pushChatMessage('complete');
@@ -491,7 +499,7 @@ function App() {
     const result = CheckinManager.checkin();
     if (result.success) {
       AudioManager.playAchievement();
-      showToast(i18n.language === 'zh' ? `🎉 打卡成功！连击 ${result.streak} 天，获得 ${result.rewardXp} XP 和 ${result.rewardCoins} 🪙` : `🎉 Checked in! Streak ${result.streak}, +${result.rewardXp} XP, +${result.rewardCoins} Coins`);
+      showToast(isZh ? `🎉 打卡成功！连击 ${result.streak} 天，获得 ${result.rewardXp} XP 和 ${result.rewardCoins} 🪙` : `🎉 Checked in! Streak ${result.streak}, +${result.rewardXp} XP, +${result.rewardCoins} Coins`);
       refreshData(); processAchievements();
     } else showToast(t('alreadyCheckedIn'));
   };
@@ -530,7 +538,7 @@ function App() {
     if (!completeModelId) return;
     AudioManager.playFinishPart(); const updated = ModelManager.finishModel(completeModelId);
     setModels(updated); refreshData(); setShowCompleteModelConfirm(false); setCompleteModelId(null);
-    showToast('🎉 模型已收入格纳库！');
+    showToast(isZh ? '🎉 模型已收入格纳库！' : '🎉 Model added to Hangar!');
     triggerAutoBackup();
   };
 
@@ -553,7 +561,7 @@ function App() {
   const addToLegacyList = (item: GunplaItem) => {
     AudioManager.playClick();
     if (!legacyList.some(i => i.name.en === item.name.en && i.grade === item.grade)) setLegacyList([...legacyList, { ...item }]);
-    else showToast('该模型已经在待导入列表中啦！');
+    else showToast(isZh ? '该模型已经在待导入列表中啦！' : 'Model already in import list!');
     setLegacyInput(''); setLegacyResults([]);
   };
 
@@ -562,7 +570,7 @@ function App() {
   const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      showToast('处理图片中...');
+      showToast(isZh ? '处理图片中...' : 'Processing...');
       const result = await processImageUpload(file, 'cover');
       if (result) { const newList = [...legacyList]; newList[index].coverImage = result; setLegacyList(newList); }
     }
@@ -580,7 +588,7 @@ function App() {
 
   const handleDeleteModel = (modelId: string) => {
     AudioManager.playClick(); const updated = ModelManager.deleteModel(modelId);
-    setModels(updated); setViewingModelId(null); refreshData(); showToast("已删除"); triggerAutoBackup();
+    setModels(updated); setViewingModelId(null); refreshData(); showToast(isZh ? "已删除" : "Deleted"); triggerAutoBackup();
   };
 
   const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
@@ -620,7 +628,7 @@ function App() {
   const updateAudioSetting = (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); StorageManager.setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); };
 
   const openPreview = () => { AudioManager.playClick(); setBgSize(StorageManager.getBgSize()); setBgPosition(StorageManager.getBgPosition()); setIsPreviewOpen(true); };
-  const applyBackground = () => { AudioManager.playClick(); StorageManager.setBgSize(bgSize); StorageManager.setBgPosition(bgPosition); setIsPreviewOpen(false); showToast('✅ 适配设置应用成功！'); };
+  const applyBackground = () => { AudioManager.playClick(); StorageManager.setBgSize(bgSize); StorageManager.setBgPosition(bgPosition); setIsPreviewOpen(false); showToast(isZh ? '✅ 适配设置应用成功！' : '✅ Settings applied!'); };
 
   const buyTitle = (id: string) => { 
     const result = UserManager.buyTitle(id);
@@ -632,8 +640,8 @@ function App() {
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
-    if (isWeChat) { showToast('微信内不支持画中画，请用浏览器打开'); return; }
-    if (!('documentPictureInPicture' in window)) { showToast('您的浏览器不支持画中画，请使用 Chrome/Edge。'); return; }
+    if (isWeChat) { showToast(isZh ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.'); return; }
+    if (!('documentPictureInPicture' in window)) { showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
     try {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
@@ -642,7 +650,7 @@ function App() {
       });
       pipWin.document.body.style.backgroundColor = '#1e1e1e'; pipWin.document.body.style.margin = '0'; pipWin.document.body.style.display = 'flex'; pipWin.document.body.style.justifyContent = 'center'; pipWin.document.body.style.alignItems = 'center'; pipWin.document.body.style.height = '100vh'; pipWin.document.body.style.overflow = 'hidden';
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
-    } catch (err) { console.error(err); showToast('画中画打开失败'); }
+    } catch (err) { console.error(err); showToast(isZh ? '画中画打开失败' : 'Failed to open PiP'); }
   };
 
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
@@ -669,7 +677,7 @@ function App() {
 
   const generateShareCard = async (model: Model, totalTime: number) => {
     AudioManager.playClick();
-    showToast('🎨 正在渲染专属战报...');
+    showToast(isZh ? '🎨 正在渲染专属战报...' : '🎨 Rendering report...');
     
     const canvas = document.createElement('canvas');
     canvas.width = 800; canvas.height = 1000;
@@ -702,7 +710,7 @@ function App() {
         
         ctx.fillStyle = 'rgba(9, 9, 11, 0.85)'; 
         ctx.fillRect(0, 0, 800, 1000);
-      } catch (e) { console.log('背景图加载失败，使用纯黑底色'); }
+      } catch (e) { console.log('Background img load failed'); }
     }
 
     ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)'; 
@@ -720,23 +728,23 @@ function App() {
     ctx.fillStyle = '#fff'; 
     ctx.font = 'bold 48px sans-serif'; 
     ctx.textAlign = 'center'; 
-    ctx.fillText(i18n.language === 'zh' ? model.name.zh : model.name.en, 400, 600);
+    ctx.fillText(isZh ? model.name.zh : model.name.en, 400, 600);
     
     ctx.fillStyle = '#3b82f6'; 
     ctx.font = 'bold 24px monospace'; 
-    ctx.fillText(`[ ${model.grade} | ${i18n.language === 'zh' ? model.series.zh : model.series.en} ]`, 400, 650);
+    ctx.fillText(`[ ${model.grade} | ${isZh ? model.series.zh : model.series.en} ]`, 400, 650);
 
     ctx.fillStyle = '#10b981'; 
     ctx.font = 'bold 80px monospace'; 
     ctx.fillText(formatTime(totalTime), 400, 760);
     ctx.fillStyle = '#888'; 
     ctx.font = '18px monospace'; 
-    ctx.fillText(i18n.language === 'zh' ? 'TOTAL FOCUS TIME' : 'TOTAL FOCUS TIME', 400, 790);
+    ctx.fillText(isZh ? 'TOTAL FOCUS TIME' : 'TOTAL FOCUS TIME', 400, 790);
 
     const activeBotData = BOTS[currentBot];
-    const botName = i18n.language === 'zh' ? activeBotData.name : activeBotData.enName;
+    const botName = isZh ? activeBotData.name : activeBotData.enName;
     const title = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
-    const titleName = title ? t(title.nameKey) : '新晋胶佬';
+    const titleName = title ? t(title.nameKey) : (isZh ? '新晋胶佬' : 'New Builder');
 
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     ctx.fillRect(50, 850, 700, 80);
@@ -744,16 +752,16 @@ function App() {
     ctx.fillStyle = '#f59e0b';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`机师: ${username} (Lv.${level})`, 70, 880);
+    ctx.fillText(`${isZh ? '机师' : 'Builder'}: ${username} (Lv.${level})`, 70, 880);
     
     ctx.fillStyle = '#888';
     ctx.font = '16px sans-serif';
-    ctx.fillText(`称号: ${titleName}`, 70, 910);
+    ctx.fillText(`${isZh ? '称号' : 'Title'}: ${titleName}`, 70, 910);
 
     ctx.fillStyle = activeBotData.color;
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`由塑灵【${botName}】见证并记录`, 730, 890);
+    ctx.fillText(isZh ? `由塑灵【${botName}】见证并记录` : `Witnessed by Animold [${botName}]`, 730, 890);
     
     ctx.fillStyle = '#555';
     ctx.font = '14px monospace';
@@ -762,7 +770,7 @@ function App() {
 
     const url = canvas.toDataURL('image/jpeg', 0.9);
     const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
-    showToast('✅ 机甲大片战报已保存到相册/下载');
+    showToast(isZh ? '✅ 战报已保存到相册/下载' : '✅ Report saved!');
   };
 
   const getHistoryLogs = () => { 
@@ -832,37 +840,32 @@ function App() {
 
         <div className="mini-window">
           
-          {viewingModel ? (
+          {/* 🌟 统一导航栏 (除详情页外全部展示) */}
+          {!viewingModel && (
+            <div className="tabs">
+              <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
+              <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
+              <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
+              <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {isZh ? '机体' : 'Mecha'}</button>
+              <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {isZh ? '塑灵' : 'Animold'}</button>
+              <button id="tab-profile" className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
+            </div>
+          )}
+
+          {viewingModel && (
             <div className="profile-topbar">
               <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); setShowRebuildConfirm(false); }}>← {t('backToHangar')}</button>
               <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {confirmDeleteId === viewingModel.id ? (
                   <>
-                    <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>确认删除</button>
+                    <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>{isZh ? '确认删除' : 'Confirm'}</button>
                     <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(null); }}>{t('cancel')}</button>
                   </>
                 ) : (
                   <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(viewingModel.id); }}>🗑️</button>
                 )}
-                <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
+                <button className="lang-btn" onClick={toggleLanguage}>{isZh ? 'EN' : '中'}</button>
               </div>
-            </div>
-          ) : activeTab === 'profile' ? (
-            <div className="profile-topbar">
-              <button className="back-btn" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>{t('backToFocus')}</button>
-              <div className="top-right">
-                <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗</button>
-                <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
-              </div>
-            </div>
-          ) : (
-            <div className="tabs">
-              <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
-              <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
-              <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
-              <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {i18n.language === 'zh' ? '机体' : 'Mecha'}</button>
-              <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
-              <button id="tab-profile" className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
           )}
 
@@ -909,7 +912,7 @@ function App() {
           </div>
         </div>
 
-        <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />
+        <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} i18n={i18n} />
 
         {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
       </div>

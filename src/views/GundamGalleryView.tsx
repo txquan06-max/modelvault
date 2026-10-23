@@ -3,11 +3,12 @@ import { CORE_DB, type GunplaItem } from '../core/GunplaDB';
 import { AudioManager } from '../core/AudioManager';
 
 export const GundamGalleryView = ({ i18n, models }: any) => {
+  const isZh = i18n.language === 'zh';
   const [filter, setFilter] = useState<'all' | 'collected' | 'uncollected'>('all');
   const [seriesFilter, setSeriesFilter] = useState<string>('all');
 
   // 显式声明 string 数组，解决 unknown 类型报错
-  const allSeries = Array.from(new Set(CORE_DB.map((item: GunplaItem) => i18n.language === 'zh' ? item.series.zh : item.series.en))).sort() as string[];
+  const allSeries = Array.from(new Set(CORE_DB.map((item: GunplaItem) => isZh ? item.series.zh : item.series.en))).sort() as string[];
 
   const galleryData = CORE_DB.map((dbItem: GunplaItem) => {
     const userModel = models.find((m: any) => 
@@ -23,7 +24,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
 
   const filteredData = galleryData.filter(item => {
     const matchFilter = filter === 'all' ? true : filter === 'collected' ? item.isCollected : !item.isCollected;
-    const matchSeries = seriesFilter === 'all' ? true : (i18n.language === 'zh' ? item.series.zh : item.series.en) === seriesFilter;
+    const matchSeries = seriesFilter === 'all' ? true : (isZh ? item.series.zh : item.series.en) === seriesFilter;
     return matchFilter && matchSeries;
   });
 
@@ -33,7 +34,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
   return (
     <div className="view-content" style={{ width: '100%', padding: '10px' }}>
       <h2 style={{ fontSize: '18px', color: '#fff', marginBottom: '16px', borderLeft: '4px solid #f59e0b', paddingLeft: '10px' }}>
-        {i18n.language === 'zh' ? '高达图鉴收集' : 'Gundam Archive'}
+        {isZh ? '高达图鉴收集' : 'Gundam Archive'}
         <span style={{ fontSize: '12px', color: '#f59e0b', marginLeft: '10px', fontWeight: 'normal' }}>
           {totalCollected} / {totalDB}
         </span>
@@ -46,7 +47,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
             onClick={() => { AudioManager.playClick(); setFilter(f); }}
             style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '12px', border: 'none', cursor: 'pointer', background: filter === f ? '#f59e0b' : 'rgba(255,255,255,0.1)', color: filter === f ? '#000' : '#fff', fontWeight: 'bold' }}
           >
-            {f === 'all' ? '全部' : f === 'collected' ? '已收集' : '未收集'}
+            {f === 'all' ? (isZh ? '全部' : 'All') : f === 'collected' ? (isZh ? '已收集' : 'Collected') : (isZh ? '未收集' : 'Uncollected')}
           </button>
         ))}
         <select 
@@ -54,15 +55,15 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
           onChange={e => { AudioManager.playClick(); setSeriesFilter(e.target.value); }}
           style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '12px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid #555', outline: 'none' }}
         >
-          <option value="all">所有系列</option>
+          <option value="all">{isZh ? '所有系列' : 'All Series'}</option>
           {allSeries.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', paddingBottom: '40px' }}>
         {filteredData.map((item, idx) => {
-          const name = i18n.language === 'zh' ? item.name.zh : item.name.en;
-          const series = i18n.language === 'zh' ? item.series.zh : item.series.en;
+          const name = isZh ? item.name.zh : item.name.en;
+          const series = isZh ? item.series.zh : item.series.en;
           
           return (
             <div 
@@ -93,7 +94,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
                 <div style={{ fontSize: '9px', color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{series}</div>
                 {item.isCollected && (
                   <div style={{ fontSize: '9px', color: item.status === 'Completed' ? '#10b981' : '#3b82f6', marginTop: '4px', background: 'rgba(0,0,0,0.5)', padding: '2px 4px', borderRadius: '4px' }}>
-                    {item.status === 'Completed' ? '已完成' : '进行中'}
+                    {item.status === 'Completed' ? (isZh ? '已完成' : 'Completed') : (isZh ? '进行中' : 'In Progress')}
                   </div>
                 )}
               </div>

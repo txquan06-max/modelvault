@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'; // 🌟 修复：直接导入 useEffect
+import { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { StorageManager } from '../core/StorageManager';
 
 const LocalCover = ({ image, fallback }: { image: string, fallback: string }) => {
   const [url, setUrl] = useState<string | null>(null);
   
-  // 🌟 修复：这里改为直接使用 useEffect
   useEffect(() => {
     if (image?.startsWith('local://')) {
       let objUrl: string | null = null;
@@ -22,6 +21,7 @@ const LocalCover = ({ image, fallback }: { image: string, fallback: string }) =>
 
 export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setViewingModelId, setExpandedTaskId, setActiveTab, setCurrentModelId }: any) => {
   const [activeSubTab, setActiveSubTab] = useState<'completed' | 'backlog'>('completed');
+  const isZh = i18n.language === 'zh';
 
   const completedModels = models.filter((m: any) => m.status === 'Completed' || m.isRebuilding).sort((a: any, b: any) => a.grade.localeCompare(b.grade));
   const backlogModels = models.filter((m: any) => m.status === 'NotStarted' || m.status === 'InProgress').sort((a: any, b: any) => b.createdAt - a.createdAt);
@@ -37,14 +37,14 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
           style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: activeSubTab === 'completed' ? '#3b82f6' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 'bold' }}
           onClick={() => { AudioManager.playClick(); setActiveSubTab('completed'); }}
         >
-          🏆 {i18n.language === 'zh' ? '已完成格纳库' : 'Completed'}
+          🏆 {isZh ? '已完成格纳库' : 'Completed'}
         </button>
         <button 
           className={`tab ${activeSubTab === 'backlog' ? 'active' : ''}`}
           style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: activeSubTab === 'backlog' ? '#f59e0b' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 'bold' }}
           onClick={() => { AudioManager.playClick(); setActiveSubTab('backlog'); }}
         >
-          📦 {i18n.language === 'zh' ? '堆积区 / 待拼' : 'Backlog'}
+          📦 {isZh ? '堆积区 / 待拼' : 'Backlog'}
         </button>
       </div>
 
@@ -52,7 +52,7 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
         <div className="empty-state">
           {activeSubTab === 'completed' 
             ? t('emptyHangar') 
-            : (i18n.language === 'zh' ? '你的堆积区空空如也，赶紧去买模型吧！' : 'Your backlog is empty. Time to buy more kits!')}
+            : (isZh ? '你的堆积区空空如也，赶紧去买模型吧！' : 'Your backlog is empty. Time to buy more kits!')}
         </div>
       ) : (
         <div className="hangar-grid" style={{ flex: 1, overflowY: 'auto', alignContent: 'start' }}>
@@ -75,7 +75,7 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
               <div className="hangar-cover">
                 {model.coverImage ? <LocalCover image={model.coverImage} fallback="📷" /> : <span>📷 {t('noImage')}</span>}
                 {model.isRebuilding && <span className="rebuild-badge-overlay">🔧 {t('rebuilding')}</span>}
-                {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>拼装中</span>}
+                {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{isZh ? '拼装中' : 'In Progress'}</span>}
               </div>
               <div className="hangar-info">
                 <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6' }}>{model.grade}</div>

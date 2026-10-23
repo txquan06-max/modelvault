@@ -14,28 +14,37 @@ interface ModalsProps {
   setBgPosition: (val: string) => void;
   applyBackground: () => void;
 
-  // 🌟 新增：PWA 安装弹窗状态
+  // PWA 安装弹窗状态
   deferredPrompt: any;
   setDeferredPrompt: (val: any) => void;
+  
+  // 双语支持
+  i18n: any;
 }
 
 export const Modals = ({
   showCompleteModelConfirm, setShowCompleteModelConfirm, handleConfirmCompleteModel,
   isPreviewOpen, setIsPreviewOpen, bgMain, bgSize, bgPosition, setBgSize, setBgPosition, applyBackground,
-  deferredPrompt, setDeferredPrompt
+  deferredPrompt, setDeferredPrompt, i18n
 }: ModalsProps) => {
+  const isZh = i18n.language === 'zh';
+
   return (
     <>
       {showCompleteModelConfirm && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ width: '320px', textAlign: 'center' }}>
-            <h3 style={{ color: '#10b981' }}>🎉 所有部位已完成！</h3>
+            <h3 style={{ color: '#10b981' }}>🎉 {isZh ? '所有部位已完成！' : 'All parts completed!'}</h3>
             <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px' }}>
-              该模型的所有部位均已拼装完毕，是否直接完成并收入格纳库？
+              {isZh ? '该模型的所有部位均已拼装完毕，是否直接完成并收入格纳库？' : 'All parts are assembled. Finish and move to hangar?'}
             </p>
             <div className="modal-actions" style={{ justifyContent: 'center' }}>
-              <button className="btn yes" style={{ flex: 1 }} onClick={handleConfirmCompleteModel}>收入格纳库</button>
-              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setShowCompleteModelConfirm(false); }}>稍后再说</button>
+              <button className="btn yes" style={{ flex: 1 }} onClick={handleConfirmCompleteModel}>
+                {isZh ? '收入格纳库' : 'Move to Hangar'}
+              </button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setShowCompleteModelConfirm(false); }}>
+                {isZh ? '稍后再说' : 'Later'}
+              </button>
             </div>
           </div>
         </div>
@@ -44,8 +53,8 @@ export const Modals = ({
       {isPreviewOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ width: '400px' }}>
-            <h3>背景图预览与编辑</h3>
-            <p style={{ fontSize: '12px', color: '#aaa' }}>仅用于主屏预览。</p>
+            <h3>{isZh ? '背景图预览与编辑' : 'Background Preview & Edit'}</h3>
+            <p style={{ fontSize: '12px', color: '#aaa' }}>{isZh ? '仅用于主屏预览。' : 'For main screen preview only.'}</p>
             
             <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center' }}>
@@ -58,39 +67,45 @@ export const Modals = ({
             </div>
 
             <div className="custom-row">
-              <span>填充模式 (Object-Fit):</span>
+              <span>{isZh ? '填充模式 (Object-Fit):' : 'Object-Fit:'}</span>
               <select value={bgSize} onChange={e => { AudioManager.playClick(); setBgSize(e.target.value); }} style={{ padding: '6px', marginBottom: '10px' }}>
-                <option value="cover">Cover (覆盖并裁切)</option>
-                <option value="contain">Contain (包含并留边)</option>
-                <option value="fill">Fill (拉伸填满)</option>
+                <option value="cover">{isZh ? 'Cover (覆盖并裁切)' : 'Cover'}</option>
+                <option value="contain">{isZh ? 'Contain (包含并留边)' : 'Contain'}</option>
+                <option value="fill">{isZh ? 'Fill (拉伸填满)' : 'Fill'}</option>
               </select>
               
-              <span>对齐位置 (Object-Position):</span>
+              <span>{isZh ? '对齐位置 (Object-Position):' : 'Object-Position:'}</span>
               <select value={bgPosition} onChange={e => { AudioManager.playClick(); setBgPosition(e.target.value); }} style={{ padding: '6px' }}>
-                <option value="center">居中 (Center)</option>
-                <option value="top">顶部对齐 (Top)</option>
-                <option value="bottom">底部对齐 (Bottom)</option>
-                <option value="left">左对齐 (Left)</option>
-                <option value="right">右对齐 (Right)</option>
+                <option value="center">{isZh ? '居中 (Center)' : 'Center'}</option>
+                <option value="top">{isZh ? '顶部对齐 (Top)' : 'Top'}</option>
+                <option value="bottom">{isZh ? '底部对齐 (Bottom)' : 'Bottom'}</option>
+                <option value="left">{isZh ? '左对齐 (Left)' : 'Left'}</option>
+                <option value="right">{isZh ? '右对齐 (Right)' : 'Right'}</option>
               </select>
             </div>
 
             <div className="modal-actions" style={{ marginTop: '20px' }}>
-              <button onClick={() => { AudioManager.playClick(); setIsPreviewOpen(false); }} style={{ background: 'transparent', color: '#aaa' }}>取消</button>
-              <button className="btn start" style={{ flex: 1, maxWidth: '120px' }} onClick={applyBackground}>确认应用</button>
+              <button onClick={() => { AudioManager.playClick(); setIsPreviewOpen(false); }} style={{ background: 'transparent', color: '#aaa' }}>
+                {isZh ? '取消' : 'Cancel'}
+              </button>
+              <button className="btn start" style={{ flex: 1, maxWidth: '120px' }} onClick={applyBackground}>
+                {isZh ? '确认应用' : 'Apply'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🌟 新增：PWA 安装引导 */}
+      {/* PWA 安装引导 */}
       {deferredPrompt && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ width: '320px', textAlign: 'center', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.2)' }}>
             <div style={{ fontSize: '40px', marginBottom: '10px' }}>📱</div>
-            <h3 style={{ color: '#fff', marginBottom: '10px' }}>安装到桌面</h3>
+            <h3 style={{ color: '#fff', marginBottom: '10px' }}>{isZh ? '安装到桌面' : 'Install to Desktop'}</h3>
             <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px', lineHeight: '1.5' }}>
-              将《模途》安装到您的手机或电脑桌面，体验全屏无边框的沉浸式拼装！
+              {isZh 
+                ? '将《模途》安装到您的手机或电脑桌面，体验全屏无边框的沉浸式拼装！' 
+                : 'Install ModelJourney to your desktop for a fullscreen immersive experience!'}
             </p>
             <div className="modal-actions" style={{ justifyContent: 'center' }}>
               <button 
@@ -105,9 +120,11 @@ export const Modals = ({
                   }
                 }}
               >
-                立即安装
+                {isZh ? '立即安装' : 'Install Now'}
               </button>
-              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setDeferredPrompt(null); }}>暂不</button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setDeferredPrompt(null); }}>
+                {isZh ? '暂不' : 'Not Now'}
+              </button>
             </div>
           </div>
         </div>

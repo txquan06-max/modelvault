@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +33,21 @@ interface ChatMessage {
   text: string;
   timestamp: number;
 }
+
+// 🌟 辅助组件：处理 local:// 协议的图片加载
+const LocalImage = ({ src, ...props }: any) => {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    StorageManager.loadLocalFileUrl(src).then(res => {
+      if (res) { objectUrl = res; setUrl(res); }
+    });
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [src]);
+
+  if (!url) return <div {...props} style={{ ...props.style, background: '#333' }} />;
+  return <img src={url} {...props} />;
+};
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -119,7 +133,10 @@ function App() {
     return (saved && BOTS[saved]) ? saved : 'tu';
   });
 
-  // 🌟 新增：全局聊天记录状态
+  const [storageEstimate, setStorageEstimate] = useState({ usage: 0, quota: 0, percent: 0 });
+  const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
+  const [isAssetsMounted, setIsAssetsMounted] = useState(false);
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('mv_chat_messages');
@@ -128,14 +145,10 @@ function App() {
     return []; 
   });
 
-  // 同步聊天记录到 sessionStorage
   useEffect(() => {
-    if (chatMessages.length > 0) {
-      sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
-    }
+    if (chatMessages.length > 0) sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
   }, [chatMessages]);
 
-  // 初始化第一条消息
   useEffect(() => {
     QuoteEngine.setBot(currentBot);
     if (chatMessages.length === 0) {
@@ -144,43 +157,44 @@ function App() {
     }
   }, [currentBot, i18n.language, chatMessages.length]);
 
-  // 🌟 核心：全局统一发声逻辑
+  useEffect(() => {
+    const initStorage = async () => {
+      await StorageManager.requestPersistentStorage();
+      const est = await StorageManager.getStorageEstimate();
+      setStorageEstimate(est);
+    };
+    initStorage();
+    GunplaSearch.init();
+  }, []);
+
   useEffect(() => {
     let chatTimer: any;
-
     const tick = () => {
       const newText = QuoteEngine.getRandom(i18n.language);
       setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }].slice(-5));
     };
-
     const updateTimer = () => {
       if (chatTimer) clearInterval(chatTimer);
-      
       let interval = 0;
-      // 如果悬浮窗存在，只使用悬浮窗频率（避免两个窗口各自说话）
-      if (pipWindow) {
-        interval = pipChatInterval;
-      } 
-      // 如果没有悬浮窗，且网页在焦点状态，使用网页频率
-      else if (document.visibilityState === 'visible') {
-        interval = webChatInterval;
-      }
-
-      if (interval > 0) {
-        chatTimer = setInterval(tick, interval);
-      }
+      if (pipWindow) interval = pipChatInterval;
+      else if (document.visibilityState === 'visible') interval = webChatInterval;
+      if (interval > 0) chatTimer = setInterval(tick, interval);
     };
-
     updateTimer();
     document.addEventListener('visibilitychange', updateTimer);
-
     return () => {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
   }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow]);
 
-  // 手动触发新消息（开始/暂停/完成）
+  const triggerAutoBackup = async () => {
+    if (isAutoBackupEnabled) {
+      const data = StorageManager.exportAll();
+      await StorageManager.autoBackupData(data);
+    }
+  };
+
   const pushChatMessage = (type: 'start' | 'pause' | 'complete') => {
     const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
                : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
@@ -192,16 +206,8 @@ function App() {
   const getModelSeries = (m: Model) => i18n.language === 'zh' ? m.series.zh : m.series.en;
 
   useEffect(() => {
-    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-    GunplaSearch.init();
-  }, []);
-
-  useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (timerState === 'Running') {
-        e.preventDefault();
-        e.returnValue = '你有正在进行的计时，刷新或关闭将丢失当前计时！Are you sure?';
-      }
+      if (timerState === 'Running') { e.preventDefault(); e.returnValue = '你有正在进行的计时，刷新或关闭将丢失当前计时！Are you sure?'; }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -230,7 +236,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [legacyInput, showLegacyForm]);
 
-  const refreshData = () => {
+  const refreshData = async () => {
     const xp = ModelManager.getTotalXP();
     setLevel(UserManager.getLevel(xp));
     setLevelProgress(UserManager.getLevelProgress(xp));
@@ -253,6 +259,9 @@ function App() {
     if (available.length > 0) {
       if (!currentModelId || !available.some(m => m.id === currentModelId)) setCurrentModelId(available[0].id);
     } else setCurrentModelId(''); 
+
+    const est = await StorageManager.getStorageEstimate();
+    setStorageEstimate(est);
   };
 
   useEffect(() => { refreshData(); }, []);
@@ -314,22 +323,97 @@ function App() {
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = i18n.language === 'zh' ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
 
+  const processImageUpload = async (file: File, type: 'main' | 'pip' | 'cover') => {
+    return new Promise<string>(async (resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width; let h = img.height;
+          if(w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+          
+          canvas.toBlob(async (blob) => {
+            if (!blob) return resolve('');
+            const filename = `${type}_${Date.now()}.webp`;
+            const localPath = await StorageManager.saveFileToLocal(filename, blob);
+            if (localPath) resolve(localPath);
+            else resolve(canvas.toDataURL('image/webp', 0.6));
+          }, 'image/webp', 0.6);
+        };
+      };
+    });
+  };
+
+  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      showToast('处理图片中...');
+      const result = await processImageUpload(file, type);
+      if (result) {
+        if (type === 'main') { setBgMain(result); StorageManager.setBgMain(result); } 
+        else { setBgPip(result); StorageManager.setBgPip(result); }
+        showToast('✅ 背景图上传成功！');
+        triggerAutoBackup();
+      }
+    }
+    e.target.value = '';
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && viewingModelId) {
+      showToast('处理图片中...');
+      const result = await processImageUpload(file, 'cover');
+      if (result) {
+        const updated = ModelManager.updateModelCover(viewingModelId, result);
+        setModels(updated); setIsEditingCover(false);
+        showToast('✅ 封面修改成功！');
+        triggerAutoBackup();
+      }
+    }
+    e.target.value = '';
+  };
+
+  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) { showToast('音频文件太大（最大1MB）'); return; }
+    
+    const filename = `audio_${type}_${Date.now()}.mp3`;
+    StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
+      const finalPath = localPath || await new Promise<string>((res) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => res(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      const newAudios = { ...customAudios, [type]: finalPath };
+      setCustomAudios(newAudios);
+      StorageManager.setCustomAudios(newAudios);
+      updateAudioSetting(type, 'custom');
+      showToast('✅ 音效上传成功！');
+      triggerAutoBackup();
+    });
+    e.target.value = '';
+  };
+
   const handleUnlockBot = (botId: BotType, cost: number) => {
     if (coinsBalance >= cost) {
       StorageManager.setCoinsBalance(coinsBalance - cost);
       const newUnlocked = [...unlockedBots, botId];
       setUnlockedBots(newUnlocked);
       localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
-      
-      AudioManager.playAchievement();
-      refreshData();
+      AudioManager.playAchievement(); refreshData();
       showToast(i18n.language === 'zh' ? `🎉 成功解锁 ${BOTS[botId].name}！` : `🎉 Unlocked ${BOTS[botId].enName}!`);
     }
   };
 
   const handleEquipBot = (botId: BotType) => {
-    setCurrentBot(botId);
-    localStorage.setItem('mv_current_bot', botId);
+    setCurrentBot(botId); localStorage.setItem('mv_current_bot', botId);
     AudioManager.playStageDone();
     showToast(i18n.language === 'zh' ? `✅ 已切换为 ${BOTS[botId].name}` : `✅ Switched to ${BOTS[botId].enName}`);
   };
@@ -338,33 +422,21 @@ function App() {
     AudioManager.playClick(); setTimeboxTarget(min * 60); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
   };
 
-  // 🌟 在操作中触发全局消息
   const handleStart = () => { 
-    AudioManager.playStart(); 
-    engineRef.current.start(); 
+    AudioManager.playStart(); engineRef.current.start(); 
     setModels(ModelManager.startStage(currentTaskId, currentStageId)); 
-    setHasPlayedTimeboxSound(false); 
-    refreshData(); 
-    pushChatMessage('start');
+    setHasPlayedTimeboxSound(false); refreshData(); pushChatMessage('start');
   };
-  const handlePause = () => { 
-    AudioManager.playPause(); 
-    engineRef.current.pause(); 
-    pushChatMessage('pause');
-  };
-  const handleResume = () => { 
-    AudioManager.playStart(); 
-    engineRef.current.resume(); 
-    pushChatMessage('start');
-  };
+  const handlePause = () => { AudioManager.playPause(); engineRef.current.pause(); pushChatMessage('pause'); };
+  const handleResume = () => { AudioManager.playStart(); engineRef.current.resume(); pushChatMessage('start'); };
   const handleComplete = () => {
     const result = engineRef.current.complete();
     if (result) {
-      if (result.activeSeconds < 10) { showToast(i18n.language === 'zh' ? '计时太短，无法记录（至少10秒）。' : 'Time too short, not saved (min 10s).'); return; }
+      if (result.activeSeconds < 10) { showToast('计时太短，无法记录（至少10秒）。'); return; }
       AudioManager.playComplete();
       SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
-      refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId });
-      pushChatMessage('complete');
+      refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId }); pushChatMessage('complete');
+      triggerAutoBackup();
     }
   };
 
@@ -380,11 +452,8 @@ function App() {
     if (result.success) {
       AudioManager.playAchievement();
       showToast(i18n.language === 'zh' ? `🎉 打卡成功！连击 ${result.streak} 天，获得 ${result.rewardXp} XP 和 ${result.rewardCoins} 🪙` : `🎉 Checked in! Streak ${result.streak}, +${result.rewardXp} XP, +${result.rewardCoins} Coins`);
-      refreshData();
-      processAchievements();
-    } else {
-      showToast(t('alreadyCheckedIn'));
-    }
+      refreshData(); processAchievements();
+    } else showToast(t('alreadyCheckedIn'));
   };
 
   const checkAndPromptCompleteModel = (updatedModels: Model[], modelId?: string) => {
@@ -398,9 +467,9 @@ function App() {
   };
 
   const handleConfirmStageDone = () => {
-    AudioManager.playStageDone();
-    const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
+    AudioManager.playStageDone(); const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
     setModels(updated); refreshData(); setLastSession(null); processAchievements(); checkAndPromptCompleteModel(updated);
+    triggerAutoBackup();
   };
 
   const handleFinishPart = () => {
@@ -411,17 +480,18 @@ function App() {
   };
 
   const handleConfirmFinishPart = () => {
-    AudioManager.playFinishPart();
-    const result = ModelManager.finishTask(currentTaskId, finishPartPhoto);
+    AudioManager.playFinishPart(); const result = ModelManager.finishTask(currentTaskId, finishPartPhoto);
     if (result.error) { showToast(t(result.error)); return; }
     setModels(result.models); refreshData(); processAchievements(); setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false); setIsFinishingPart(false); checkAndPromptCompleteModel(result.models);
+    triggerAutoBackup();
   };
 
   const handleConfirmCompleteModel = () => {
     if (!completeModelId) return;
     AudioManager.playFinishPart(); const updated = ModelManager.finishModel(completeModelId);
     setModels(updated); refreshData(); setShowCompleteModelConfirm(false); setCompleteModelId(null);
-    showToast(i18n.language === 'zh' ? '🎉 模型已收入格纳库！' : '🎉 Model added to Hangar!');
+    showToast('🎉 模型已收入格纳库！');
+    triggerAutoBackup();
   };
 
   const handleAddModel = () => {
@@ -432,17 +502,18 @@ function App() {
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks);
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);
     setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null); setIsAddingModel(false); setUseDefaultTasks(true); setSearchResults([]); processAchievements();
+    triggerAutoBackup();
   };
 
   const handleAddTask = (name: string) => {
     const updated = ModelManager.addTask(currentModelId, name);
-    setModels(updated); 
+    setModels(updated); triggerAutoBackup();
   };
 
   const addToLegacyList = (item: GunplaItem) => {
     AudioManager.playClick();
     if (!legacyList.some(i => i.name.en === item.name.en && i.grade === item.grade)) setLegacyList([...legacyList, { ...item }]);
-    else showToast(i18n.language === 'zh' ? '该模型已经在待导入列表中啦！' : 'Model already in import list!');
+    else showToast('该模型已经在待导入列表中啦！');
     setLegacyInput(''); setLegacyResults([]);
   };
 
@@ -451,18 +522,9 @@ function App() {
   const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const reader = new FileReader(); reader.readAsDataURL(file);
-        reader.onload = (ev) => {
-           const img = new Image(); img.src = ev.target?.result as string;
-           img.onload = () => {
-             const canvas = document.createElement('canvas'); let w = img.width; let h = img.height;
-             if(w > 400) { h = Math.round((h * 400) / w); w = 400; }
-             canvas.width = w; canvas.height = h; canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-             const newList = [...legacyList]; newList[index].coverImage = canvas.toDataURL('image/jpeg', 0.6); setLegacyList(newList);
-           };
-        };
-      } catch (err) { showToast(i18n.language === 'zh' ? '图片上传失败' : 'Image upload failed'); }
+      showToast('处理图片中...');
+      const result = await processImageUpload(file, 'cover');
+      if (result) { const newList = [...legacyList]; newList[index].coverImage = result; setLegacyList(newList); }
     }
     e.target.value = '';
   };
@@ -472,13 +534,13 @@ function App() {
     AudioManager.playClick(); const result = ModelManager.importLegacyModelsFromList(legacyList);
     if (result.count > 0) {
       AudioManager.playFinishPart(); showToast(t('importedSuccess', { count: result.count }));
-      setLegacyList([]); refreshData(); processAchievements();
+      setLegacyList([]); refreshData(); processAchievements(); triggerAutoBackup();
     }
   };
 
   const handleDeleteModel = (modelId: string) => {
     AudioManager.playClick(); const updated = ModelManager.deleteModel(modelId);
-    setModels(updated); setViewingModelId(null); refreshData(); showToast(i18n.language === 'zh' ? "已删除" : "Deleted");
+    setModels(updated); setViewingModelId(null); refreshData(); showToast("已删除"); triggerAutoBackup();
   };
 
   const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
@@ -499,7 +561,7 @@ function App() {
   const handleConfirmRebuild = () => {
     if (!viewingModel) return;
     AudioManager.playStageDone(); const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages);
-    setModels(updated); setIsEditingImportedStatus(false); setShowRebuildConfirm(true);
+    setModels(updated); setIsEditingImportedStatus(false); setShowRebuildConfirm(true); triggerAutoBackup();
   };
 
   const handleDoRebuild = () => {
@@ -510,7 +572,7 @@ function App() {
   const handleSaveImportedStages = () => {
     if (!viewingModelId) return;
     AudioManager.playStageDone(); const updated = ModelManager.updateImportedModelStatus(viewingModelId, importedStages);
-    setModels(updated); setIsEditingImportedStatus(false); checkAndPromptCompleteModel(updated, viewingModelId);
+    setModels(updated); setIsEditingImportedStatus(false); checkAndPromptCompleteModel(updated, viewingModelId); triggerAutoBackup();
   };
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
@@ -518,85 +580,20 @@ function App() {
   const updateAudioSetting = (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); StorageManager.setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); };
 
   const openPreview = () => { AudioManager.playClick(); setBgSize(StorageManager.getBgSize()); setBgPosition(StorageManager.getBgPosition()); setIsPreviewOpen(true); };
-  const applyBackground = () => { AudioManager.playClick(); StorageManager.setBgSize(bgSize); StorageManager.setBgPosition(bgPosition); setIsPreviewOpen(false); showToast(i18n.language === 'zh' ? '✅ 适配设置应用成功！' : '✅ Settings applied!'); };
-
-  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const reader = new FileReader(); reader.readAsDataURL(file);
-        reader.onload = (ev) => {
-           const img = new Image(); img.src = ev.target?.result as string;
-           img.onload = () => {
-             const canvas = document.createElement('canvas'); let w = img.width; let h = img.height;
-             if(w > 800) { h = Math.round((h * 800) / w); w = 800; }
-             canvas.width = w; canvas.height = h; canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-             const base64 = canvas.toDataURL('image/jpeg', 0.4);
-             if (type === 'main') { setBgMain(base64); StorageManager.setBgMain(base64); } 
-             else { setBgPip(base64); StorageManager.setBgPip(base64); }
-             showToast(i18n.language === 'zh' ? '✅ 背景图上传成功！' : '✅ Background uploaded!');
-           };
-        };
-      } catch (err) { showToast(i18n.language === 'zh' ? '❌ 图片处理失败' : '❌ Image processing failed'); }
-    }
-    e.target.value = '';
-  };
-
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && viewingModelId) {
-      try {
-        const reader = new FileReader(); reader.readAsDataURL(file);
-        reader.onload = (ev) => {
-           const img = new Image(); img.src = ev.target?.result as string;
-           img.onload = () => {
-             const canvas = document.createElement('canvas'); let w = img.width; let h = img.height;
-             if(w > 800) { h = Math.round((h * 800) / w); w = 800; }
-             canvas.width = w; canvas.height = h; canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-             const updated = ModelManager.updateModelCover(viewingModelId, canvas.toDataURL('image/jpeg', 0.6));
-             setModels(updated); setIsEditingCover(false); showToast(i18n.language === 'zh' ? '✅ 封面修改成功！' : '✅ Cover updated!');
-           };
-        };
-      } catch (err) { showToast(i18n.language === 'zh' ? '❌ 图片处理失败' : '❌ Image processing failed'); }
-    }
-    e.target.value = '';
-  };
-
-  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) { showToast(i18n.language === 'zh' ? '音频文件太大（最大1MB）' : 'Audio file too large (max 1MB)'); return; }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      const newAudios = { ...customAudios, [type]: base64 };
-      setCustomAudios(newAudios);
-      try { StorageManager.setCustomAudios(newAudios); updateAudioSetting(type, 'custom'); showToast(i18n.language === 'zh' ? '✅ 音效上传成功！' : '✅ Audio uploaded!'); } 
-      catch (err) { showToast(i18n.language === 'zh' ? '本地存储空间不足，音效保存失败。' : 'Not enough local storage.'); }
-    };
-    reader.readAsDataURL(file); e.target.value = '';
-  };
+  const applyBackground = () => { AudioManager.playClick(); StorageManager.setBgSize(bgSize); StorageManager.setBgPosition(bgPosition); setIsPreviewOpen(false); showToast('✅ 适配设置应用成功！'); };
 
   const buyTitle = (id: string) => { 
     const result = UserManager.buyTitle(id);
-    if (result.success) { 
-      AudioManager.playAchievement(); 
-      showToast(t('titleUnlocked')); 
-      refreshData(); 
-    } else { 
-      AudioManager.playClick(); 
-      if (result.error === 'level_too_low') showToast(t('levelTooLow'));
-      else if (result.error === 'not_enough_coins') showToast(t('notEnoughCoins'));
-      else showToast(t('notEnoughCoins')); 
-    } 
+    if (result.success) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); } 
+    else { AudioManager.playClick(); if (result.error === 'level_too_low') showToast(t('levelTooLow')); else if (result.error === 'not_enough_coins') showToast(t('notEnoughCoins')); else showToast(t('notEnoughCoins')); } 
   };
   
   const equipTitle = (id: string) => { AudioManager.playClick(); StorageManager.setEquippedTitle(id); setEquippedTitle(id); AudioManager.playStageDone(); };
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
-    if (isWeChat) { showToast(i18n.language === 'zh' ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.'); return; }
-    if (!('documentPictureInPicture' in window)) { showToast(i18n.language === 'zh' ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
+    if (isWeChat) { showToast('微信内不支持画中画，请用浏览器打开'); return; }
+    if (!('documentPictureInPicture' in window)) { showToast('您的浏览器不支持画中画，请使用 Chrome/Edge。'); return; }
     try {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
       [...document.styleSheets].forEach((styleSheet) => {
@@ -605,7 +602,7 @@ function App() {
       });
       pipWin.document.body.style.backgroundColor = '#1e1e1e'; pipWin.document.body.style.margin = '0'; pipWin.document.body.style.display = 'flex'; pipWin.document.body.style.justifyContent = 'center'; pipWin.document.body.style.alignItems = 'center'; pipWin.document.body.style.height = '100vh'; pipWin.document.body.style.overflow = 'hidden';
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
-    } catch (err) { console.error(err); showToast(i18n.language === 'zh' ? '画中画打开失败' : 'Failed to open PiP'); }
+    } catch (err) { console.error(err); showToast('画中画打开失败'); }
   };
 
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
@@ -645,7 +642,7 @@ function App() {
     ctx.fillStyle = '#555'; ctx.font = '20px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '用热爱与耐心，铸造属于你的杰作。' : 'Built with love and patience.', 400, 850);
     const url = canvas.toDataURL('image/jpeg', 0.9);
     const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
-    showToast(i18n.language === 'zh' ? '✅ 战报已保存到相册/下载' : '✅ Report saved!');
+    showToast('✅ 战报已保存到相册/下载');
   };
 
   const getHistoryLogs = () => { 
@@ -681,15 +678,20 @@ function App() {
     showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, addToLegacyList, legacyList, setLegacyList, removeLegacyItem, handleLegacyCoverUpload, handleLegacyImport,
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
     setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
-    currentBot,
-    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    // 🌟 传递全局聊天记录
-    chatMessages
+    currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
+    chatMessages,
+    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted
   };
 
   return (
     <div className="app-wrapper">
-      {bgMain && <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />}
+      {bgMain && (
+        bgMain.startsWith('local://') ? (
+          <LocalImage src={bgMain} className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
+        ) : (
+          <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
+        )
+      )}
       {toastMsg && <div className="toast">{toastMsg}</div>}
 
       <div className="mini-window">
@@ -699,7 +701,7 @@ function App() {
             <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {confirmDeleteId === viewingModel.id ? (
                 <>
-                  <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>{i18n.language === 'zh' ? '确认删除' : 'Confirm'}</button>
+                  <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>确认删除</button>
                   <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(null); }}>{t('cancel')}</button>
                 </>
               ) : (
@@ -756,38 +758,14 @@ function App() {
             {activeTab === 'focus' && <FocusView {...commonProps} />}
             {activeTab === 'journal' && <JournalView {...commonProps} />}
             {activeTab === 'hangar' && <HangarView {...commonProps} completedModels={ModelManager.getCompletedModels()} setViewingModelId={setViewingModelId} setExpandedTaskId={setExpandedTaskId} />}
-            {activeTab === 'gallery' && (
-              <BotGalleryView 
-                unlockedBots={unlockedBots}
-                currentBot={currentBot}
-                level={level}
-                coins={coinsBalance}
-                checkinStreak={checkinStreak}
-                onUnlock={handleUnlockBot}
-                onEquip={handleEquipBot}
-                i18n={i18n}
-              />
-            )}
+            {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
             {activeTab === 'profile' && <ProfileView {...commonProps} />}
           </>
         )}
       </div>
 
-      <Modals 
-        showCompleteModelConfirm={showCompleteModelConfirm}
-        setShowCompleteModelConfirm={setShowCompleteModelConfirm}
-        handleConfirmCompleteModel={handleConfirmCompleteModel}
-        isPreviewOpen={isPreviewOpen}
-        setIsPreviewOpen={setIsPreviewOpen}
-        bgMain={bgMain}
-        bgSize={bgSize}
-        bgPosition={bgPosition}
-        setBgSize={setBgSize}
-        setBgPosition={setBgPosition}
-        applyBackground={applyBackground}
-      />
+      <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} />
 
-      {/* 🌟 悬浮窗渲染 */}
       {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
     </div>
   );

@@ -1,4 +1,3 @@
-// src/views/ProfileView.tsx
 import { AudioManager } from '../core/AudioManager';
 
 export const ProfileView = (props: any) => {
@@ -10,8 +9,8 @@ export const ProfileView = (props: any) => {
     customAudios, handleAudioUpload, titles, earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle,
     earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
-    // 🌟 接收新增的发言频率属性
-    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval
+    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
+    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted
   } = props;
 
   return (
@@ -46,6 +45,52 @@ export const ProfileView = (props: any) => {
               ) : null)}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="custom-section" style={{ border: '1px dashed #10b981' }}>
+        <h4>🛡️ {i18n.language === 'zh' ? '本地数据安全与扩容' : 'Data Security & Expansion'}</h4>
+        <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>
+          {i18n.language === 'zh' 
+            ? '浏览器默认容量有限。绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！' 
+            : 'Browser storage is limited. Bind a local folder to store media directly on your disk!'}
+        </p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '12px' }}>
+              <div>容量分配: {storageEstimate.quota} GB</div>
+              <div style={{ color: '#10b981' }}>已用: {storageEstimate.usage} GB</div>
+            </div>
+            <button 
+              className="mini-btn" 
+              onClick={async () => {
+                AudioManager.playClick();
+                const success = await StorageManager.selectAssetsFolder();
+                if (success) { setIsAssetsMounted(true); props.showToast('✅ 本地图库扩容已挂载！'); }
+                else props.showToast('❌ 未选择文件夹或浏览器不支持');
+              }}
+              style={{ background: isAssetsMounted ? '#10b981' : '#555' }}
+            >
+              {isAssetsMounted ? '已挂载本地图库' : '📁 挂载本地图库 (扩容)'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px' }}>
+            <div style={{ fontSize: '12px' }}>自动无感备份</div>
+            <button 
+              className="mini-btn" 
+              onClick={async () => {
+                AudioManager.playClick();
+                const success = await StorageManager.selectBackupFolder();
+                if (success) { setIsAutoBackupEnabled(true); props.showToast('✅ 自动备份已开启！'); }
+                else props.showToast('❌ 未选择文件夹或浏览器不支持');
+              }}
+              style={{ background: isAutoBackupEnabled ? '#10b981' : '#555' }}
+            >
+              {isAutoBackupEnabled ? '自动备份中' : '📁 选择备份文件夹'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -127,7 +172,6 @@ export const ProfileView = (props: any) => {
           </select>
         </div>
 
-        {/* 🌟 新增：发言频率设置 */}
         <div className="custom-row">
           <span>{i18n.language === 'zh' ? '网页AI发言频率' : 'Web AI Chat Freq'}:</span>
           <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); StorageManager.setWebChatInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
@@ -148,7 +192,6 @@ export const ProfileView = (props: any) => {
             <option value={300000}>300s</option>
           </select>
         </div>
-        {/* 🌟 新增结束 */}
 
         <div className="custom-row">
           <span>{t('bgMain')}:</span>

@@ -173,7 +173,7 @@ function App() {
     { targetId: 'tab-hangar', title: '格纳库', content: '拼完的模型都会陈列在这里。', page: 'hangar' },
     { targetId: 'tab-gallery', title: '塑灵', content: '解锁不同的【塑灵】陪你聊天。', page: 'gallery' },
     { targetId: 'tab-profile', title: '个人中心', content: '换背景、补录历史模型、导出备份都在这里。', page: 'profile' },
-    { targetId: 'tour-install', title: '安装至桌面', content: 'Android：菜单“安装应用”。\niOS (Safari)：分享“添加到主屏幕”。', page: 'profile' }
+    { targetId: 'tour-install', title: '安装至桌面', content: '强烈建议安装！\n💻 电脑端：点击浏览器地址栏右侧的“安装”图标，或通过菜单选择“安装页面为应用”。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！', page: 'profile' }
   ];
 
   useEffect(() => {

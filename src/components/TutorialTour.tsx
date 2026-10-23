@@ -6,7 +6,6 @@ export interface TourStep {
   title: string;
   content: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
-  // 🌟 修复：加上 'gundam'
   page?: 'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile';
 }
 
@@ -29,7 +28,8 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
     if (step.page && step.page !== activeTab) {
       setActiveTab(step.page);
-      setTimeout(() => updateRect(), 300); 
+      // 🌟 增加等待时间，确保页面渲染和滚动完全结束
+      setTimeout(() => updateRect(), 400); 
     } else {
       updateRect();
     }
@@ -39,9 +39,10 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
     const el = document.getElementById(step.targetId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 🌟 增加等待时间，避免长页面滚动时计算高亮框卡顿
       setTimeout(() => {
         setRect(el.getBoundingClientRect());
-      }, 300);
+      }, 400);
     } else {
       setRect(new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0));
     }

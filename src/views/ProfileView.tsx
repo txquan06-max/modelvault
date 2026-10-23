@@ -3,7 +3,6 @@ import { SessionManager } from '../core/SessionManager';
 
 // 🌟 新增：赛博风 SVG 柱状图组件
 const WeeklyChart = ({ sessions }: { sessions: any[] }) => {
-  // 获取近7天的日期标签和对应时长
   const days = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -13,7 +12,7 @@ const WeeklyChart = ({ sessions }: { sessions: any[] }) => {
     return { label: `${d.getMonth() + 1}/${d.getDate()}`, totalSec };
   });
 
-  const maxSec = Math.max(...days.map(d => d.totalSec), 3600); // 最小刻度1小时
+  const maxSec = Math.max(...days.map(d => d.totalSec), 3600);
 
   return (
     <div style={{ width: '100%', height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 0', marginTop: '10px' }}>
@@ -70,7 +69,6 @@ export const ProfileView = (props: any) => {
         </div>
       </div>
 
-      {/* 🌟 新增：近 7 天肝度看板 */}
       <div className="custom-section" style={{ paddingBottom: '10px' }}>
         <h4>📊 {i18n.language === 'zh' ? '近 7 天专注势能' : '7-Day Focus Energy'}</h4>
         <WeeklyChart sessions={allSessions} />
@@ -98,6 +96,20 @@ export const ProfileView = (props: any) => {
               ) : null)}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 🌟 新增：专属安装引导卡片，方便教程高亮 */}
+      <div id="tour-install" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.1), rgba(0,0,0,0.2))' }}>
+        <h4>📲 {i18n.language === 'zh' ? '安装到桌面 (PWA)' : 'Install to Desktop'}</h4>
+        <p style={{ fontSize: '11px', color: '#ccc', lineHeight: '1.6', marginBottom: '8px' }}>
+          {i18n.language === 'zh' 
+            ? '安装后去除浏览器边框，体验原生 App 级全屏沉浸感！' 
+            : 'Install to remove browser borders and enjoy native app-like fullscreen immersion!'}
+        </p>
+        <div style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '6px' }}>
+          💻 <b>电脑端：</b>点击浏览器地址栏右侧的“安装”图标（显示器向下箭头），或通过菜单 → “保存并分享” → “安装页面为应用”。<br/>
+          📱 <b>移动端：</b>Android 浏览器菜单选“添加到主屏幕”；iOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。
         </div>
       </div>
 
@@ -299,7 +311,7 @@ export const ProfileView = (props: any) => {
 
       <div className="shop-section">
         <div className="shop-header"><h4>🏪 {t('titlesShop')}</h4><span>🪙 {coinsBalance}</span></div>
-        <div className="title-list">
+        <div className="title-list" style={{ maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
           {titles.map((title: any) => {
             const isOwned = earnedTitles.includes(title.id);
             const canAfford = coinsBalance >= title.cost;
@@ -326,7 +338,7 @@ export const ProfileView = (props: any) => {
       <div className="achievements-section">
         <h4>🏆 {t('achievements')}</h4>
         {earnedAchievements.length === 0 ? (<div className="empty-ach">{t('emptyAchievements')}</div>) : (
-          <div className="ach-list">
+          <div className="ach-list" style={{ maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
             {earnedAchievements.map((a: any) => (
               <div key={a.id} className="ach-item">
                 <span className="ach-icon">🏆</span>
@@ -340,7 +352,8 @@ export const ProfileView = (props: any) => {
         )}
       </div>
 
-      <div id="tour-install" className="data-backup-section">
+      {/* 🌟 这里移除了 tour-install，只保留数据备份 */}
+      <div className="data-backup-section">
         <h4>{t('dataBackup')} <span style={{float:'right', fontSize:'11px', color:'#888'}}>Used: {storageUsage} MB</span></h4>
         <div className="backup-actions" style={{ marginBottom: '16px' }}>
           <button className="backup-btn" onClick={exportData}>{t('exportData')}</button>

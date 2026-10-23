@@ -55,7 +55,7 @@ export const ProfileView = (props: any) => {
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
-    level, levelProgress // 🌟 接收等级和经验
+    level, levelProgress
   } = props;
 
   const isZh = i18n.language === 'zh';
@@ -63,7 +63,6 @@ export const ProfileView = (props: any) => {
 
   return (
     <div className="view-content profile-view">
-      {/* 🌟 资料卡重构 */}
       <div className="profile-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="avatar" style={{ flexShrink: 0 }}>🧑‍🔧</div>
@@ -133,7 +132,7 @@ export const ProfileView = (props: any) => {
         </p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '12px' }}>
               <div>{isZh ? '容量分配' : 'Quota'}: {storageEstimate.quota} GB</div>
               <div style={{ color: '#10b981' }}>{isZh ? '已用' : 'Used'}: {storageEstimate.usage} GB</div>
@@ -146,13 +145,13 @@ export const ProfileView = (props: any) => {
                 if (success) { setIsAssetsMounted(true); props.showToast(isZh ? '✅ 本地图库扩容已挂载！' : '✅ Local gallery mounted!'); }
                 else props.showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
               }}
-              style={{ background: isAssetsMounted ? '#10b981' : '#555' }}
+              style={{ background: isAssetsMounted ? '#10b981' : '#555', flexShrink: 0 }}
             >
               {isAssetsMounted ? (isZh ? '已挂载本地图库' : 'Mounted') : (isZh ? '📁 挂载本地图库 (扩容)' : '📁 Mount Local Gallery')}
             </button>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '12px' }}>{isZh ? '自动无感备份' : 'Auto Backup'}</div>
             <button 
               className="mini-btn" 
@@ -162,7 +161,7 @@ export const ProfileView = (props: any) => {
                 if (success) { setIsAutoBackupEnabled(true); props.showToast(isZh ? '✅ 自动备份已开启！' : '✅ Auto backup enabled!'); }
                 else props.showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
               }}
-              style={{ background: isAutoBackupEnabled ? '#10b981' : '#555' }}
+              style={{ background: isAutoBackupEnabled ? '#10b981' : '#555', flexShrink: 0 }}
             >
               {isAutoBackupEnabled ? (isZh ? '自动备份中' : 'Backing up') : (isZh ? '📁 选择备份文件夹' : '📁 Select Backup Folder')}
             </button>
@@ -214,8 +213,8 @@ export const ProfileView = (props: any) => {
                         <span><span className="ac-grade">{item.grade}</span> {displayName}</span>
                         <button onClick={() => removeLegacyItem(item.id)}>✕</button>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }}>
-                        <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0 }}>
+                      <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, minWidth: '120px' }}>
                           {item.coverImage ? (isZh ? '✅ 已添加封面' : '✅ Cover Added') : (isZh ? '📷 添加封面图 (可选)' : '📷 Add Cover (Optional)')}
                           <input type="file" accept="image/*" onChange={(e) => handleLegacyCoverUpload(e, idx)} style={{ display: 'none' }} />
                         </label>
@@ -226,9 +225,9 @@ export const ProfileView = (props: any) => {
                 })}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>{t('importBtn')} ({legacyList.length})</button>
-              <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(false); props.setLegacyList([]); setLegacyInput(''); }}>{t('cancel')}</button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <button className="btn start" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>{t('importBtn')} ({legacyList.length})</button>
+              <button className="btn no" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(false); props.setLegacyList([]); setLegacyInput(''); }}>{t('cancel')}</button>
             </div>
           </div>
         )}
@@ -239,7 +238,7 @@ export const ProfileView = (props: any) => {
         
         <div className="custom-row">
           <span>{t('reminderInterval')}:</span>
-          <select value={reminderInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setReminderInterval(val); StorageManager.setReminderInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
+          <select value={reminderInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setReminderInterval(val); StorageManager.setReminderInterval(val); }}>
             <option value={0}>{t('audioOff')}</option>
             <option value={15 * 60}>15m</option>
             <option value={30 * 60}>30m</option>
@@ -250,7 +249,7 @@ export const ProfileView = (props: any) => {
 
         <div className="custom-row">
           <span>{isZh ? '网页AI发言频率' : 'Web AI Chat Freq'}:</span>
-          <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); StorageManager.setWebChatInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
+          <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); StorageManager.setWebChatInterval(val); }}>
             <option value={5000}>5s</option>
             <option value={8000}>8s ({isZh ? '默认' : 'Default'})</option>
             <option value={15000}>15s</option>
@@ -261,7 +260,7 @@ export const ProfileView = (props: any) => {
 
         <div className="custom-row">
           <span>{isZh ? '悬浮窗AI发言频率' : 'PiP AI Chat Freq'}:</span>
-          <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); StorageManager.setPipChatInterval(val); }} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #666', color: '#fff', padding: '4px 8px', borderRadius: '4px', outline: 'none' }}>
+          <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); StorageManager.setPipChatInterval(val); }}>
             <option value={30000}>30s</option>
             <option value={60000}>60s ({isZh ? '默认' : 'Default'})</option>
             <option value={120000}>120s</option>
@@ -271,21 +270,21 @@ export const ProfileView = (props: any) => {
 
         <div className="custom-row">
           <span>{t('bgMain')}:</span>
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-            <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
+            <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
               📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
             </label>
-            {bgMain && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>{t('clear')}</button>}
+            {bgMain && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
         <div className="custom-row">
           <span>{t('bgPip')}:</span>
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-            <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
+            <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
               📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
             </label>
-            {bgPip && <button className="mini-btn" style={{ color: '#ef4444' }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>{t('clear')}</button>}
+            {bgPip && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
@@ -302,7 +301,7 @@ export const ProfileView = (props: any) => {
             return (
               <div key={type} className="audio-row">
                 <span>{labelMap[type]}</span>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   <select id={`audio-select-${type}`} value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
                     <option value="default">{t('audioDefault')}</option>
                     <option value="chiptune">{t('audio8Bit')}</option>
@@ -365,9 +364,9 @@ export const ProfileView = (props: any) => {
 
       <div className="data-backup-section">
         <h4>{t('dataBackup')} <span style={{float:'right', fontSize:'11px', color:'#888'}}>Used: {storageUsage} MB</span></h4>
-        <div className="backup-actions" style={{ marginBottom: '16px' }}>
-          <button className="backup-btn" onClick={exportData}>{t('exportData')}</button>
-          <label className="backup-btn import-label">{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
+        <div className="backup-actions" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
+          <button className="backup-btn" style={{ flex: 1, minWidth: '100px' }} onClick={exportData}>{t('exportData')}</button>
+          <label className="backup-btn import-label" style={{ flex: 1, minWidth: '100px', display: 'flex', justifyContent: 'center' }}>{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
         </div>
         
         <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginTop: '8px' }}>
@@ -377,9 +376,9 @@ export const ProfileView = (props: any) => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>{t('resetConfirm')}</p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px' }} onClick={handleResetData} disabled={isResetting}>{isResetting ? t('clearing') : t('confirm')}</button>
-                <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>{t('cancel')}</button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px', minWidth: '100px' }} onClick={handleResetData} disabled={isResetting}>{isResetting ? t('clearing') : t('confirm')}</button>
+                <button className="btn no" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>{t('cancel')}</button>
               </div>
             </div>
           )}

@@ -1,6 +1,9 @@
 /* =========================================
    Base Reset & Layout
    ========================================= */
+* {
+  box-sizing: border-box;
+}
 body {
   margin: 0;
   background-color: #1e1e1e;
@@ -10,14 +13,17 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
+  height: 100dvh;
   user-select: none;
   overflow: hidden;
+  -webkit-tap-highlight-color: transparent; /* 去除手机点击高亮 */
 }
 
 .app-wrapper {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -31,6 +37,7 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   object-fit: cover;
   z-index: 0;
   pointer-events: none;
@@ -77,6 +84,7 @@ body {
   padding-right: 4px;
   display: flex;
   flex-direction: column;
+  -webkit-overflow-scrolling: touch; /* 苹果丝滑滚动 */
 }
 
 .scroll-content::-webkit-scrollbar { width: 4px; }
@@ -192,7 +200,7 @@ body {
 .selector-group { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 16px; }
 .selector-row { display: flex; gap: 8px; width: 100%; }
 
-.selector-group select {
+.selector-group select, .selector-group input {
   flex: 1;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.5);
@@ -202,11 +210,12 @@ body {
   font-size: 14px;
   outline: none;
   cursor: pointer;
+  max-width: 100%;
 }
 .selector-group select:disabled { opacity: 0.5; cursor: not-allowed; }
 .selector-group select:focus { border-color: #3b82f6; }
 
-.add-controls { display: flex; gap: 8px; width: 100%; margin-bottom: 16px; }
+.add-controls { display: flex; gap: 8px; width: 100%; margin-bottom: 16px; flex-wrap: wrap; }
 .add-btn-large {
   flex: 1;
   padding: 10px;
@@ -222,6 +231,7 @@ body {
   align-items: center;
   transition: background 0.2s;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  min-width: 120px;
 }
 .add-btn-large:hover { background: #555; }
 
@@ -241,7 +251,7 @@ body {
 /* =========================================
    Task Info & Stages
    ========================================= */
-.task-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; }
+.task-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .task-name { font-size: 18px; font-weight: 600; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
 
 .finish-part-btn {
@@ -292,7 +302,7 @@ body {
    Timer Display & Timebox
    ========================================= */
 .timer-display {
-  font-size: 52px;
+  font-size: clamp(48px, 12vw, 72px);
   font-variant-numeric: tabular-nums;
   font-weight: 300;
   margin-bottom: 16px;
@@ -300,12 +310,13 @@ body {
   transition: color 0.3s;
   text-align: center;
   text-shadow: 0 4px 15px rgba(0,0,0,0.9);
+  width: 100%;
 }
 .timer-display.running { color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 4px 15px rgba(0,0,0,0.9); }
 .timer-display.paused { color: #f59e0b; text-shadow: 0 0 20px rgba(245, 158, 11, 0.5), 0 4px 15px rgba(0,0,0,0.9); }
 .timer-display.time-up { color: #ef4444; animation: flash 1s infinite alternate; text-shadow: 0 0 20px rgba(239, 68, 68, 0.6), 0 4px 15px rgba(0,0,0,0.9); }
 
-.timebox-selector { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; width: 100%; }
+.timebox-selector { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; width: 100%; flex-wrap: wrap; }
 .timebox-label { font-size: 12px; color: #ddd; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
 .timebox-btn {
   background: rgba(0, 0, 0, 0.4);
@@ -333,11 +344,11 @@ body {
 /* =========================================
    Controls & Buttons
    ========================================= */
-.controls { display: flex; gap: 12px; width: 100%; margin-top: 20px; }
+.controls { display: flex; gap: 8px; width: 100%; margin-top: 20px; flex-wrap: wrap; }
 
 .btn {
   flex: 1;
-  padding: 12px;
+  padding: 12px 8px;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -345,6 +356,7 @@ body {
   cursor: pointer;
   transition: opacity 0.2s, background 0.2s, transform 0.1s;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  min-width: 80px;
 }
 .btn:active:not(:disabled) { transform: scale(0.96); }
 .btn:hover:not(:disabled) { opacity: 0.9; }
@@ -373,7 +385,7 @@ body {
 .inline-confirm { width: 100%; display: flex; flex-direction: column; gap: 12px; animation: fadeIn 0.2s ease-out; }
 .confirm-text { text-align: center; font-size: 14px; color: #eee; line-height: 1.4; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
 .confirm-text span { font-size: 12px; color: #aaa; }
-.confirm-actions { display: flex; gap: 8px; width: 100%; }
+.confirm-actions { display: flex; gap: 8px; width: 100%; flex-wrap: wrap; }
 .btn.yes { background: #10b981; color: white; }
 .btn.no { background: rgba(68, 68, 68, 0.9); color: #eee; }
 
@@ -449,7 +461,8 @@ body {
 .custom-section h4, .shop-section h4, .achievements-section h4, .data-backup-section h4 { margin: 0 0 12px 0; font-size: 14px; color: #ddd; display: flex; justify-content: space-between; align-items: center; }
 
 .custom-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; font-size: 12px; color: #bbb; }
-.custom-row select { width: 50%; max-width: 150px; }
+.custom-row select { width: 100%; max-width: 100%; padding: 8px; background: rgba(0,0,0,0.5); border: 1px solid #666; color: #fff; border-radius: 6px; font-size: 14px; }
+.custom-row input { width: 100%; padding: 8px; background: rgba(0,0,0,0.5); border: 1px solid #666; color: #fff; border-radius: 6px; font-size: 14px; }
 
 .mini-btn { background: #555; border: 1px solid #666; color: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: background 0.2s; }
 .mini-btn:hover:not(:disabled) { background: #666; }
@@ -458,30 +471,30 @@ body {
 .buy-btn:hover:not(:disabled) { background: #d97706; }
 
 .audio-settings { display: flex; flex-direction: column; gap: 8px; }
-.audio-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #bbb; }
-.audio-row select { background: rgba(0, 0, 0, 0.5); border: 1px solid #666; color: #fff; padding: 4px 8px; border-radius: 4px; outline: none; }
+.audio-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #bbb; flex-wrap: wrap; gap: 8px; }
+.audio-row select { background: rgba(0, 0, 0, 0.5); border: 1px solid #666; color: #fff; padding: 4px 8px; border-radius: 4px; outline: none; flex: 1; max-width: 120px; }
 
 .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .shop-header h4 { margin: 0; }
 .shop-header span { font-size: 14px; font-weight: bold; color: #f59e0b; }
 .title-list { display: flex; flex-direction: column; gap: 8px; }
-.title-item { display: flex; justify-content: space-between; align-items: center; background: rgba(45, 45, 45, 0.9); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+.title-item { display: flex; justify-content: space-between; align-items: center; background: rgba(45, 45, 45, 0.9); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; gap: 8px; }
 .title-item.owned { border: 1px solid rgba(16, 185, 129, 0.4); }
-.title-info { display: flex; flex-direction: column; }
+.title-info { display: flex; flex-direction: column; flex: 1; min-width: 100px; }
 .title-name { font-size: 13px; font-weight: bold; color: #fff; }
 .title-cond { font-size: 10px; color: #aaa; margin-top: 2px; }
 
 .ach-list { display: flex; flex-direction: column; gap: 8px; }
 .ach-item { display: flex; align-items: center; gap: 12px; background: rgba(51, 51, 51, 0.9); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
-.ach-icon { font-size: 20px; }
+.ach-icon { font-size: 20px; flex-shrink: 0; }
 .ach-name { font-size: 14px; font-weight: bold; color: #f59e0b; }
 .ach-desc { font-size: 11px; color: #bbb; }
 .empty-ach { font-size: 12px; color: #888; }
 
-.backup-actions { display: flex; gap: 12px; margin-bottom: 16px; }
-.backup-btn { flex: 1; background: #555; border: 1px solid #666; color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; text-align: center; cursor: pointer; transition: background 0.2s; }
+.backup-actions { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.backup-btn { flex: 1; background: #555; border: 1px solid #666; color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; text-align: center; cursor: pointer; transition: background 0.2s; min-width: 100px; }
 .backup-btn:hover { background: #666; }
-.import-label { display: inline-block; box-sizing: border-box; }
+.import-label { display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
 
 /* =========================================
    Legacy Import (历史补录) 暂存列表
@@ -527,10 +540,10 @@ body {
 /* =========================================
    Modal
    ========================================= */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: #2d2d2d; padding: 24px; border-radius: 12px; width: 320px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 16px; }
+.modal-content { background: #2d2d2d; padding: 20px; border-radius: 12px; width: 100%; max-width: 360px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
 .modal-content h3 { margin-top: 0; font-size: 18px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 .modal-actions button { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; border: none; }
 
 /* =========================================
@@ -636,27 +649,65 @@ body {
 .pip-container select { padding: 4px; font-size: clamp(10px, 3vw, 14px); }
 
 /* =========================================
-   Mobile Responsive (移动端适配)
+   Mobile Responsive (核心移动端优化)
    ========================================= */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   body { align-items: flex-start; }
-  .app-wrapper { height: 100dvh; align-items: flex-start; overflow-y: auto; }
-  .mini-window { 
-    width: 100%; 
-    height: 100dvh; 
-    min-height: 100dvh; 
-    max-height: none; 
-    border-radius: 0; 
-    border: none; 
-    box-shadow: none; 
-    padding: 16px; 
-    backdrop-filter: blur(12px); 
-    background: rgba(30, 30, 30, 0.8); 
+  .app-wrapper { height: 100dvh; align-items: flex-start; }
+  
+  .mini-window {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom)) 12px !important; /* 适配 iOS 底部安全区 */
   }
-  .hangar-grid { grid-template-columns: 1fr; }
-  .timer-display { font-size: 64px; margin: 20px 0; }
-  .tabs { position: sticky; top: 0; background: rgba(45, 45, 45, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 8px 0; }
-  .toast { position: fixed; top: 20px; }
+
+  .timer-display {
+    font-size: 64px;
+    margin: 10px 0;
+  }
+  
+  .tabs {
+    position: sticky;
+    top: 0;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    padding: 6px 0;
+    margin-bottom: 8px;
+  }
+  
+  .tab {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .modal-content {
+    width: 92vw !important;
+    padding: 16px;
+  }
+
+  /* 防止 iOS 输入框放大 */
+  input, select, textarea {
+    font-size: 16px !important; 
+  }
+  
+  /* 控制按钮组 */
+  .controls { gap: 6px; }
+  .btn { padding: 14px 8px; font-size: 15px; }
+  
+  /* 聊天气泡 */
+  .focus-left { width: 100%; }
+}
+
+/* 超小屏适配 (如 iPhone SE) */
+@media (max-width: 380px) {
+  .timer-display { font-size: 52px; }
+  .tab { font-size: 10px; padding: 8px 4px; }
+  .modal-content { padding: 12px; }
+  .btn { font-size: 13px; padding: 10px 6px; }
 }
 
 /* =========================================

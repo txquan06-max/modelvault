@@ -1,4 +1,4 @@
-import { QuoteSet } from '../QuoteEngine';
+import type { QuoteSet } from '../QuoteEngine';
 
 export const blazeData = {
   start: { zh: "全军出击！今天的目标是哪台机体？！", en: "All forces attack! What's our target today?!" },

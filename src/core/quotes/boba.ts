@@ -1,4 +1,4 @@
-import { QuoteSet } from '../QuoteEngine';
+import type { QuoteSet } from '../QuoteEngine';
 
 export const bobaData = {
   start: { zh: "磨蹭什么呢？还不快点开始！", en: "What's the hold up? Get started already!" },

@@ -1,4 +1,4 @@
-import { QuoteSet } from '../QuoteEngine';
+import type { QuoteSet } from '../QuoteEngine';
 
 export const tiaData = {
   start: { zh: "旅途开始，今天做哪个部位呢？", en: "Journey begins. Which part are we building today?" },

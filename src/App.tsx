@@ -27,7 +27,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
-import { generateShareCard } from './utils/shareCard'; // 🌟 引入抽离出来的工具
+import { generateShareCard } from './utils/shareCard'; 
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
@@ -887,8 +887,7 @@ function App() {
                 handleJumpToFocus={handleJumpToFocus}
                 handleCoverUpload={handleCoverUpload}
                 handleSaveImportedStages={handleSaveImportedStages}
-                generateShareCard={triggerShareCard}
-                {...commonProps}
+                {...commonProps} // 删除了显式传入的 generateShareCard，因为 commonProps 里已经有了
               />
             ) : (
               <>

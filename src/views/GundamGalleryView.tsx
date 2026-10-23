@@ -1,16 +1,35 @@
-import { useState } from 'react';
-import { CORE_DB, type GunplaItem } from '../core/GunplaDB';
+import { useState, useEffect } from 'react';
+import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { AudioManager } from '../core/AudioManager';
 
 export const GundamGalleryView = ({ i18n, models }: any) => {
   const isZh = i18n.language === 'zh';
   const [filter, setFilter] = useState<'all' | 'collected' | 'uncollected'>('all');
   const [seriesFilter, setSeriesFilter] = useState<string>('all');
+  const [dbData, setDbData] = useState<GunplaItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 显式声明 string 数组，解决 unknown 类型报错
-  const allSeries = Array.from(new Set(CORE_DB.map((item: GunplaItem) => isZh ? item.series.zh : item.series.en))).sort() as string[];
+  // 🌟 异步加载图鉴数据
+  useEffect(() => {
+    GunplaSearch.getAll().then(data => {
+      setDbData(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const galleryData = CORE_DB.map((dbItem: GunplaItem) => {
+  if (loading) {
+    return (
+      <div className="view-content" style={{ width: '100%', padding: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <div style={{ color: '#f59e0b', fontSize: '14px', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
+          ⏳ {isZh ? '正在加载机体图鉴...' : 'Loading Mecha Archive...'}
+        </div>
+      </div>
+    );
+  }
+
+  const allSeries = Array.from(new Set(dbData.map((item: GunplaItem) => isZh ? item.series.zh : item.series.en))).sort() as string[];
+
+  const galleryData = dbData.map((dbItem: GunplaItem) => {
     const userModel = models.find((m: any) => 
       (m.name.en === dbItem.name.en || m.name.zh === dbItem.name.zh) && m.grade === dbItem.grade
     );
@@ -29,7 +48,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
   });
 
   const totalCollected = galleryData.filter(i => i.isCollected).length;
-  const totalDB = CORE_DB.length;
+  const totalDB = dbData.length;
 
   return (
     <div className="view-content" style={{ width: '100%', padding: '10px' }}>

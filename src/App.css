@@ -5,7 +5,7 @@
   box-sizing: border-box;
 }
 
-/* 🌟 新增：全局极细半透明滚动条（适配所有主流浏览器） */
+/* 全局极细半透明滚动条 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -64,7 +64,6 @@ body {
   pointer-events: none;
 }
 
-/* 全局背景遮罩 */
 .bg-overlay {
   position: absolute;
   top: 0;
@@ -108,7 +107,6 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* 🌟 强制让内部视图继承 100% 高度 */
 .view-content {
   display: flex;
   flex-direction: column;
@@ -174,24 +172,6 @@ body {
 .back-btn:hover { color: #fff; }
 
 .top-right { display: flex; align-items: center; gap: 10px; }
-
-.presence-btn {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-  transition: transform 0.1s, box-shadow 0.2s;
-}
-.presence-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.5); }
-.presence-btn:active { transform: translateY(1px); }
 
 .lang-btn {
   background: rgba(68, 68, 68, 0.8);
@@ -346,9 +326,10 @@ body {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid #666;
   color: #ddd;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -723,7 +704,7 @@ body {
     height: 100%;
     justify-content: flex-start;
     min-height: 0;
-    overflow-y: auto; /* 启用滚动，配合我们做的全局细滚动条 */
+    overflow-y: auto; 
     padding-right: 4px;
   }
 
@@ -734,25 +715,79 @@ body {
   .hangar-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* 调整一下番茄钟的样式让它更显眼 */
-.timebox-btn {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid #666;
-  color: #ddd;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.timebox-btn:hover { background: rgba(68, 68, 68, 0.8); }
-.timebox-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
-
 /* 超小屏适配 (如 iPhone SE) */
 @media (max-width: 380px) {
   .timer-display { font-size: 52px; }
   .tab { font-size: 10px; padding: 8px 4px; }
   .modal-content { padding: 12px; }
   .btn { font-size: 13px; padding: 10px 6px; }
+}
+
+/* =========================================
+   🌟 移动端专属全局样式
+   ========================================= */
+@media (max-width: 767px) {
+  .app-wrapper {
+    padding: 0;
+  }
+  .mini-window.mobile-mode {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 16px 16px 0 16px !important;
+    background: rgba(20, 25, 35, 0.95) !important;
+  }
+
+  /* 移动端底部悬浮导航栏 */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    height: 60px;
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 9999;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    padding: 0 8px;
+    overflow-x: auto;
+  }
+  .mobile-bottom-nav::-webkit-scrollbar { display: none; }
+
+  .mobile-bottom-nav button {
+    background: transparent;
+    border: none;
+    color: #888;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 10px;
+    transition: all 0.2s;
+    min-width: 50px;
+  }
+
+  .mobile-bottom-nav button span {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .mobile-bottom-nav button.active {
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+  }
 }

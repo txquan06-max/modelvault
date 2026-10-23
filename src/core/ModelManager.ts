@@ -9,6 +9,7 @@ export interface BuildStage {
   status: StageStatus;
   xpReward: number;
   photoUrl?: string;
+  note?: string;
 }
 
 export interface Task {
@@ -17,6 +18,7 @@ export interface Task {
   name: string; 
   status: 'NotStarted' | 'InProgress' | 'Completed';
   stages: BuildStage[];
+  note?: string;
 }
 
 export interface Model {
@@ -155,7 +157,6 @@ export class ModelManager {
     return { models, count };
   }
 
-  // 🌟 核心重写：整合状态并继承进度
   static startLegacyRebuild(modelId: string, completedStageKeys: string[], isWholeBuild: boolean = false): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
@@ -165,7 +166,6 @@ export class ModelManager {
       
       const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
       
-      // 获取最终确定要标记为已完成的阶段
       let finalCompletedStages: string[] = [];
       if (legacyTask) {
         finalCompletedStages = legacyTask.stages.filter(s => completedStageKeys.includes(s.nameKey) || s.nameKey === 'stage_assembly').map(s => s.nameKey);
@@ -174,16 +174,13 @@ export class ModelManager {
       }
 
       if (isWholeBuild) {
-        // 整体制作
         if (legacyTask) {
-          // 直接把 legacy 改名为 whole，无缝继承状态，下拉框里就只有“整体制作”
           legacyTask.name = 'part_whole';
           legacyTask.status = 'InProgress';
           legacyTask.stages.forEach(stage => {
             stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
           });
         } else if (!model.tasks.some(t => t.name === 'part_whole')) {
-          // 如果没有 legacy 也没有 whole，就新建
           const newTaskStages = generateStages();
           newTaskStages.forEach(stage => {
             stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
@@ -191,9 +188,7 @@ export class ModelManager {
           model.tasks.push({ id: crypto.randomUUID(), modelId, name: 'part_whole', status: 'InProgress', stages: newTaskStages });
         }
       } else {
-        // 分部位制作
         if (legacyTask) {
-          // 删除 legacy 任务，避免出现多余的选项
           model.tasks = model.tasks.filter(t => t.id !== legacyTask.id);
         }
         
@@ -203,7 +198,6 @@ export class ModelManager {
             newTaskStages.forEach(stage => {
               stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
             });
-            // 如果素组已完成，就把状态设为 InProgress，否则 NotStarted
             const taskStatus = finalCompletedStages.includes('stage_assembly') ? 'InProgress' : 'NotStarted';
             model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: taskStatus, stages: newTaskStages });
           }
@@ -276,14 +270,38 @@ export class ModelManager {
     return models;
   }
 
-  static completeStage(taskId: string, stageId: string | null, photoUrl?: string): Model[] {
+  static updateStageNote(taskId: string, stageId: string, note: string): Model[] {
     const models = this.getAllModels();
-    let changedModelId: string | null = null; let isStageCompletedNow = false;
     for (const m of models) {
       const task = m.tasks.find(t => t.id === taskId);
       if (task) {
-        if (stageId) { const stage = task.stages.find(s => s.id === stageId); if (stage && stage.status !== 'Completed') { stage.status = 'Completed'; if (photoUrl) stage.photoUrl = photoUrl; isStageCompletedNow = true; } }
-        changedModelId = m.id; break;
+        const stage = task.stages.find(s => s.id === stageId);
+        if (stage) {
+          stage.note = note;
+          break;
+        }
+      }
+    }
+    this.saveModels(models);
+    return models;
+  }
+
+  static completeStage(taskId: string, stageId: string | null, photoUrl?: string, note?: string): Model[] {
+    const models = this.getAllModels();
+    let isStageCompletedNow = false;
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        if (stageId) { 
+          const stage = task.stages.find(s => s.id === stageId); 
+          if (stage && stage.status !== 'Completed') { 
+            stage.status = 'Completed'; 
+            if (photoUrl) stage.photoUrl = photoUrl; 
+            if (note) stage.note = note;
+            isStageCompletedNow = true; 
+          } 
+        }
+        break; // 🌟 删除了多余的 changedModelId 记录
       }
     }
     this.saveModels(models); 
@@ -349,5 +367,28 @@ export class ModelManager {
   static hasSpeedrunHG(): boolean {
     const models = this.getAllModels(); const sessions = JSON.parse(StorageManager.getSessions() || '[]');
     return models.some(m => { if (m.grade !== 'HG' || m.status !== 'Completed') return false; const taskIds = m.tasks.map(t => t.id); const modelTime = sessions.filter((s: any) => taskIds.includes(s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0); return modelTime > 0 && modelTime <= 7200; });
+  }
+
+  static getDetailedStatsForShareCard(modelId: string) {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (!model) return null;
+    
+    const sessions = JSON.parse(StorageManager.getSessions() || '[]');
+    const taskIds = model.tasks.map(t => t.id);
+    const modelSessions = sessions.filter((s: any) => taskIds.includes(s.taskId));
+    
+    let totalTime = 0;
+    const stageTimes: Record<string, number> = {};
+    
+    modelSessions.forEach((s: any) => {
+      totalTime += s.activeSeconds;
+      if (s.stageId) {
+        const key = this.getStageNameKey(s.taskId, s.stageId);
+        if (key) stageTimes[key] = (stageTimes[key] || 0) + s.activeSeconds;
+      }
+    });
+    
+    return { model, totalTime, stageTimes };
   }
 }

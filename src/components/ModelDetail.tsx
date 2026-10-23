@@ -1,12 +1,10 @@
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { StorageManager } from '../core/StorageManager';
+import { ModelManager } from '../core/ModelManager';
 import { useEffect, useState } from 'react';
+import type { ShareCardTemplate } from '../utils/shareCard';
 
-/**
- * 🌟 Bug #7 修复：统一处理 local:// 路径。
- * 所有需要读取 coverImage / photoUrl 的地方都通过这个 hook 转换。
- */
 const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -30,7 +28,6 @@ const useLocalImageSrc = (image?: string): string | null => {
 
 const LocalHero = ({ image, children, onClick }: { image: string, children: React.ReactNode, onClick: () => void }) => {
   const url = useLocalImageSrc(image);
-
   return (
     <div className="detail-hero" style={{ backgroundImage: url ? `url(${url})` : 'none', cursor: 'pointer' }} onClick={onClick}>
       {children}
@@ -43,17 +40,24 @@ export const ModelDetail = (props: any) => {
     t, i18n, viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
     isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus,
     importedStages, setImportedStages, handleConfirmRebuild, showRebuildConfirm, setShowRebuildConfirm,
-    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, generateShareCard,
-    rebuildMode, setRebuildMode
+    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, 
+    rebuildMode, setRebuildMode,
+    // 🌟 新增/由 App 传下来的 
+    setModels, refreshData, generateShareCard
   } = props;
 
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
 
   const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
-
-  // 🌟 Bug #7 修复：裁剪预览也走 useLocalImageSrc，兼容 local:// 路径
   const coverPreviewUrl = useLocalImageSrc(viewingModel.coverImage);
+
+  // 🌟 心得/日记编辑相关状态
+  const [editingNoteStageId, setEditingNoteStageId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  
+  // 🌟 战报模板选择状态
+  const [template, setTemplate] = useState<ShareCardTemplate>('cyber');
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -63,6 +67,24 @@ export const ModelDetail = (props: any) => {
       }, 100);
     }
   }, [isEditingImportedStatus]);
+
+  const handleSaveNote = (taskId: string, stageId: string) => {
+    AudioManager.playClick();
+    const updated = ModelManager.updateStageNote(taskId, stageId, noteText);
+    setModels(updated);
+    refreshData(); 
+    setEditingNoteStageId(null);
+    setNoteText('');
+  };
+
+  const handleGenerateShareCard = () => {
+    AudioManager.playClick();
+    // 提取详细数据传给 App.tsx 的 triggerShareCard
+    const detailedStats = ModelManager.getDetailedStatsForShareCard(viewingModel.id);
+    if (detailedStats) {
+      generateShareCard(detailedStats.model, detailedStats.totalTime, detailedStats.stageTimes, template);
+    }
+  };
 
   return (
     <div className="detail-view">
@@ -83,27 +105,14 @@ export const ModelDetail = (props: any) => {
       {isEditingCover && (
         <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '上传/修改模型封面' : 'Upload/Modify Cover'}</span>
-
-          {/* 格纳库裁剪预览框（已兼容 local:// 路径） */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{
-              width: '140px',
-              aspectRatio: '4 / 3',
-              backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none',
-              backgroundColor: '#333',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              borderRadius: '6px',
-              border: '1px solid #555',
-              flexShrink: 0
-            }}>
+            <div style={{ width: '140px', aspectRatio: '4 / 3', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundColor: '#333', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '6px', border: '1px solid #555', flexShrink: 0 }}>
               {!coverPreviewUrl && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>No Image</div>}
             </div>
             <div style={{ fontSize: '11px', color: '#aaa', lineHeight: 1.5 }}>
-              {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。如果被裁切过多，建议更换横屏图片。' : 'This is how it looks in the Hangar (4:3). If too cropped, try a landscape photo.'}
+              {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。' : 'This is how it looks in the Hangar (4:3).'}
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
             <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {isZh ? '上传新图片' : 'Upload'}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
             <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>{isZh ? '取消' : 'Cancel'}</button>
@@ -112,11 +121,7 @@ export const ModelDetail = (props: any) => {
       )}
 
       {needsRebuild && !isEditingImportedStatus && (
-        <button
-          className="btn start"
-          style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: 'none', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }}
-          onClick={() => { AudioManager.playClick(); handleStartRebuild(null); }}
-        >
+        <button className="btn start" style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: 'none', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }} onClick={() => { AudioManager.playClick(); handleStartRebuild(null); }}>
           🔧 {isZh ? '开始改造这台历史模型' : 'Start Rebuilding This Model'}
         </button>
       )}
@@ -125,24 +130,10 @@ export const ModelDetail = (props: any) => {
         <div id="imported-status-form" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
           <h4 style={{ color: '#f59e0b', marginBottom: '6px' }}>📦 {t('rebuild_mode_title')}</h4>
           <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '10px' }}>{t('rebuild_mode_desc')}</p>
-
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <button
-              className={`btn ${rebuildMode === 'part' ? 'start' : 'no'}`}
-              style={{ flex: 1, padding: '10px' }}
-              onClick={() => { AudioManager.playClick(); setRebuildMode('part'); }}
-            >
-              {t('rebuild_by_part')}
-            </button>
-            <button
-              className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`}
-              style={{ flex: 1, padding: '10px' }}
-              onClick={() => { AudioManager.playClick(); setRebuildMode('whole'); }}
-            >
-              {t('rebuild_by_whole')}
-            </button>
+            <button className={`btn ${rebuildMode === 'part' ? 'start' : 'no'}`} style={{ flex: 1, padding: '10px' }} onClick={() => { AudioManager.playClick(); setRebuildMode('part'); }}>{t('rebuild_by_part')}</button>
+            <button className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`} style={{ flex: 1, padding: '10px' }} onClick={() => { AudioManager.playClick(); setRebuildMode('whole'); }}>{t('rebuild_by_whole')}</button>
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '勾选你当时已经完成的流程：' : 'Check completed stages:'}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
@@ -171,7 +162,7 @@ export const ModelDetail = (props: any) => {
         </div>
       )}
 
-      <div className="timeline-container" style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+      <div className="timeline-container" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
           if (needsRebuild && task.name !== 'part_legacy') return null;
 
@@ -182,11 +173,7 @@ export const ModelDetail = (props: any) => {
 
           return (
             <div key={task.id} className="timeline-item">
-              <div
-                className="timeline-header"
-                style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
-                onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}
-              >
+              <div className="timeline-header" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }} onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}>
                 <div className="timeline-title" style={{ flex: 1, minWidth: 0 }}>
                   <span>{isCompleted ? '✅' : '⏳'}</span>
                   <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t(task.name)}</span>
@@ -196,10 +183,13 @@ export const ModelDetail = (props: any) => {
                   <span style={{ color: '#666', fontSize: '12px', width: '16px', textAlign: 'center' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
               </div>
+              
               {isExpanded && (
                 <div className="timeline-content" style={{ padding: '16px' }}>
                   {task.stages.map((stage: any) => {
                     const stageTime = taskSessions.filter((s: any) => s.stageId === stage.id).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
+                    const isEditingThisNote = editingNoteStageId === stage.id;
+                    
                     return (
                       <div key={stage.id} className={`stage-detail-item ${stage.status === 'Completed' ? 'done' : ''}`}>
                         <div className={`stage-detail-header ${stage.status === 'Completed' ? 'done' : ''}`}>
@@ -209,19 +199,41 @@ export const ModelDetail = (props: any) => {
                             <span>{stage.status === 'Completed' ? 'Done' : (stage.status === 'InProgress' ? 'In Progress' : 'Pending')}</span>
                           </div>
                         </div>
+                        
                         {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        
+                        {/* 🌟 新增：心得/日记显示与编辑区域 */}
+                        <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
+                          {isEditingThisNote ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <textarea
+                                autoFocus
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                placeholder={isZh ? '记录一下当时的拼装心得、遇到的问题或想法...' : 'Record your thoughts, issues, or tips...'}
+                                style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid #3b82f6', color: '#fff', borderRadius: '4px', padding: '6px', fontSize: '12px', outline: 'none', resize: 'vertical' }}
+                              />
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button className="mini-btn" style={{ background: 'transparent', border: '1px solid #555', color: '#aaa' }} onClick={() => setEditingNoteStageId(null)}>{t('cancel')}</button>
+                                <button className="mini-btn" style={{ background: '#3b82f6', border: 'none', color: '#fff' }} onClick={() => handleSaveNote(task.id, stage.id)}>{t('save')}</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div 
+                              onClick={() => { setEditingNoteStageId(stage.id); setNoteText(stage.note || ''); }}
+                              style={{ fontSize: '12px', color: stage.note ? '#ccc' : '#666', cursor: 'pointer', fontStyle: stage.note ? 'normal' : 'italic', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                            >
+                              <span style={{ whiteSpace: 'pre-wrap' }}>{stage.note || (isZh ? '+ 添加制作心得...' : '+ Add build note...')}</span>
+                              <span style={{ fontSize: '10px', opacity: 0.5 }}>📝</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
-
+                  
                   {(!needsRebuild || task.name !== 'part_legacy') && (
-                    <button
-                      className="mini-btn"
-                      style={{ width: '100%', marginTop: '20px', background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
-                      onClick={() => {
-                        AudioManager.playClick();
-                        handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id);
-                      }}>
+                    <button className="mini-btn" style={{ width: '100%', marginTop: '12px', background: '#3b82f6', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold' }} onClick={() => { AudioManager.playClick(); handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
                       {isZh ? `⏱ 开始专注` : `⏱ Start Focus`}
                     </button>
                   )}
@@ -232,9 +244,29 @@ export const ModelDetail = (props: any) => {
         })}
       </div>
 
-      <button className="btn start" style={{ width: '100%', marginTop: '16px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px' }} onClick={() => generateShareCard(viewingModel, viewingModelTotalSec)}>
-        📸 {isZh ? '生成专属战报' : 'Generate Build Report'}
-      </button>
+      {/* 🌟 战报生成器区域：带模板选择 */}
+      <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>{isZh ? '🎨 选择战报样式' : '🎨 Select Report Style'}</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(['cyber', 'minimal', 'glitch'] as ShareCardTemplate[]).map(tpl => (
+            <button
+              key={tpl}
+              onClick={() => { AudioManager.playClick(); setTemplate(tpl); }}
+              style={{
+                flex: 1, padding: '8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+                background: template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                color: template === tpl ? '#fff' : '#aaa',
+                border: `1px solid ${template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`
+              }}
+            >
+              {tpl === 'cyber' ? (isZh ? '赛博光晕' : 'Cyber') : tpl === 'minimal' ? (isZh ? '极简白描' : 'Minimal') : (isZh ? '故障错位' : 'Glitch')}
+            </button>
+          ))}
+        </div>
+        <button className="btn start" style={{ width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px', fontWeight: 'bold' }} onClick={handleGenerateShareCard}>
+          📸 {isZh ? '生成专属战报' : 'Generate Build Report'}
+        </button>
+      </div>
     </div>
   );
 };

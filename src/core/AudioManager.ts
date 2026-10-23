@@ -1,7 +1,7 @@
 import { createUISFX } from 'uisfx';
 import { StorageManager } from './StorageManager';
 
-export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' | 'stage' | 'timebox' | 'achievement' | 'typing';
+export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' | 'stage' | 'timebox' | 'achievement' | 'typing' | 'distraction' | 'wakeup';
 export type AmbientType = 'none' | 'rain' | 'cafe' | 'wind';
 
 const ui = createUISFX({ pack: 'glass' });
@@ -21,15 +21,15 @@ const CUE_MAP: Record<SoundType, string> = {
   stage: 'select',
   timebox: 'focus',
   achievement: 'long-press',
-  typing: 'press', // fallback，实际走 playTypeTick 分支
+  typing: 'press',
+  distraction: 'press', // fallback
+  wakeup: 'complete', // fallback
 };
 
 export class AudioManager {
   private static currentPack = 'glass';
   private static ctx: AudioContext | null = null;
-
-  // 🌟 点击音效 50ms 节流锁（防止首点或连点双响）
-  private static lastClickTime = 0;
+  private static lastClickTime = 0; 
 
   private static ambientSource: AudioBufferSourceNode | null = null;
   private static ambientGain: GainNode | null = null;
@@ -59,7 +59,7 @@ export class AudioManager {
     if (base64) {
       const audio = new Audio(base64);
       audio.volume = 0.5;
-      audio.play().catch(e => console.warn('Audio play failed', e));
+      audio.play().catch(e => console.warn("Audio play failed", e));
       return true;
     }
     return false;
@@ -80,15 +80,37 @@ export class AudioManager {
     } catch (e) {}
   }
 
+  // 🌟 新增：防作弊警告音（切屏提示）
+  private static playDistractionSound() {
+    try {
+      const ctx = this.getCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      
+      // 低沉的三全音（Tritone），听起来有警告感
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(350, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.3);
+      
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.45);
+    } catch (e) {}
+  }
+
   private static play(type: SoundType) {
-    // 🌟 typing 独立走 playTypeTick，避免污染 CUE_MAP 逻辑
     if (type === 'typing') { this.playTypeTick(); return; }
+    if (type === 'distraction') { this.playDistractionSound(); return; }
+    if (type === 'wakeup') { this.playWakeupSound(); return; }
 
     const settings = StorageManager.getAudioSettings();
     const style = settings[type] || 'default';
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom(type)) return;
-
+    
     if (type === 'click' && style === 'default') {
       this.playCrispClick();
       return;
@@ -98,14 +120,13 @@ export class AudioManager {
     ui.play(CUE_MAP[type] as any);
   }
 
-  // 🌟 50ms 节流
-  static playClick() {
+  static playClick() { 
     const now = Date.now();
     if (now - this.lastClickTime < 50) return;
     this.lastClickTime = now;
-    this.play('click');
+    this.play('click'); 
   }
-
+  
   static playStart() { this.play('start'); }
   static playPause() { this.play('pause'); }
   static playComplete() { this.play('complete'); }
@@ -113,19 +134,36 @@ export class AudioManager {
   static playStageDone() { this.play('stage'); }
   static playTimeboxEnd() { this.play('timebox'); }
   static playAchievement() { this.play('achievement'); }
+  
+  // 🌟 新增：供外部调用的防干扰音
+  static playDistraction() { this.play('distraction'); }
+
+  // 🌟 新增：自定义起床铃逻辑
+  static playWakeup() { this.play('wakeup'); }
+  
+  private static playWakeupSound() {
+    const customWakeup = StorageManager.getCustomWakeupSound();
+    if (customWakeup) {
+      const audio = new Audio(customWakeup);
+      audio.volume = 1.0;
+      audio.play().catch(e => console.warn('Wakeup sound play failed', e));
+      return;
+    }
+    // 如果没有自定义，走默认的 complete 音效
+    const settings = StorageManager.getAudioSettings();
+    const style = settings['complete'] || 'default';
+    if (style !== 'off') {
+      this.syncPack(style);
+      ui.play(CUE_MAP['complete'] as any);
+    }
+  }
 
   static previewSound(type: SoundType) { this.play(type); }
 
-  /**
-   * 🌟 打字机音效 - Roadmap 任务 B 已完成
-   * 现在支持独立配置：default / chiptune / soft / off / custom
-   * 由 StorageManager.getAudioSettings()['typing'] 控制
-   */
   static playTypeTick() {
     const settings = StorageManager.getAudioSettings();
     const style = settings['typing'] || 'default';
     if (style === 'off') return;
-
     if (style === 'custom' && this.playCustom('typing')) return;
 
     try {
@@ -149,7 +187,6 @@ export class AudioManager {
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.04);
       } else {
-        // default（原默认合成音）
         osc.type = 'sine';
         osc.frequency.setValueAtTime(1600, ctx.currentTime);
         gain.gain.setValueAtTime(0.015, ctx.currentTime);
@@ -160,29 +197,26 @@ export class AudioManager {
     } catch (e) {}
   }
 
-  // ==========================================
-  // 环境白噪音引擎 (纯代码合成)
-  // ==========================================
   static playAmbient(type: AmbientType) {
     if (this.currentAmbient === type) return;
     this.stopAmbient();
-
+    
     if (type === 'none') return;
     this.currentAmbient = type;
 
     try {
       const ctx = this.getCtx();
-      const bufferSize = ctx.sampleRate * 2;
+      const bufferSize = ctx.sampleRate * 2; 
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
-
+      
       let lastOut = 0;
       for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
         if (type === 'rain') {
           output[i] = (lastOut + (0.02 * white)) / 1.02;
           lastOut = output[i];
-          output[i] *= 3.5;
+          output[i] *= 3.5; 
         } else if (type === 'wind') {
           output[i] = (lastOut + (0.05 * white)) / 1.05;
           lastOut = output[i];
@@ -201,16 +235,14 @@ export class AudioManager {
       filter.frequency.value = type === 'rain' ? 800 : 400;
 
       this.ambientGain = ctx.createGain();
-      this.ambientGain.gain.value = 0.2;
+      this.ambientGain.gain.value = 0.2; 
 
       this.ambientSource.connect(filter);
       filter.connect(this.ambientGain);
       this.ambientGain.connect(ctx.destination);
 
       this.ambientSource.start();
-    } catch (e) {
-      console.warn('Ambient sound generation failed', e);
-    }
+    } catch (e) { console.warn('Ambient sound generation failed', e); }
   }
 
   static stopAmbient() {

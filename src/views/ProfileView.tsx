@@ -1,12 +1,7 @@
+import { useState } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 
-/**
- * 🌟 Bug #5 修复：
- * 原逻辑用 new Date(s.startedAt).toISOString().slice(0, 10) 按 UTC 聚合，
- * 中国用户凌晨时段（UTC+8 的 0:00~7:59）会被算到"昨天"，导致周图表失真。
- * 下面改为按"用户本地时区"取 YYYY-MM-DD。
- */
 const toLocalDateStr = (ts: number): string => {
   const d = new Date(ts);
   const y = d.getFullYear();
@@ -17,15 +12,12 @@ const toLocalDateStr = (ts: number): string => {
 
 const WeeklyChart = ({ sessions, i18n }: { sessions: any[], i18n: any }) => {
   const isZh = i18n.language === 'zh';
-
   const days = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const dateStr = toLocalDateStr(d.getTime());
-
     const daySessions = sessions.filter((s) => toLocalDateStr(s.startedAt) === dateStr);
     const totalSec = daySessions.reduce((sum, s) => sum + s.activeSeconds, 0);
-
     return { label: `${d.getMonth() + 1}/${d.getDate()}`, totalSec };
   });
 
@@ -42,14 +34,7 @@ const WeeklyChart = ({ sessions, i18n }: { sessions: any[], i18n: any }) => {
               {day.totalSec > 0 ? `${Math.floor(day.totalSec / 60)}m` : ''}
             </div>
             <div style={{ width: '20px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-              <div style={{
-                width: '100%',
-                height: `${Math.max(heightPercent, 2)}%`,
-                background: isToday ? 'linear-gradient(to top, #3b82f6, #8b5cf6)' : 'rgba(59, 130, 246, 0.4)',
-                boxShadow: isToday ? '0 0 10px rgba(59,130,246,0.8)' : 'none',
-                borderRadius: '4px',
-                transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)'
-              }} />
+              <div style={{ width: '100%', height: `${Math.max(heightPercent, 2)}%`, background: isToday ? 'linear-gradient(to top, #3b82f6, #8b5cf6)' : 'rgba(59, 130, 246, 0.4)', boxShadow: isToday ? '0 0 10px rgba(59,130,246,0.8)' : 'none', borderRadius: '4px', transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)' }} />
             </div>
             <div style={{ fontSize: '10px', color: isToday ? '#fff' : '#666', marginTop: '6px', fontWeight: isToday ? 'bold' : 'normal' }}>
               {isToday ? (isZh ? '今日' : 'Today') : day.label}
@@ -72,18 +57,39 @@ export const ProfileView = (props: any) => {
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
-    level, levelProgress
+    level, levelProgress, showToast
   } = props;
 
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
 
-  // 🌟 typing 文案自适应 fallback：若 locale 里没有 audioTyping 键，用默认中文/英文
   const typingLabel = (() => {
     const raw = t('audioTyping');
     if (raw === 'audioTyping') return isZh ? '打字机音效' : 'Typing Sound';
     return raw;
   })();
+
+  const [isUploadingWakeup, setIsUploadingWakeup] = useState(false);
+
+  const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast(isZh ? '音频文件太大（最大2MB）' : 'Audio file too large (max 2MB)'); return; }
+    
+    setIsUploadingWakeup(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      StorageManager.setCustomWakeupSound(base64);
+      setIsUploadingWakeup(false);
+      showToast(isZh ? '✅ 起床铃已更新' : '✅ Wakeup sound updated');
+      AudioManager.playWakeup();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const currentWakeupSound = StorageManager.getCustomWakeupSound();
 
   return (
     <div className="view-content profile-view">
@@ -136,9 +142,7 @@ export const ProfileView = (props: any) => {
       <div id="tour-install" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.1), rgba(0,0,0,0.2))' }}>
         <h4>📲 {isZh ? '安装到桌面 (PWA)' : 'Install to Desktop'}</h4>
         <p style={{ fontSize: '11px', color: '#ccc', lineHeight: '1.6', marginBottom: '8px' }}>
-          {isZh
-            ? '安装后去除浏览器边框，体验原生 App 级全屏沉浸感！'
-            : 'Install to remove browser borders and enjoy native app-like fullscreen immersion!'}
+          {isZh ? '安装后去除浏览器边框，体验原生 App 级全屏沉浸感！' : 'Install to remove browser borders and enjoy native app-like fullscreen immersion!'}
         </p>
         <div style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '6px', lineHeight: '1.6' }}>
           {isZh ? '💻 电脑端 (Edge/Chrome)：点击右上角三个点菜单 → 更多工具 → 应用 → 将此站点安装为应用（或点击地址栏右侧的安装图标）。' : '💻 PC (Edge/Chrome): Click the 3-dots menu → More tools → Apps → Install this site as an app.'}
@@ -150,9 +154,7 @@ export const ProfileView = (props: any) => {
       <div className="custom-section" style={{ border: '1px dashed #10b981' }}>
         <h4>🛡️ {isZh ? '本地数据安全与扩容' : 'Data Security & Expansion'}</h4>
         <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>
-          {isZh
-            ? '浏览器默认容量有限。绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！'
-            : 'Browser storage is limited. Bind a local folder to store media directly on your disk!'}
+          {isZh ? '浏览器默认容量有限。绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！' : 'Browser storage is limited. Bind a local folder to store media directly on your disk!'}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -161,32 +163,24 @@ export const ProfileView = (props: any) => {
               <div>{isZh ? '容量分配' : 'Quota'}: {storageEstimate.quota} GB</div>
               <div style={{ color: '#10b981' }}>{isZh ? '已用' : 'Used'}: {storageEstimate.usage} GB</div>
             </div>
-            <button
-              className="mini-btn"
-              onClick={async () => {
-                AudioManager.playClick();
-                const success = await StorageManager.selectAssetsFolder();
-                if (success) { setIsAssetsMounted(true); props.showToast(isZh ? '✅ 本地图库扩容已挂载！' : '✅ Local gallery mounted!'); }
-                else props.showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
-              }}
-              style={{ background: isAssetsMounted ? '#10b981' : '#555', flexShrink: 0 }}
-            >
+            <button className="mini-btn" onClick={async () => {
+              AudioManager.playClick();
+              const success = await StorageManager.selectAssetsFolder();
+              if (success) { setIsAssetsMounted(true); showToast(isZh ? '✅ 本地图库扩容已挂载！' : '✅ Local gallery mounted!'); }
+              else showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
+            }} style={{ background: isAssetsMounted ? '#10b981' : '#555', flexShrink: 0 }}>
               {isAssetsMounted ? (isZh ? '已挂载本地图库' : 'Mounted') : (isZh ? '📁 挂载本地图库 (扩容)' : '📁 Mount Local Gallery')}
             </button>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '12px' }}>{isZh ? '自动无感备份' : 'Auto Backup'}</div>
-            <button
-              className="mini-btn"
-              onClick={async () => {
-                AudioManager.playClick();
-                const success = await StorageManager.selectBackupFolder();
-                if (success) { setIsAutoBackupEnabled(true); props.showToast(isZh ? '✅ 自动备份已开启！' : '✅ Auto backup enabled!'); }
-                else props.showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
-              }}
-              style={{ background: isAutoBackupEnabled ? '#10b981' : '#555', flexShrink: 0 }}
-            >
+            <button className="mini-btn" onClick={async () => {
+              AudioManager.playClick();
+              const success = await StorageManager.selectBackupFolder();
+              if (success) { setIsAutoBackupEnabled(true); showToast(isZh ? '✅ 自动备份已开启！' : '✅ Auto backup enabled!'); }
+              else showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
+            }} style={{ background: isAutoBackupEnabled ? '#10b981' : '#555', flexShrink: 0 }}>
               {isAutoBackupEnabled ? (isZh ? '自动备份中' : 'Backing up') : (isZh ? '📁 选择备份文件夹' : '📁 Select Backup Folder')}
             </button>
           </div>
@@ -201,16 +195,7 @@ export const ProfileView = (props: any) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="search-autocomplete">
-              <input
-                id="legacy-search-input"
-                autoFocus
-                placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'}
-                value={legacyInput}
-                onChange={e => setLegacyInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }}
-                onBlur={() => setTimeout(() => setLegacyResults([]), 200)}
-                onFocus={handleFocus}
-              />
+              <input id="legacy-search-input" autoFocus placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} onBlur={() => setTimeout(() => setLegacyResults([]), 200)} onFocus={handleFocus} />
               {legacyResults.length > 0 && (
                 <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
                   {legacyResults.map((item: any, idx: number) => {
@@ -316,19 +301,28 @@ export const ProfileView = (props: any) => {
           <button className="mini-btn" onClick={openPreview}>{t('previewBg')}</button>
         </div>
 
-        <div className="audio-settings">
-          {/* 🌟 Roadmap B 收尾：新增 typing（打字机音效）独立配置行 */}
+        <div className="custom-row" style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '12px', marginTop: '12px' }}>
+          <span>{isZh ? '自定义专注结束起床铃' : 'Custom Wakeup Sound'}:</span>
+          <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: isUploadingWakeup ? 'not-allowed' : 'pointer', opacity: isUploadingWakeup ? 0.5 : 1, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
+              🎵 {isUploadingWakeup ? (isZh ? '处理中...' : 'Processing...') : (currentWakeupSound ? (isZh ? '更换起床铃' : 'Replace Sound') : (isZh ? '上传起床铃' : 'Upload Sound'))}
+              <input type="file" accept="audio/*" onChange={handleWakeupUpload} style={{ display: 'none' }} disabled={isUploadingWakeup} />
+            </label>
+            {currentWakeupSound && (
+              <>
+                <button className="mini-btn" style={{ background: '#3b82f6', flexShrink: 0 }} onClick={() => { AudioManager.playWakeup(); }}>{isZh ? '试听' : 'Test'}</button>
+                <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { StorageManager.setCustomWakeupSound(''); showToast(isZh ? '已恢复默认起床铃' : 'Reset to default'); }}>{t('clear')}</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="audio-settings" style={{ marginTop: '12px' }}>
           {(['click', 'typing', 'start', 'pause', 'complete', 'finishPart', 'stage', 'timebox', 'achievement'] as const).map(type => {
             const labelMap: any = {
-              click: t('audioClick'),
-              typing: typingLabel,
-              start: t('audioStart'),
-              pause: t('audioPause'),
-              complete: t('audioComplete'),
-              finishPart: t('audioFinishPart'),
-              stage: t('audioStage'),
-              timebox: t('audioTimebox'),
-              achievement: t('audioAchievement')
+              click: t('audioClick'), typing: typingLabel, start: t('audioStart'), pause: t('audioPause'),
+              complete: t('audioComplete'), finishPart: t('audioFinishPart'), stage: t('audioStage'),
+              timebox: t('audioTimebox'), achievement: t('audioAchievement')
             };
             return (
               <div key={type} className="audio-row">
@@ -361,9 +355,7 @@ export const ProfileView = (props: any) => {
             return (
               <div key={title.id} className={`title-item ${isOwned ? 'owned' : ''}`}>
                 <div className="title-info">
-                  <div className="title-name" style={{ color: title.color, textShadow: `0 0 10px ${title.color}40` }}>
-                    {t(title.nameKey)}
-                  </div>
+                  <div className="title-name" style={{ color: title.color, textShadow: `0 0 10px ${title.color}40` }}>{t(title.nameKey)}</div>
                   <div className="title-cond">{t(title.descKey)}</div>
                 </div>
                 {isOwned ? (
@@ -417,7 +409,7 @@ export const ProfileView = (props: any) => {
         </div>
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.0</p>
+          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.2.0</p>
           <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>

@@ -6,7 +6,8 @@ export interface TourStep {
   title: string;
   content: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
-  page?: 'focus' | 'journal' | 'hangar' | 'gallery' | 'profile';
+  // 🌟 修复：加上 'gundam'
+  page?: 'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile';
 }
 
 interface Props {
@@ -14,7 +15,6 @@ interface Props {
   onClose: () => void;
   activeTab: string;
   setActiveTab: (tab: any) => void;
-  // 🌟 移除未使用的 i18n
 }
 
 export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props) => {

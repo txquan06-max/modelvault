@@ -10,11 +10,11 @@ export const FocusPanel = ({
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
-  currentBot, chatMessages 
+  currentBot, chatMessages,
+  ambientType, setAmbientType // 🌟 接收环境音状态
 }: any) => {
   
   const [charIndex, setCharIndex] = useState(0);
-  // 🌟 新增：沉浸模式状态
   const [isImmersive, setIsImmersive] = useState(false);
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -22,6 +22,7 @@ export const FocusPanel = ({
   
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
+  // 打字机动画逻辑（修复首字丢失）
   useEffect(() => {
     const lastMsg = chatMessages[chatMessages.length - 1];
     if (!lastMsg) return;
@@ -48,7 +49,13 @@ export const FocusPanel = ({
   }, [chatMessages]);
 
   const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
-  const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
+  const formatTime = (totalSec: number) => { 
+    const h = Math.floor(totalSec / 3600); 
+    const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); 
+    const s = (totalSec % 60).toString().padStart(2, '0'); 
+    if (h > 0) return `${h}:${m}:${s}`; 
+    return `${m}:${s}`; 
+  };
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - timeboxElapsed) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && timeboxElapsed > 0;
 
@@ -67,7 +74,7 @@ export const FocusPanel = ({
             if (width > 800) { height = Math.round((height * 800) / width); width = 800; }
             canvas.width = width; canvas.height = height;
             canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
-            setFinishPartPhoto(canvas.toDataURL('image/jpeg', 0.6));
+            setFinishPartPhoto(canvas.toDataURL('image/webp', 0.6)); // 改用 webp
           };
         };
       } catch (err) { showToast('图片处理失败'); }
@@ -77,7 +84,9 @@ export const FocusPanel = ({
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
+  const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // 聊天气泡渲染
   const renderChatHistory = (isPipView: boolean) => (
     <div style={{ 
       background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
@@ -118,6 +127,7 @@ export const FocusPanel = ({
     </div>
   );
 
+  // ================= 悬浮窗视图 =================
   if (isPip) {
     return (
       <div className={pipClass}>
@@ -146,6 +156,16 @@ export const FocusPanel = ({
                     {[0, 15, 30, 60].map(min => (
                       <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => handleSetTimeboxTarget(min)}>
                         {min === 0 ? t('timeboxNone') : `${min}m`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: '4px' }}>
+                    {currentTask.stages.map((stage: any) => (
+                      <button key={stage.id} style={{ background: stage.id === currentStageId ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: 'none', padding: '4px 6px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
+                        {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
                       </button>
                     ))}
                   </div>
@@ -190,21 +210,21 @@ export const FocusPanel = ({
     );
   }
 
-  // 🌟 沉浸模式 UI 渲染
+  // ================= 沉浸模式视图 =================
   if (isImmersive) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.5s ease-out' }}>
         {/* 呼吸光晕背景 */}
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
         
-        <button id="btn-pip" onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '30px', right: '30px', background: 'transparent', border: 'none', color: '#666', fontSize: '24px', cursor: 'pointer' }}>✕</button>
+        <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '30px', right: '30px', background: 'transparent', border: 'none', color: '#666', fontSize: '24px', cursor: 'pointer' }}>✕</button>
 
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ color: botData.color, fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px', opacity: 0.8 }}>
             {currentModel ? getModelName(currentModel) : ''} - {currentTaskName}
           </div>
           
-          <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '120px', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>
+          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '120px', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>
             {formatTime(activeSeconds)}
           </div>
 
@@ -227,9 +247,7 @@ export const FocusPanel = ({
     );
   }
 
-  // =========================================================================
-  // 普通视图
-  // =========================================================================
+  // ================= 普通视图 =================
   return (
     <div className="focus-layout">
       
@@ -247,6 +265,7 @@ export const FocusPanel = ({
               <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
           </div>
+          <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>🕒 {localTime}</div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -266,10 +285,11 @@ export const FocusPanel = ({
       </div>
 
       <div className="focus-right">
-        {/* 🌟 沉浸模式入口 */}
-        <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ alignSelf: 'flex-end', marginBottom: '10px', background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
-          ⛶ 沉浸模式
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
+          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+            ⛶ 沉浸模式
+          </button>
+        </div>
 
         <div className="selector-group" style={{ marginBottom: '20px' }}>
           <div className="selector-row">
@@ -304,12 +324,30 @@ export const FocusPanel = ({
           </div>
         )}
         
-        <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '72px', textShadow: '0 0 30px rgba(255,255,255,0.2)' }}>{formatTime(activeSeconds)}</div>
+        <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '72px', textShadow: '0 0 30px rgba(255,255,255,0.2)' }}>{formatTime(activeSeconds)}</div>
         
         {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
           <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
         )}
         
+        {/* 🌟 环境音切换 UI */}
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '15px 0' }}>
+          {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => { AudioManager.playClick(); setAmbientType(type); }}
+              style={{ 
+                background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', 
+                color: ambientType === type ? '#c4b5fd' : '#888', 
+                border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, 
+                padding: '6px 12px', borderRadius: '16px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' 
+              }}
+            >
+              {type === 'none' ? '🔇 静音' : type === 'rain' ? '🌧️ 雨声' : type === 'wind' ? '🌬️ 风声' : '☕ 白噪音'}
+            </button>
+          ))}
+        </div>
+
         {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
           <div className="stages-panel" style={{ justifyContent: 'center', margin: '20px 0' }}>
             {currentTask.stages.map((stage: any) => (

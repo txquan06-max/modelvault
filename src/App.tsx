@@ -5,7 +5,7 @@ import { TimerEngine } from './core/TimerEngine';
 import { SessionManager } from './core/SessionManager';
 import { ModelManager } from './core/ModelManager';
 import { AchievementManager } from './core/AchievementManager';
-import { AudioManager } from './core/AudioManager';
+import { AudioManager, type AmbientType } from './core/AudioManager';
 import { StorageManager } from './core/StorageManager';
 import { UserManager } from './core/UserManager';
 import { CheckinManager } from './core/CheckinManager';
@@ -19,14 +19,12 @@ import { JournalView } from './views/JournalView';
 import { HangarView } from './views/HangarView';
 import { ProfileView } from './views/ProfileView';
 import { BotGalleryView } from './views/BotGalleryView';
+import { GundamGalleryView } from './views/GundamGalleryView'; // 🌟 新增引入
 import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
-
-// 🌟 新增引入
 import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
-
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
@@ -55,11 +53,12 @@ const LocalImage = ({ src, ...props }: any) => {
 function App() {
   const { t, i18n } = useTranslation();
   
-  // 🌟 状态控制
   const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile' | 'gallery'>('focus');
+  // 🌟 新增：图鉴 Tab
+  const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile'>('focus');
+  
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -144,8 +143,10 @@ function App() {
   const [storageEstimate, setStorageEstimate] = useState({ usage: 0, quota: 0, percent: 0 });
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
   const [isAssetsMounted, setIsAssetsMounted] = useState(false);
-  
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // 🌟 新增：环境音状态
+  const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -155,48 +156,28 @@ function App() {
     return []; 
   });
 
-  // 🌟 配置教程步骤
-  const tutorialSteps: TourStep[] = [
-    {
-      targetId: 'tour-welcome', title: '欢迎来到模途',
-      content: '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始，我们将用一分钟带你了解核心功能。', page: 'focus'
-    },
-    {
-      targetId: 'btn-add-model', title: '第一步：建立目标',
-      content: '点击这里【添加模型】。可以搜索你的机体，或者手动输入。', page: 'focus'
-    },
-    {
-      targetId: 'btn-add-task', title: '第二步：拆分部位',
-      content: '添加模型后，点击【添加部位】，比如“头部”、“躯干”。你可以使用默认模板。', page: 'focus'
-    },
-    {
-      targetId: 'btn-pip', title: '悬浮窗模式',
-      content: '如果你用的是电脑或安卓，点击这里开启悬浮窗（画中画），边看视频边拼胶！', page: 'focus'
-    },
-    {
-      targetId: 'tour-timer', title: '番茄钟与专注',
-      content: '选择时间，点击【开始】。注意：计时必须超过 10 秒才能【完成】记录哦，防作弊！', page: 'focus'
-    },
-    {
-      targetId: 'tab-journal', title: '制作日程',
-      content: '在【日志】里，你可以回顾过去的每一分专注，数据一目了然。', page: 'journal'
-    },
-    {
-      targetId: 'tab-hangar', title: '格纳库',
-      content: '拼完的模型都会陈列在这里。还有你的“堆积区”，随时看看那些吃灰的盒子。', page: 'hangar'
-    },
-    {
-      targetId: 'tab-gallery', title: '塑灵',
-      content: '在这里解锁不同的【塑灵】。她们会陪你聊天，为你见证战报。', page: 'gallery'
-    },
-    {
-      targetId: 'tab-profile', title: '个人中心',
-      content: '在这里可以换背景、补录以前做过的历史模型，还可以导出数据备份。', page: 'profile'
-    },
-    {
-      targetId: 'tour-install', title: '安装至桌面',
-      content: '强烈建议安装！\nAndroid：点击右上角菜单“安装应用”。\niOS (Safari)：点击底部“分享”，选择“添加到主屏幕”。\n安装后体验完全像原生 App 一样流畅！', page: 'profile'
+  // 🌟 监听计时器状态，控制白噪音播放
+  useEffect(() => {
+    if (timerState === 'Running') {
+      AudioManager.playAmbient(ambientType);
+    } else {
+      AudioManager.stopAmbient();
     }
+    return () => AudioManager.stopAmbient();
+  }, [timerState, ambientType]);
+
+  const tutorialSteps: TourStep[] = [
+    { targetId: 'tour-welcome', title: '欢迎来到模途', content: '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。', page: 'focus' },
+    { targetId: 'btn-add-model', title: '第一步：建立目标', content: '点击这里【添加模型】。可以搜索你的机体。', page: 'focus' },
+    { targetId: 'btn-add-task', title: '第二步：拆分部位', content: '添加模型后，点击【添加部位】，比如“头部”。', page: 'focus' },
+    { targetId: 'btn-pip', title: '悬浮窗模式', content: '点击这里开启悬浮窗，边看视频边拼胶！', page: 'focus' },
+    { targetId: 'tour-timer', title: '番茄钟与专注', content: '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！', page: 'focus' },
+    { targetId: 'tab-gundam', title: '机体图鉴', content: '你收集的机体都在这里，看看还有哪些没拼！', page: 'gundam' },
+    { targetId: 'tab-journal', title: '制作日程', content: '在【日志】里回顾每一分专注。', page: 'journal' },
+    { targetId: 'tab-hangar', title: '格纳库', content: '拼完的模型都会陈列在这里。', page: 'hangar' },
+    { targetId: 'tab-gallery', title: '塑灵', content: '解锁不同的【塑灵】陪你聊天。', page: 'gallery' },
+    { targetId: 'tab-profile', title: '个人中心', content: '换背景、补录历史模型、导出备份都在这里。', page: 'profile' },
+    { targetId: 'tour-install', title: '安装至桌面', content: 'Android：菜单“安装应用”。\niOS (Safari)：分享“添加到主屏幕”。', page: 'profile' }
   ];
 
   useEffect(() => {
@@ -824,22 +805,14 @@ function App() {
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     chatMessages,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
-    setActiveTab
+    setActiveTab, ambientType, setAmbientType
   };
 
   return (
     <>
-      {/* 🌟 启动页 */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-
-      {/* 🌟 教程遮罩 */}
       {showTutorial && !showSplash && (
-        <TutorialTour 
-          steps={tutorialSteps} 
-          onClose={() => setShowTutorial(false)} 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-        />
+        <TutorialTour steps={tutorialSteps} onClose={() => setShowTutorial(false)} activeTab={activeTab} setActiveTab={setActiveTab} />
       )}
 
       <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>
@@ -878,23 +851,20 @@ function App() {
             </div>
           ) : (
             <>
-              <div className="tabs">
-                {/* 🌟 在这里加入了 ID 以便定位 */}
+              <div className="tabs" style={{ display: 'flex', overflowX: 'auto', paddingBottom: '4px' }}>
                 <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
                 <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
                 <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
+                <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {i18n.language === 'zh' ? '机体' : 'Mecha'}</button>
                 <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
                 <button id="tab-profile" className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
               </div>
               
-              {/* 🌟 始终显示的新手教程按钮 */}
               <button 
                 onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
                 style={{ position: 'absolute', right: '24px', top: '60px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', zIndex: 100, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 title="新手教程"
-              >
-                ?
-              </button>
+              >?</button>
             </>
           )}
 
@@ -926,27 +896,14 @@ function App() {
               {activeTab === 'focus' && <FocusView {...commonProps} />}
               {activeTab === 'journal' && <JournalView {...commonProps} />}
               {activeTab === 'hangar' && <HangarView {...commonProps} />}
+              {activeTab === 'gundam' && <GundamGalleryView {...commonProps} />} 
               {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
               {activeTab === 'profile' && <ProfileView {...commonProps} />}
             </>
           )}
         </div>
 
-        <Modals 
-          showCompleteModelConfirm={showCompleteModelConfirm} 
-          setShowCompleteModelConfirm={setShowCompleteModelConfirm} 
-          handleConfirmCompleteModel={handleConfirmCompleteModel} 
-          isPreviewOpen={isPreviewOpen} 
-          setIsPreviewOpen={setIsPreviewOpen} 
-          bgMain={bgMain} 
-          bgSize={bgSize} 
-          bgPosition={bgPosition} 
-          setBgSize={setBgSize} 
-          setBgPosition={setBgPosition} 
-          applyBackground={applyBackground} 
-          deferredPrompt={deferredPrompt}
-          setDeferredPrompt={setDeferredPrompt}
-        />
+        <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />
 
         {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
       </div>

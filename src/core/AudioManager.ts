@@ -1,8 +1,8 @@
-// src/core/AudioManager.ts
 import { createUISFX } from 'uisfx';
 import { StorageManager } from './StorageManager';
 
 export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' | 'stage' | 'timebox' | 'achievement';
+export type AmbientType = 'none' | 'rain' | 'cafe' | 'wind';
 
 const ui = createUISFX({ pack: 'glass' });
 
@@ -26,6 +26,11 @@ const CUE_MAP: Record<SoundType, string> = {
 export class AudioManager {
   private static currentPack = 'glass';
   private static ctx: AudioContext | null = null;
+  
+  // 🌟 新增：环境音状态
+  private static ambientSource: AudioBufferSourceNode | null = null;
+  private static ambientGain: GainNode | null = null;
+  private static currentAmbient: AmbientType = 'none';
 
   static async unlock() {
     try { await ui.unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
@@ -98,7 +103,6 @@ export class AudioManager {
 
   static previewSound(type: SoundType) { this.play(type); }
 
-  // 🌟 优化：打字机微音效，更柔和
   static playTypeTick() {
     const settings = StorageManager.getAudioSettings();
     if (settings['click'] === 'off') return;
@@ -107,12 +111,86 @@ export class AudioManager {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine'; // 改为sine波，更顺滑
+      osc.type = 'sine'; 
       osc.frequency.setValueAtTime(1600, ctx.currentTime); 
-      gain.gain.setValueAtTime(0.015, ctx.currentTime); // 音量减半
+      gain.gain.setValueAtTime(0.015, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03); 
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.03);
     } catch (e) {}
+  }
+
+  // ==========================================
+  // 🌟 新增：环境白噪音引擎 (纯代码合成)
+  // ==========================================
+  
+  static playAmbient(type: AmbientType) {
+    if (this.currentAmbient === type) return;
+    this.stopAmbient();
+    
+    if (type === 'none') return;
+    this.currentAmbient = type;
+
+    try {
+      const ctx = this.getCtx();
+      // 生成 2 秒的噪音 buffer
+      const bufferSize = ctx.sampleRate * 2; 
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      
+      let lastOut = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        if (type === 'rain') {
+          // 雨声：粉红噪音（低频更多）
+          output[i] = (lastOut + (0.02 * white)) / 1.02;
+          lastOut = output[i];
+          output[i] *= 3.5; 
+        } else if (type === 'wind') {
+          // 风声：经过平滑的布朗噪音
+          output[i] = (lastOut + (0.05 * white)) / 1.05;
+          lastOut = output[i];
+          output[i] *= 2.0;
+        } else {
+          // 咖啡馆：轻微的白噪音
+          output[i] = white * 0.3;
+        }
+      }
+
+      this.ambientSource = ctx.createBufferSource();
+      this.ambientSource.buffer = noiseBuffer;
+      this.ambientSource.loop = true;
+
+      // 滤波器微调，让声音更自然
+      const filter = ctx.createBiquadFilter();
+      filter.type = type === 'rain' ? 'lowpass' : 'bandpass';
+      filter.frequency.value = type === 'rain' ? 800 : 400;
+
+      this.ambientGain = ctx.createGain();
+      this.ambientGain.gain.value = 0.2; // 默认音量 20%
+
+      this.ambientSource.connect(filter);
+      filter.connect(this.ambientGain);
+      this.ambientGain.connect(ctx.destination);
+
+      this.ambientSource.start();
+    } catch (e) { console.warn('Ambient sound generation failed', e); }
+  }
+
+  static stopAmbient() {
+    if (this.ambientSource) {
+      try { this.ambientSource.stop(); } catch (e) {}
+      this.ambientSource = null;
+    }
+    if (this.ambientGain) {
+      this.ambientGain = null;
+    }
+    this.currentAmbient = 'none';
+  }
+
+  static setAmbientVolume(vol: number) {
+    if (this.ambientGain) {
+      this.ambientGain.gain.value = vol;
+    }
   }
 }

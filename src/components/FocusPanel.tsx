@@ -98,19 +98,19 @@ export const FocusPanel = ({
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // 聊天记录渲染
+  // 🌟 渲染聊天记录，普通视图高度设为 100%，并在 flex 中自动撑开
   const renderChatHistory = (isPipView: boolean) => (
     <div style={{ 
       background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
       border: `1px solid ${botData.color}50`, 
       borderRadius: '12px', 
-      padding: isPipView ? '8px' : '12px 16px', 
-      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '6px',
+      padding: isPipView ? '8px' : '16px', 
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '8px',
       boxShadow: `0 4px 16px rgba(0, 0, 0, 0.5)`,
       backdropFilter: 'blur(12px)', transition: 'all 0.3s',
-      flex: isPipView ? 1 : 'none',
-      height: isPipView ? 'auto' : '320px',
-      minHeight: isPipView ? '60px' : '320px',
+      flex: isPipView ? 1 : 1, // 网页端也设为 1 撑满
+      height: '100%', 
+      minHeight: isPipView ? '100px' : 0, // 网页端不限制最小高度，让它随容器缩放
       overflow: 'hidden', position: 'relative',
       maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%)',
       WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%)'
@@ -122,17 +122,17 @@ export const FocusPanel = ({
         const displayTxt = isLatest ? msg.text.slice(0, charIndex) : msg.text;
         
         return (
-          <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+          <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
             <div style={{ 
-              width: isPipView ? '20px' : '32px', 
-              height: isPipView ? '20px' : '32px', 
+              width: isPipView ? 'clamp(16px, 4vw, 24px)' : '32px', 
+              height: isPipView ? 'clamp(16px, 4vw, 24px)' : '32px', 
               borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: `1px solid ${msgBotData.color}`, background: '#111' 
             }}>
               <img src={msgBotData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ flex: 1, marginTop: '2px' }}>
-              <div style={{ color: msgBotData.color, fontWeight: 'bold', fontSize: isPipView ? '10px' : '13px', marginBottom: '2px' }}>{msgBotName}</div>
-              <div style={{ fontSize: isPipView ? '11px' : '14px', color: '#e2e8f0', lineHeight: '1.4', wordBreak: 'break-word' }}>
+              <div style={{ color: msgBotData.color, fontWeight: 'bold', fontSize: isPipView ? 'clamp(9px, 2vw, 11px)' : '13px', marginBottom: '2px' }}>{msgBotName}</div>
+              <div style={{ fontSize: isPipView ? 'clamp(10px, 2.5vw, 13px)' : '14px', color: '#e2e8f0', lineHeight: '1.4', wordBreak: 'break-word' }}>
                 {displayTxt}
                 {isLatest && charIndex < msg.text.length && <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>}
               </div>
@@ -145,7 +145,7 @@ export const FocusPanel = ({
   );
 
   // ==============================
-  // 🌟 悬浮窗视图 (左右分栏布局)
+  // 🌟 悬浮窗视图 (左右分栏)
   // ==============================
   if (isPip) {
     return (
@@ -155,59 +155,43 @@ export const FocusPanel = ({
         
         <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'row', padding: '8px', boxSizing: 'border-box', gap: '8px' }}>
           
-          {/* 左侧：核心控制区 */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          {/* 左侧控制区 */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px', outline: 'none', width: '100%' }}>
+              <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
                 {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
               </select>
-              <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px', outline: 'none', width: '100%' }}>
+              <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
                 {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
               </select>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '8px 0' }}>
-              <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(32px, 8vw, 48px)', margin: 0, lineHeight: 1, textShadow: `0 0 20px ${botData.color}40` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+              <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(32px, 12vw, 56px)', margin: 0, lineHeight: 1, textShadow: `0 0 20px ${botData.color}40`, textAlign: 'center' }}>
                 {formatTime(activeSeconds)}
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {/* 番茄钟 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
               {timerState === 'Idle' && !lastSession && (
-                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {[0, 15, 30, 60].map(min => (
-                    <button 
-                      key={min} 
-                      style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }} 
-                      onClick={() => handleSetTimeboxTarget(min)}
-                    >
+                    <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2.5vw, 10px)', cursor: 'pointer' }} onClick={() => handleSetTimeboxTarget(min)}>
                       {min === 0 ? (isZh ? '不限' : '∞') : `${min}m`}
                     </button>
                   ))}
                 </div>
               )}
-
-              {/* 白噪音 */}
-              <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => { AudioManager.playClick(); setAmbientType(type); }}
-                    style={{ 
-                      background: ambientType === type ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.05)', 
-                      color: ambientType === type ? '#c4b5fd' : '#888', 
-                      border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, 
-                      padding: '4px 6px', borderRadius: '12px', fontSize: '10px', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                    }}
-                  >
+                  <button key={type} onClick={() => { AudioManager.playClick(); setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '2px 4px', borderRadius: '10px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }}>
                     {type === 'none' ? '🔇' : type === 'rain' ? '🌧️' : type === 'wind' ? '🌬️' : '☕'}
                   </button>
                 ))}
               </div>
 
               {isFinishingPart ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
                   <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '10px', padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} />
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
@@ -215,7 +199,7 @@ export const FocusPanel = ({
                   </div>
                 </div>
               ) : lastSession ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
                   <div style={{ fontSize: '10px', color: '#10b981', textAlign: 'center', fontWeight: 'bold' }}>{t('saved')}: {formatTime(lastSession.duration)}</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px' }} onClick={handleConfirmStageDone}>{t('yesDone')}</button>
@@ -223,13 +207,13 @@ export const FocusPanel = ({
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {timerState === 'Idle' && <button className="btn start" style={{ padding: '10px', fontSize: '14px', borderRadius: '6px', width: '100%' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
-                  {timerState === 'Running' && <button className="btn pause" style={{ padding: '10px', fontSize: '14px', borderRadius: '6px', width: '100%' }} onClick={handlePause}>{t('pause')}</button>}
+                <div style={{ display: 'flex', gap: '4px', width: '100%' }}>
+                  {timerState === 'Idle' && <button className="btn start" style={{ padding: '8px', fontSize: '13px', borderRadius: '6px', width: '100%' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+                  {timerState === 'Running' && <button className="btn pause" style={{ padding: '8px', fontSize: '13px', borderRadius: '6px', width: '100%' }} onClick={handlePause}>{t('pause')}</button>}
                   {timerState === 'Paused' && (
                     <>
-                      <button className="btn resume" style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '6px' }} onClick={handleResume}>{t('resume')}</button>
-                      <button className="btn complete" style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '6px' }} onClick={handleComplete}>{t('complete')}</button>
+                      <button className="btn resume" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '6px' }} onClick={handleResume}>{t('resume')}</button>
+                      <button className="btn complete" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '6px' }} onClick={handleComplete}>{t('complete')}</button>
                     </>
                   )}
                 </div>
@@ -237,7 +221,7 @@ export const FocusPanel = ({
             </div>
           </div>
 
-          {/* 右侧：聊天框区域 */}
+          {/* 右侧聊天区 */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             {renderChatHistory(true)}
           </div>
@@ -303,28 +287,82 @@ export const FocusPanel = ({
   }
 
   // ==============================
-  // 🌟 普通网页视图 (PC端左右分栏对调)
+  // 🌟 普通网页视图 (左侧聊天撑满，右侧控制)
   // ==============================
   return (
     <div className="focus-layout">
       
-      {/* 左侧：核心控制区 */}
+      {/* 左侧：陪伴与聊天区 */}
       <div className="focus-left">
+        <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111', flexShrink: 0 }}>
+              <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{username}</span>
+                <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Lv.{level}</span>
+                {equippedTitleDef && (
+                  <span style={{ fontSize: '11px', color: equippedTitleDef.color, background: `${equippedTitleDef.color}20`, padding: '2px 6px', borderRadius: '4px', border: `1px solid ${equippedTitleDef.color}50`, fontWeight: 'bold' }}>
+                    [{t(equippedTitleDef.nameKey)}]
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>🕒 {localTime}</div>
+            </div>
+          </div>
+          
+          <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+            ⏳ {t('today')}: {formatTime(todayTotal)}
+          </div>
+          {!isCheckedIn ? (
+            <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>
+              📅 {isZh ? '打卡' : 'Check-in'}
+            </button>
+          ) : (
+            <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {isZh ? '已打卡' : 'Checked in'} ({checkinStreak}{isZh ? '天' : 'd'})</span>
+          )}
+        </div>
+
+        {/* 🌟 下方使用 flex: 1 撑满容器剩余高度 */}
+        <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {renderChatHistory(false)}
+        </div>
+      </div>
+
+      {/* 右侧：核心控制区 */}
+      <div className="focus-right">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px', flexWrap: 'wrap', width: '100%' }}>
+          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+            📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
+          </button>
+          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+            ⛶ {isZh ? '沉浸模式' : 'Immersive'}
+          </button>
+        </div>
+
         <div className="selector-group" style={{ marginBottom: '20px' }}>
           <div className="selector-row">
-            <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px 14px', borderRadius: '8px', outline: 'none' }}>
+            <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
               {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
             </select>
           </div>
           <div className="selector-row">
-            <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px 14px', borderRadius: '8px', outline: 'none' }}>
+            <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
               {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
             </select>
           </div>
         </div>
 
         <div className="task-header">
-          <div className="task-name" style={{ fontSize: '20px' }}>{currentTaskName}{currentModel?.isRebuilding && <span className="rebuild-badge">🔧 {t('rebuilding')}</span>}</div>
+          <div className="task-name">{currentTaskName}{currentModel?.isRebuilding && <span className="rebuild-badge">🔧 {t('rebuilding')}</span>}</div>
           {currentTask && currentTask.status !== 'Completed' && timerState === 'Idle' && !lastSession && !isFinishingPart && (
              <button className="finish-part-btn" onClick={handleFinishPart}>✓ {t('finishPart')}</button>
           )}
@@ -332,12 +370,11 @@ export const FocusPanel = ({
         <div className={`task-status ${currentTask?.status === 'Completed' ? 'status-completed' : currentTask?.status === 'InProgress' ? 'status-inprogress' : 'status-notstarted'}`}>
           {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
         </div>
-        
         {timerState === 'Idle' && !lastSession && (
-          <div className="timebox-selector" style={{ justifyContent: 'center', margin: '20px 0', flexWrap: 'wrap', gap: '8px' }}>
-            <span className="timebox-label" style={{ fontSize: '14px' }}>{t('timebox')}:</span>
+          <div className="timebox-selector" style={{ justifyContent: 'center', margin: '20px 0', flexWrap: 'wrap', gap: '6px' }}>
+            <span className="timebox-label">{t('timebox')}:</span>
             {[0, 10, 30, 60].map(min => (
-              <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} style={{ padding: '8px 12px', fontSize: '14px' }} onClick={() => handleSetTimeboxTarget(min)}>
+              <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => handleSetTimeboxTarget(min)}>
                 {min === 0 ? t('timeboxNone') : `${min}m`}
               </button>
             ))}
@@ -350,7 +387,7 @@ export const FocusPanel = ({
           <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '14px' }}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
         )}
         
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', margin: '20px 0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', margin: '15px 0', flexWrap: 'wrap' }}>
           {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
             <button
               key={type}
@@ -359,7 +396,7 @@ export const FocusPanel = ({
                 background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', 
                 color: ambientType === type ? '#c4b5fd' : '#888', 
                 border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, 
-                padding: '8px 16px', borderRadius: '20px', fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                padding: '6px 10px', borderRadius: '16px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s',
                 whiteSpace: 'nowrap'
               }}
             >
@@ -409,59 +446,6 @@ export const FocusPanel = ({
           </div>
         )}
         {timerState === 'Running' && <button className="btn complete-outline" style={{ padding: '14px', marginTop: '12px', fontSize: '16px' }} onClick={handleComplete}>{t('complete')}</button>}
-      </div>
-
-      {/* 右侧：陪伴与聊天区 */}
-      <div className="focus-right">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px', flexWrap: 'wrap', width: '100%' }}>
-          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
-            📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
-          </button>
-          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
-            ⛶ {isZh ? '沉浸模式' : 'Immersive'}
-          </button>
-        </div>
-
-        <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111', flexShrink: 0 }}>
-              <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{username}</span>
-                <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Lv.{level}</span>
-                {equippedTitleDef && (
-                  <span style={{ fontSize: '11px', color: equippedTitleDef.color, background: `${equippedTitleDef.color}20`, padding: '2px 6px', borderRadius: '4px', border: `1px solid ${equippedTitleDef.color}50`, fontWeight: 'bold' }}>
-                    [{t(equippedTitleDef.nameKey)}]
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>🕒 {localTime}</div>
-            </div>
-          </div>
-          
-          <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
-          <div style={{ fontSize: '14px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-            ⏳ {t('today')}: {formatTime(todayTotal)}
-          </div>
-          {!isCheckedIn ? (
-            <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>
-              📅 {isZh ? '打卡' : 'Check-in'}
-            </button>
-          ) : (
-            <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {isZh ? '已打卡' : 'Checked in'} ({checkinStreak}{isZh ? '天' : 'd'})</span>
-          )}
-        </div>
-
-        <div style={{ flex: 1, width: '100%' }}>
-          {renderChatHistory(false)}
-        </div>
       </div>
     </div>
   );

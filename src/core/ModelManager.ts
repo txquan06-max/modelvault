@@ -155,6 +155,7 @@ export class ModelManager {
     return { models, count };
   }
 
+  // 🌟 核心重写：整合状态并继承进度
   static startLegacyRebuild(modelId: string, completedStageKeys: string[], isWholeBuild: boolean = false): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
@@ -162,31 +163,53 @@ export class ModelManager {
       model.isRebuilding = true;
       model.status = 'InProgress';
       
-      // 根据用户的选择生成任务
+      const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
+      
+      // 获取最终确定要标记为已完成的阶段
+      let finalCompletedStages: string[] = [];
+      if (legacyTask) {
+        finalCompletedStages = legacyTask.stages.filter(s => completedStageKeys.includes(s.nameKey) || s.nameKey === 'stage_assembly').map(s => s.nameKey);
+      } else {
+        finalCompletedStages = ['stage_assembly'];
+      }
+
       if (isWholeBuild) {
-        // 如果选整体，检查是否已经有 part_whole
-        if (!model.tasks.some(t => t.name === 'part_whole')) {
-           model.tasks.push({ id: crypto.randomUUID(), modelId, name: 'part_whole', status: 'NotStarted', stages: generateStages() });
+        // 整体制作
+        if (legacyTask) {
+          // 直接把 legacy 改名为 whole，无缝继承状态，下拉框里就只有“整体制作”
+          legacyTask.name = 'part_whole';
+          legacyTask.status = 'InProgress';
+          legacyTask.stages.forEach(stage => {
+            stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+          });
+        } else if (!model.tasks.some(t => t.name === 'part_whole')) {
+          // 如果没有 legacy 也没有 whole，就新建
+          const newTaskStages = generateStages();
+          newTaskStages.forEach(stage => {
+            stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+          });
+          model.tasks.push({ id: crypto.randomUUID(), modelId, name: 'part_whole', status: 'InProgress', stages: newTaskStages });
         }
       } else {
-        // 如果选分部位，补齐所有部位
+        // 分部位制作
+        if (legacyTask) {
+          // 删除 legacy 任务，避免出现多余的选项
+          model.tasks = model.tasks.filter(t => t.id !== legacyTask.id);
+        }
+        
         DEFAULT_TASK_KEYS.forEach(key => {
           if (!model.tasks.some(t => t.name === key)) {
-            model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() });
+            const newTaskStages = generateStages();
+            newTaskStages.forEach(stage => {
+              stage.status = finalCompletedStages.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+            });
+            // 如果素组已完成，就把状态设为 InProgress，否则 NotStarted
+            const taskStatus = finalCompletedStages.includes('stage_assembly') ? 'InProgress' : 'NotStarted';
+            model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: taskStatus, stages: newTaskStages });
           }
         });
       }
-
-      // 更新历史任务的阶段进度
-      const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
-      if (legacyTask) {
-        legacyTask.status = 'InProgress';
-        legacyTask.stages.forEach(stage => {
-          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
-        });
-        const assembly = legacyTask.stages.find(s => s.nameKey === 'stage_assembly');
-        if (assembly) assembly.status = 'Completed';
-      }
+      
       this.saveModels(models);
     }
     return models;
@@ -210,7 +233,11 @@ export class ModelManager {
     if (model) {
       model.tasks.forEach(task => {
         task.stages.forEach(stage => {
-          stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+          if (stage.nameKey === 'stage_assembly') {
+            stage.status = 'Completed';
+          } else {
+            stage.status = completedStageKeys.includes(stage.nameKey) ? 'Completed' : 'NotStarted';
+          }
         });
       });
       this.saveModels(models);

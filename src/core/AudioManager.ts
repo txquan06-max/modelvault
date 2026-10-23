@@ -27,7 +27,9 @@ export class AudioManager {
   private static currentPack = 'glass';
   private static ctx: AudioContext | null = null;
   
-  // 🌟 新增：环境音状态
+  // 🌟 新增：点击音效节流锁
+  private static lastClickTime = 0; 
+
   private static ambientSource: AudioBufferSourceNode | null = null;
   private static ambientGain: GainNode | null = null;
   private static currentAmbient: AmbientType = 'none';
@@ -92,7 +94,14 @@ export class AudioManager {
     ui.play(CUE_MAP[type] as any);
   }
 
-  static playClick() { this.play('click'); }
+  // 🌟 核心修复：加入 50ms 节流
+  static playClick() { 
+    const now = Date.now();
+    if (now - this.lastClickTime < 50) return;
+    this.lastClickTime = now;
+    this.play('click'); 
+  }
+  
   static playStart() { this.play('start'); }
   static playPause() { this.play('pause'); }
   static playComplete() { this.play('complete'); }
@@ -121,7 +130,7 @@ export class AudioManager {
   }
 
   // ==========================================
-  // 🌟 新增：环境白噪音引擎 (纯代码合成)
+  // 环境白噪音引擎 (纯代码合成)
   // ==========================================
   
   static playAmbient(type: AmbientType) {
@@ -133,7 +142,6 @@ export class AudioManager {
 
     try {
       const ctx = this.getCtx();
-      // 生成 2 秒的噪音 buffer
       const bufferSize = ctx.sampleRate * 2; 
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -142,17 +150,14 @@ export class AudioManager {
       for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
         if (type === 'rain') {
-          // 雨声：粉红噪音（低频更多）
           output[i] = (lastOut + (0.02 * white)) / 1.02;
           lastOut = output[i];
           output[i] *= 3.5; 
         } else if (type === 'wind') {
-          // 风声：经过平滑的布朗噪音
           output[i] = (lastOut + (0.05 * white)) / 1.05;
           lastOut = output[i];
           output[i] *= 2.0;
         } else {
-          // 咖啡馆：轻微的白噪音
           output[i] = white * 0.3;
         }
       }
@@ -161,13 +166,12 @@ export class AudioManager {
       this.ambientSource.buffer = noiseBuffer;
       this.ambientSource.loop = true;
 
-      // 滤波器微调，让声音更自然
       const filter = ctx.createBiquadFilter();
       filter.type = type === 'rain' ? 'lowpass' : 'bandpass';
       filter.frequency.value = type === 'rain' ? 800 : 400;
 
       this.ambientGain = ctx.createGain();
-      this.ambientGain.gain.value = 0.2; // 默认音量 20%
+      this.ambientGain.gain.value = 0.2; 
 
       this.ambientSource.connect(filter);
       filter.connect(this.ambientGain);

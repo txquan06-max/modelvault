@@ -34,7 +34,6 @@ export const ModelDetail = (props: any) => {
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
 
-  // 判断是否为需要改造的历史模型
   const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
 
   useEffect(() => {
@@ -65,14 +64,34 @@ export const ModelDetail = (props: any) => {
       {isEditingCover && (
         <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '上传/修改模型封面' : 'Upload/Modify Cover'}</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {isZh ? '上传图片' : 'Upload'}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
+          
+          {/* 🌟 新增：格纳库裁剪预览框 */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ 
+              width: '140px', 
+              aspectRatio: '4 / 3', 
+              backgroundImage: viewingModel.coverImage ? `url(${viewingModel.coverImage})` : 'none', 
+              backgroundColor: '#333',
+              backgroundSize: 'cover', 
+              backgroundPosition: 'center', 
+              borderRadius: '6px', 
+              border: '1px solid #555',
+              flexShrink: 0
+            }}>
+              {!viewingModel.coverImage && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>No Image</div>}
+            </div>
+            <div style={{ fontSize: '11px', color: '#aaa', lineHeight: 1.5 }}>
+              {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。如果被裁切过多，建议更换横屏图片。' : 'This is how it looks in the Hangar (4:3). If too cropped, try a landscape photo.'}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {isZh ? '上传新图片' : 'Upload'}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
             <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>{isZh ? '取消' : 'Cancel'}</button>
           </div>
         </div>
       )}
 
-      {/* 🌟 全局改造入口 */}
       {needsRebuild && !isEditingImportedStatus && (
         <button 
           className="btn start" 
@@ -135,7 +154,6 @@ export const ModelDetail = (props: any) => {
 
       <div className="timeline-container" style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
-          // 🌟 如果是需要改造的模型，暂时不显示新部位，只显示历史记录
           if (needsRebuild && task.name !== 'part_legacy') return null;
 
           const taskSessions = allSessions.filter((s: any) => s.taskId === task.id);
@@ -145,7 +163,6 @@ export const ModelDetail = (props: any) => {
           
           return (
             <div key={task.id} className="timeline-item">
-              {/* 🌟 修复 UI 挤压：使用 flex 布局，增加 padding 和 gap */}
               <div 
                 className="timeline-header" 
                 style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
@@ -178,7 +195,6 @@ export const ModelDetail = (props: any) => {
                     );
                   })}
                   
-                  {/* 🌟 去专注按钮（只对非 legacy 或已改造的任务显示） */}
                   {(!needsRebuild || task.name !== 'part_legacy') && (
                     <button 
                       className="mini-btn" 

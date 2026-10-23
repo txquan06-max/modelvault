@@ -735,7 +735,8 @@ function App() {
     if (isWeChat) { showToast(isZh ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.'); return; }
     if (!('documentPictureInPicture' in window)) { showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 320, height: 480 });
+      // 🌟 改为 1:1 比例
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 450, height: 450 });
       [...document.styleSheets].forEach((styleSheet) => {
         try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
         catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
@@ -744,7 +745,7 @@ function App() {
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
     } catch (err) { console.error(err); showToast(isZh ? '画中画打开失败' : 'Failed to open PiP'); }
   };
-
+  
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
   
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 

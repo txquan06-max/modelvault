@@ -13,7 +13,12 @@ export const FocusPanel = ({
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
   currentBot, chatMessages,
   ambientType, setAmbientType, handleOpenPiP,
-  equippedTitleDef
+  equippedTitleDef,
+  // 添加模型/部位相关
+  isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
+  newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
+  newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
+  newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild
 }: any) => {
   
   const [charIndex, setCharIndex] = useState(0);
@@ -22,13 +27,11 @@ export const FocusPanel = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastMsgIdRef = useRef<string | null>(null);
   
-  // 🌟 新增：悬浮窗布局位置 (localStorage 读取)
   const [pipLayout, setPipLayout] = useState<'left' | 'right'>(() => {
     return (localStorage.getItem('mv_pip_layout') as 'left' | 'right') || 'left';
   });
-  
-  // 🌟 新增：实时本地时间
   const [localTime, setLocalTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  
   useEffect(() => {
     const timer = setInterval(() => {
       setLocalTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -164,24 +167,19 @@ export const FocusPanel = ({
   );
 
   // ==============================
-  // 🌟 悬浮窗视图 (支持左右切换)
+  // 🌟 悬浮窗视图
   // ==============================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
         
-        {/* 顶部：本地时间 & 切换按钮 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#888', fontWeight: 'bold' }}>
             🕒 {localTime}
           </div>
           <button 
             onClick={togglePipLayout} 
-            style={{ 
-              background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', 
-              color: '#fff', padding: '2px 6px', borderRadius: '4px', 
-              cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s' 
-            }}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s' }}
             title={isZh ? "切换左右布局" : "Switch Layout"}
           >
             ⇄
@@ -373,16 +371,81 @@ export const FocusPanel = ({
       </div>
 
       {/* 右侧：核心控制区 */}
-      <div className="focus-right">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px', flexWrap: 'wrap', width: '100%' }}>
-          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
-            📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
-          </button>
-          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
-            ⛶ {isZh ? '沉浸模式' : 'Immersive'}
-          </button>
+      <div className="focus-right" style={{ overflowY: 'auto' }}>
+        {/* 1. 顶部按钮区 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px', width: '100%' }}>
+          <div className="add-controls" style={{ marginBottom: 0 }}>
+            <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
+            <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+            <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+              📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
+            </button>
+            <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+              ⛶ {isZh ? '沉浸模式' : 'Immersive'}
+            </button>
+          </div>
         </div>
 
+        {/* 2. 添加模型/部位的弹出表单 */}
+        {isAddingModel && (
+          <div className="inline-form vertical-form" style={{ position: 'relative', marginBottom: '16px' }}>
+            <div className="search-autocomplete">
+              <input id="new-model-name" autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} onFocus={handleFocus} />
+              {searchResults.length > 0 && (
+                <div className="autocomplete-dropdown">
+                  {searchResults.map((item: any, idx: number) => {
+                    const displayName = isZh ? item.name.zh : item.name.en;
+                    const displaySeries = isZh ? item.series.zh : item.series.en;
+                    return (
+                      <div key={idx} className="autocomplete-item" onClick={() => { AudioManager.playClick(); setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="ac-grade">{item.grade}</span><strong style={{ color: '#fff' }}>{displayName}</strong></div>
+                        <div className="ac-series">| {displaySeries}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <select id="new-model-grade" value={newModelGrade} onChange={e => { AudioManager.playClick(); setNewModelGrade(e.target.value); }}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+            <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} onFocus={handleFocus} />
+            
+            <label className="checkbox-label">
+              <input type="checkbox" checked={useDefaultTasks} onChange={e => { AudioManager.playClick(); setUseDefaultTasks(e.target.checked); }} />
+              {t('useDefaultTasks')}
+            </label>
+
+            {useDefaultTasks && (
+              <label className="checkbox-label">
+                <input type="checkbox" checked={isWholeBuild} onChange={e => { AudioManager.playClick(); setIsWholeBuild(e.target.checked); }} />
+                {t('whole_build')}
+              </label>
+            )}
+
+            <div style={{display:'flex', gap:'8px', width:'100%', marginTop: '8px'}}>
+              <button className="btn start" style={{flex: 1, padding: '8px'}} onClick={handleAddModel}>{t('save')}</button>
+              <button className="btn no" style={{flex: 1, padding: '8px'}} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
+            </div>
+          </div>
+        )}
+
+        {isAddingTask && (
+          <div className="inline-form" style={{ marginBottom: '16px' }}>
+            <input id="new-task-name" autoFocus placeholder={t('taskName')} value={newTaskName} onChange={e => setNewTaskName(e.target.value)} onKeyDown={e => {
+              if (e.key === 'Enter' && newTaskName.trim()) {
+                AudioManager.playClick();
+                handleAddTask(newTaskName.trim());
+                setNewTaskName(''); 
+                setIsAddingTask(false);
+              }
+            }} onFocus={handleFocus} />
+            <button onClick={() => { AudioManager.playClick(); setIsAddingTask(false); }}>{t('cancel')}</button>
+          </div>
+        )}
+
+        {/* 3. 选择器、任务、计时器等 */}
         <div className="selector-group" style={{ marginBottom: '20px' }}>
           <div className="selector-row">
             <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
@@ -405,11 +468,12 @@ export const FocusPanel = ({
         <div className={`task-status ${currentTask?.status === 'Completed' ? 'status-completed' : currentTask?.status === 'InProgress' ? 'status-inprogress' : 'status-notstarted'}`}>
           {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
         </div>
+        
         {timerState === 'Idle' && !lastSession && (
-          <div className="timebox-selector" style={{ justifyContent: 'center', margin: '20px 0', flexWrap: 'wrap', gap: '6px' }}>
-            <span className="timebox-label">{t('timebox')}:</span>
+          <div className="timebox-selector" style={{ justifyContent: 'center', margin: '20px 0', flexWrap: 'wrap', gap: '8px' }}>
+            <span className="timebox-label" style={{ fontSize: '14px' }}>{t('timebox')}:</span>
             {[0, 10, 30, 60].map(min => (
-              <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} onClick={() => handleSetTimeboxTarget(min)}>
+              <button key={min} className={`timebox-btn ${timeboxTarget === min * 60 ? 'active' : ''}`} style={{ padding: '8px 14px', fontSize: '14px', fontWeight: 'bold' }} onClick={() => handleSetTimeboxTarget(min)}>
                 {min === 0 ? t('timeboxNone') : `${min}m`}
               </button>
             ))}
@@ -422,7 +486,7 @@ export const FocusPanel = ({
           <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '14px' }}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
         )}
         
-        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', margin: '15px 0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '15px 0', flexWrap: 'wrap' }}>
           {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
             <button
               key={type}
@@ -431,7 +495,7 @@ export const FocusPanel = ({
                 background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', 
                 color: ambientType === type ? '#c4b5fd' : '#888', 
                 border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, 
-                padding: '6px 10px', borderRadius: '16px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s',
+                padding: '8px 14px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s',
                 whiteSpace: 'nowrap'
               }}
             >

@@ -602,21 +602,10 @@ function App() {
     triggerAutoBackup();
   };
 
-  // 🌟 拦截重复添加模型
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
-    
-    // 检查是否存在同名且同级别的模型
-    const isDuplicate = models.some(m => 
-      (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade === newModelGrade
-    );
-    if (isDuplicate) {
-      showToast(isZh ? '该模型已在你的列表中，请勿重复添加！' : 'This model already exists in your list!');
-      return;
-    }
-
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);

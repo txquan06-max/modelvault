@@ -1,5 +1,26 @@
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
+import { StorageManager } from '../core/StorageManager';
+import { useEffect, useState } from 'react';
+
+const LocalHero = ({ image, children, onClick }: { image: string, children: React.ReactNode, onClick: () => void }) => {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (image?.startsWith('local://')) {
+      let objUrl: string | null = null;
+      StorageManager.loadLocalFileUrl(image).then(res => { if (res) { objUrl = res; setUrl(res); } });
+      return () => { if (objUrl) URL.revokeObjectURL(objUrl); };
+    } else {
+      setUrl(image);
+    }
+  }, [image]);
+
+  return (
+    <div className="detail-hero" style={{ backgroundImage: url ? `url(${url})` : 'none', cursor: 'pointer' }} onClick={onClick}>
+      {children}
+    </div>
+  );
+};
 
 export const ModelDetail = (props: any) => {
   const {
@@ -9,37 +30,50 @@ export const ModelDetail = (props: any) => {
     handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, generateShareCard
   } = props;
 
+  const isZh = i18n.language === 'zh';
+
+  // 🌟 当用户点击“开始改造”时，自动滚动到录入表单
+  useEffect(() => {
+    if (isEditingImportedStatus) {
+      setTimeout(() => {
+        const el = document.getElementById('imported-status-form');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [isEditingImportedStatus]);
+
   return (
     <div className="detail-view">
-      <div className="detail-hero" style={{ backgroundImage: viewingModel.coverImage ? `url(${viewingModel.coverImage})` : 'none' }}>
+      <LocalHero image={viewingModel.coverImage} onClick={() => setIsEditingCover(true)}>
         <div className="detail-hero-info">
-          <div className="detail-title">{i18n.language === 'zh' ? viewingModel.name.zh : viewingModel.name.en}</div>
+          <div className="detail-title">{isZh ? viewingModel.name.zh : viewingModel.name.en}</div>
           <div className="detail-subtitle">
-            <span>{viewingModel.grade} | {i18n.language === 'zh' ? viewingModel.series.zh : viewingModel.series.en}</span>
+            <span>{viewingModel.grade} | {isZh ? viewingModel.series.zh : viewingModel.series.en}</span>
             <span>Total: {formatTime(viewingModelTotalSec)}</span>
           </div>
         </div>
-        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10, background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => setIsEditingCover(true)}>
+        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10, background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ fontSize: '14px' }}>📷</span>
-          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>封面</span>
+          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>{isZh ? '封面' : 'Cover'}</span>
         </div>
-      </div>
+      </LocalHero>
 
       {isEditingCover && (
         <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#ccc' }}>上传/修改模型封面</span>
+          <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '上传/修改模型封面' : 'Upload/Modify Cover'}</span>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 上传图片<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
-            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>取消</button>
+            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {isZh ? '上传图片' : 'Upload'}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
+            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>{isZh ? '取消' : 'Cancel'}</button>
           </div>
         </div>
       )}
 
+      {/* 🌟 增加 id 用于定位滚动 */}
       {isEditingImportedStatus && (
-        <div className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
-          <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 历史模型进度录入</h4>
+        <div id="imported-status-form" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
+          <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 {isZh ? '历史模型进度录入' : 'Legacy Model Progress'}</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#ccc' }}>勾选你当时已经完成的流程：</span>
+            <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '勾选你当时已经完成的流程：' : 'Check completed stages:'}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
               {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
                 <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
@@ -49,8 +83,8 @@ export const ModelDetail = (props: any) => {
               ))}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn start" style={{ flex: 1, padding: '6px' }} onClick={handleConfirmRebuild}>确认并开始改造</button>
-              <button className="btn no" style={{ flex: 1, padding: '6px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>取消</button>
+              <button className="btn start" style={{ flex: 1, padding: '8px' }} onClick={handleConfirmRebuild}>{isZh ? '确认并开始改造' : 'Confirm & Start Rebuild'}</button>
+              <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>{isZh ? '取消' : 'Cancel'}</button>
             </div>
           </div>
         </div>
@@ -58,10 +92,10 @@ export const ModelDetail = (props: any) => {
 
       {showRebuildConfirm && (
         <div className="inline-confirm" style={{ border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-          <div className="confirm-text" style={{ fontSize: '14px' }}>改造状态已激活！<br/><span>是否直接跳转至专注页面开始制作？</span></div>
+          <div className="confirm-text" style={{ fontSize: '14px' }}>{isZh ? '改造状态已激活！' : 'Rebuild activated!'}<br/><span>{isZh ? '是否直接跳转至专注页面开始制作？' : 'Jump to focus page now?'}</span></div>
           <div className="confirm-actions">
-            <button className="btn yes" onClick={handleDoRebuild}>是，前往专注</button>
-            <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>留在详情页</button>
+            <button className="btn yes" onClick={handleDoRebuild}>{isZh ? '是，前往专注' : 'Yes, go to Focus'}</button>
+            <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>{isZh ? '留在详情页' : 'Stay here'}</button>
           </div>
         </div>
       )}
@@ -94,7 +128,7 @@ export const ModelDetail = (props: any) => {
                   ))}
                   <button className="mini-btn" style={{ width: '100%', marginTop: '8px', background: '#3b82f6', color: '#fff', border: 'none', padding: '8px' }}
                     onClick={() => { if (viewingModel.isImported && !viewingModel.isRebuilding) handleStartRebuild(task.id); else handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
-                    {viewingModel.isImported && !viewingModel.isRebuilding ? `🔧 开始继续改造` : `⏱ ${t('focus')}`}
+                    {viewingModel.isImported && !viewingModel.isRebuilding ? (isZh ? `🔧 开始继续改造` : `🔧 Start Rebuild`) : (isZh ? `⏱ 去专注` : `⏱ Focus`)}
                   </button>
                 </div>
               )}
@@ -104,7 +138,7 @@ export const ModelDetail = (props: any) => {
       </div>
 
       <button className="btn start" style={{ width: '100%', marginTop: '16px', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px' }} onClick={() => generateShareCard(viewingModel, viewingModelTotalSec)}>
-        📸 {i18n.language === 'zh' ? '生成专属战报' : 'Generate Build Report'}
+        📸 {isZh ? '生成专属战报' : 'Generate Build Report'}
       </button>
     </div>
   );

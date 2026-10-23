@@ -730,6 +730,29 @@ function App() {
   const generateShareCard = async (model: Model, totalTime: number) => {
     AudioManager.playClick();
     showToast(isZh ? '🎨 正在渲染专属战报...' : '🎨 Rendering report...');
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let newWindow: Window | null = null;
+
+    // 🌟 核心修复：如果是移动端，必须在用户点击的"同步"瞬间打开新窗口，否则 100% 会被浏览器拦截
+    if (isMobile) {
+      newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`
+          <html><head><title>${isZh ? '正在生成...' : 'Generating...'}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+          <body style="background:#1e1e1e;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">
+            <div style="text-align:center;">
+              <div style="font-size:40px;margin-bottom:20px;">⏳</div>
+              <p>${isZh ? '正在生成战报，请稍候...' : 'Generating report, please wait...'}</p>
+            </div>
+          </body></html>
+        `);
+      } else {
+        showToast(isZh ? '❌ 浏览器拦截了新窗口，请允许弹窗' : '❌ Popup blocked, please allow popups');
+        return;
+      }
+    }
+
     try {
       const canvas = document.createElement('canvas');
       canvas.width = 800; canvas.height = 1000;
@@ -749,9 +772,11 @@ function App() {
             if (blobUrl) imgUrl = blobUrl;
           }
           
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
+          // 🌟 增加 2 秒超时保护，防止某些图片加载卡死导致整个战报生成永久挂起
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Image load timeout')), 2000);
+            img.onload = () => { clearTimeout(timeout); resolve(); };
+            img.onerror = () => { clearTimeout(timeout); reject(new Error('Image load error')); };
             img.src = imgUrl;
           });
 
@@ -762,7 +787,7 @@ function App() {
           
           ctx.fillStyle = 'rgba(9, 9, 11, 0.85)'; 
           ctx.fillRect(0, 0, 800, 1000);
-        } catch (e) { console.log('Background img load failed', e); }
+        } catch (e) { console.warn('背景图加载失败或超时，使用纯黑底色', e); }
       }
 
       ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)'; 
@@ -822,31 +847,20 @@ function App() {
 
       const url = canvas.toDataURL('image/jpeg', 0.9);
       
-      // 🌟 判断是否为移动端设备
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        // 移动端：打开新页面显示图片让用户长按保存（避免直接下载被拦截）
-        const newWindow = window.open();
-        if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head>
-                <title>战报 - ModelJourney</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              </head>
-              <body style="margin:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;">
-                <img src="${url}" style="max-width:100%;max-height:85vh;box-shadow:0 10px 30px rgba(0,0,0,0.5);" />
-                <p style="color:#fff;margin-top:20px;font-family:sans-serif;font-size:16px;font-weight:bold;">📸 ${isZh ? '请长按图片保存到相册' : 'Long press to save image'}</p>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
-        } else {
-          showToast(isZh ? '浏览器拦截了新窗口，请允许弹窗' : 'Popup blocked');
-        }
+      if (isMobile && newWindow) {
+        // 替换之前生成的空白页
+        newWindow.document.open();
+        newWindow.document.write(`
+          <html>
+            <head><title>战报 - ModelJourney</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="margin:0;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;">
+              <img src="${url}" style="max-width:100%;max-height:85vh;box-shadow:0 10px 30px rgba(0,0,0,0.5);" />
+              <p style="color:#fff;margin-top:20px;font-family:sans-serif;font-size:16px;font-weight:bold;">📸 ${isZh ? '请长按图片保存到相册' : 'Long press to save image'}</p>
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
       } else {
-        // PC端：直接下载
         const a = document.createElement('a'); 
         a.href = url; 
         a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; 
@@ -854,8 +868,11 @@ function App() {
         showToast(isZh ? '✅ 战报已保存' : '✅ Report saved!');
       }
     } catch (err) {
-      console.error(err);
+      console.error('生成战报失败:', err);
       showToast(isZh ? '❌ 生成战报失败，请重试' : '❌ Failed to generate report');
+      if (newWindow) {
+        newWindow.document.body.innerHTML = `<h2 style="color:red;text-align:center;margin-top:50px;">${isZh ? '生成失败，请关闭重试' : 'Failed, please close and try again'}</h2>`;
+      }
     }
   };
 

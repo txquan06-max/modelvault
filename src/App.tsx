@@ -407,11 +407,7 @@ function App() {
       setUnlockedBots(newUnlocked);
       localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
       AudioManager.playAchievement(); refreshData();
-      
-      showToast(i18n.language === 'zh' 
-        ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` 
-        : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`
-      );
+      showToast(i18n.language === 'zh' ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`);
     }
   };
 
@@ -610,22 +606,15 @@ function App() {
 
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
   
-  // 🌟 修复 TS 报错的 importData
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
     const file = e.target.files?.[0]; if (!file) return; AudioManager.playClick();
     const reader = new FileReader(); 
-    // 1. 将 onload 回调改为 async
     reader.onload = async (event) => { 
       try { 
         const data = JSON.parse(event.target?.result as string); 
-        // 2. 加上 await
         const success = await StorageManager.importAll(data); 
-        if (success) { 
-          showToast(t('importSuccess')); 
-          setTimeout(() => window.location.reload(), 1000); 
-        } else {
-          showToast(t('importError')); 
-        }
+        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); } 
+        else showToast(t('importError')); 
       } catch (err) { showToast(t('importError')); } 
     }; 
     reader.readAsText(file); e.target.value = ''; 
@@ -637,39 +626,114 @@ function App() {
   const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); };
 
+  // 🌟 战报大升级：赛博机甲风
   const generateShareCard = async (model: Model, totalTime: number) => {
     AudioManager.playClick();
+    showToast('🎨 正在渲染专属战报...');
+    
     const canvas = document.createElement('canvas');
     canvas.width = 800; canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, 800, 1000);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-    for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
-    
-    ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ModelVault', 400, 80);
-    ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '我的拼装战报' : 'My Build Report', 400, 120);
-    
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 42px sans-serif'; ctx.fillText(i18n.language === 'zh' ? model.name.zh : model.name.en, 400, 560);
-    ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 28px sans-serif'; ctx.fillText(`${model.grade}  |  ${i18n.language === 'zh' ? model.series.zh : model.series.en}`, 400, 610);
-    ctx.fillStyle = '#10b981'; ctx.font = 'bold 64px monospace'; ctx.fillText(formatTime(totalTime), 400, 700);
-    ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '总专注时长' : 'Total Focus Time', 400, 745);
-    
-    ctx.fillStyle = '#555'; ctx.font = '20px sans-serif'; 
-    ctx.fillText(i18n.language === 'zh' ? '用热爱与耐心，铸造属于你的杰作。' : 'Built with love and patience.', 400, 830);
 
+    // 1. 绘制背景色
+    ctx.fillStyle = '#09090b'; 
+    ctx.fillRect(0, 0, 800, 1000);
+
+    // 2. 绘制封面图作为暗色背景
+    if (model.coverImage) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        let imgUrl = model.coverImage;
+        if (imgUrl.startsWith('local://')) {
+          const blobUrl = await StorageManager.loadLocalFileUrl(imgUrl);
+          if (blobUrl) imgUrl = blobUrl;
+        }
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = imgUrl;
+        });
+
+        // 保持比例截取铺满
+        const scale = Math.max(800 / img.width, 1000 / img.height);
+        const w = img.width * scale; const h = img.height * scale;
+        const x = (800 - w) / 2; const y = (1000 - h) / 2;
+        ctx.drawImage(img, x, y, w, h);
+        
+        // 叠加一层深色半透明遮罩，让文字清晰
+        ctx.fillStyle = 'rgba(9, 9, 11, 0.85)'; 
+        ctx.fillRect(0, 0, 800, 1000);
+      } catch (e) { console.log('背景图加载失败，使用纯黑底色'); }
+    }
+
+    // 3. 绘制赛博网格
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)'; 
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); }
+    for (let i = 0; i < 1000; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
+
+    // 4. 顶部装饰线
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(50, 80, 6, 40);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('MODELVAULT // 战报', 70, 110);
+
+    // 5. 绘制模型信息
+    ctx.fillStyle = '#fff'; 
+    ctx.font = 'bold 48px sans-serif'; 
+    ctx.textAlign = 'center'; 
+    ctx.fillText(i18n.language === 'zh' ? model.name.zh : model.name.en, 400, 600);
+    
+    ctx.fillStyle = '#3b82f6'; 
+    ctx.font = 'bold 24px monospace'; 
+    ctx.fillText(`[ ${model.grade} | ${i18n.language === 'zh' ? model.series.zh : model.series.en} ]`, 400, 650);
+
+    // 6. 绘制核心时长数据
+    ctx.fillStyle = '#10b981'; 
+    ctx.font = 'bold 80px monospace'; 
+    ctx.fillText(formatTime(totalTime), 400, 760);
+    ctx.fillStyle = '#888'; 
+    ctx.font = '18px monospace'; 
+    ctx.fillText(i18n.language === 'zh' ? 'TOTAL FOCUS TIME' : 'TOTAL FOCUS TIME', 400, 790);
+
+    // 7. 绘制机师与塑灵信息
     const activeBotData = BOTS[currentBot];
     const botName = i18n.language === 'zh' ? activeBotData.name : activeBotData.enName;
-    ctx.fillStyle = '#888'; ctx.font = 'italic 20px sans-serif';
-    ctx.fillText(
-      i18n.language === 'zh' ? `由塑灵【${botName}】见证并记录` : `Witnessed by Animold [${botName}]`, 
-      400, 920
-    );
+    const title = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
+    const titleName = title ? t(title.nameKey) : '新晋胶佬';
 
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(50, 850, 700, 80);
+    
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`机师: ${username} (Lv.${level})`, 70, 880);
+    
+    ctx.fillStyle = '#888';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(`称号: ${titleName}`, 70, 910);
+
+    ctx.fillStyle = activeBotData.color;
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`由塑灵【${botName}】见证并记录`, 730, 890);
+    
+    // 8. 底部水印
+    ctx.fillStyle = '#555';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Generated by ModelVault / ModelJourney - ${new Date().toLocaleDateString()}`, 400, 970);
+
+    // 导出并下载
     const url = canvas.toDataURL('image/jpeg', 0.9);
     const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
-    showToast('✅ 战报已保存到相册/下载');
+    showToast('✅ 机甲大片战报已保存到相册/下载');
   };
 
   const getHistoryLogs = () => { 
@@ -707,7 +771,9 @@ function App() {
     setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     chatMessages,
-    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted
+    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
+    // 🌟 补充 HangarView 需要的参数
+    setActiveTab
   };
 
   return (
@@ -784,7 +850,7 @@ function App() {
           <>
             {activeTab === 'focus' && <FocusView {...commonProps} />}
             {activeTab === 'journal' && <JournalView {...commonProps} />}
-            {activeTab === 'hangar' && <HangarView {...commonProps} completedModels={ModelManager.getCompletedModels()} setViewingModelId={setViewingModelId} setExpandedTaskId={setExpandedTaskId} />}
+            {activeTab === 'hangar' && <HangarView {...commonProps} />}
             {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
             {activeTab === 'profile' && <ProfileView {...commonProps} />}
           </>

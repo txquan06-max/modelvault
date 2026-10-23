@@ -1,7 +1,6 @@
-// src/components/FocusPanel.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
-import { BOTS, type BotType } from '../core/QuoteEngine';
+import { BOTS, type BotType } from '../core/QuoteEngine'; 
 
 export const FocusPanel = ({
   isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -11,21 +10,21 @@ export const FocusPanel = ({
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
-  currentBot, chatMessages // 🌟 从 props 接收全局消息
+  currentBot, chatMessages 
 }: any) => {
   
-  // 🌟 仅保留打字机动画状态
   const [charIndex, setCharIndex] = useState(0);
+  // 🌟 新增：沉浸模式状态
+  const [isImmersive, setIsImmersive] = useState(false);
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastMsgIdRef = useRef<string | null>(null);
-  const botData = BOTS[currentBot as keyof typeof BOTS];
+  
+  const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
-  // 🌟 打字机动画逻辑
   useEffect(() => {
     const lastMsg = chatMessages[chatMessages.length - 1];
     if (!lastMsg) return;
-    
     if (lastMsgIdRef.current === lastMsg.id) return;
     lastMsgIdRef.current = lastMsg.id;
 
@@ -38,7 +37,6 @@ export const FocusPanel = ({
     typingRef.current = setInterval(() => {
       currentIdx++;
       setCharIndex(currentIdx);
-      
       if (currentIdx < textLength) {
         if (currentIdx % 3 === 0) AudioManager.playTypeTick(); 
       } else {
@@ -68,19 +66,17 @@ export const FocusPanel = ({
             let width = img.width; let height = img.height;
             if (width > 800) { height = Math.round((height * 800) / width); width = 800; }
             canvas.width = width; canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
+            canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
             setFinishPartPhoto(canvas.toDataURL('image/jpeg', 0.6));
           };
         };
-      } catch (err) { showToast(t('imageProcessingFailed') || 'Image processing failed'); }
+      } catch (err) { showToast('图片处理失败'); }
     }
     e.target.value = '';
   };
 
   const pipClass = `pip-container ${timerState === 'Running' ? 'pip-running' : ''}`;
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
-  const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const renderChatHistory = (isPipView: boolean) => (
     <div style={{ 
@@ -88,47 +84,31 @@ export const FocusPanel = ({
       border: `1px solid ${botData.color}50`, 
       borderRadius: '16px', 
       padding: '12px 16px', 
-      display: 'flex', 
-      flexDirection: 'column',
-      justifyContent: 'flex-end', 
-      gap: '12px',
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '12px',
       boxShadow: `0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px ${botData.color}15`,
-      backdropFilter: 'blur(12px)',
-      transition: 'all 0.3s',
+      backdropFilter: 'blur(12px)', transition: 'all 0.3s',
       flex: isPipView ? 'none' : 1,
       height: isPipView ? '120px' : '220px', 
-      overflow: 'hidden', 
-      position: 'relative',
+      overflow: 'hidden', position: 'relative',
       maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)',
       WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)'
     }}>
       {chatMessages.map((msg: any, idx: number) => {
         const isLatest = idx === chatMessages.length - 1;
-        const msgBotData = BOTS[msg.botId as BotType] || BOTS['tu'];
+        const msgBotData = BOTS[msg.botId as BotType] || BOTS['tu']; 
         const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
-        
         const displayTxt = isLatest ? msg.text.slice(0, charIndex) : msg.text;
         
         return (
           <div key={msg.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <div style={{ 
-              width: isPipView ? '24px' : '32px', 
-              height: isPipView ? '24px' : '32px', 
-              borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-              border: `2px solid ${msgBotData.color}`, boxShadow: `0 0 8px ${msgBotData.color}60`,
-              background: '#111'
-            }}>
+            <div style={{ width: isPipView ? '24px' : '32px', height: isPipView ? '24px' : '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: `2px solid ${msgBotData.color}`, boxShadow: `0 0 8px ${msgBotData.color}60`, background: '#111' }}>
               <img src={msgBotData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ flex: 1, marginTop: '2px' }}>
-              <div style={{ color: msgBotData.color, fontWeight: 'bold', fontSize: isPipView ? '11px' : '13px', marginBottom: '4px' }}>
-                {msgBotName}
-              </div>
+              <div style={{ color: msgBotData.color, fontWeight: 'bold', fontSize: isPipView ? '11px' : '13px', marginBottom: '4px' }}>{msgBotName}</div>
               <div style={{ fontSize: isPipView ? '12px' : '14px', color: '#e2e8f0', lineHeight: '1.5', fontFamily: 'system-ui, -apple-system, sans-serif', wordBreak: 'break-word' }}>
                 {displayTxt}
-                {isLatest && charIndex < msg.text.length && (
-                  <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>
-                )}
+                {isLatest && charIndex < msg.text.length && <span style={{ animation: 'pulse 1s infinite', color: msgBotData.color, fontWeight: 'bold' }}>_</span>}
               </div>
             </div>
           </div>
@@ -170,16 +150,6 @@ export const FocusPanel = ({
                     ))}
                   </div>
                 )}
-                
-                {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: '4px' }}>
-                    {currentTask.stages.map((stage: any) => (
-                      <button key={stage.id} style={{ background: stage.id === currentStageId ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: 'none', padding: '4px 6px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
-                        {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -211,7 +181,6 @@ export const FocusPanel = ({
                     )}
                   </div>
                 )}
-
                 {renderChatHistory(true)}
               </div>
             </>
@@ -221,17 +190,53 @@ export const FocusPanel = ({
     );
   }
 
+  // 🌟 沉浸模式 UI 渲染
+  if (isImmersive) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.5s ease-out' }}>
+        {/* 呼吸光晕背景 */}
+        <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
+        
+        <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '30px', right: '30px', background: 'transparent', border: 'none', color: '#666', fontSize: '24px', cursor: 'pointer' }}>✕</button>
+
+        <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ color: botData.color, fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px', opacity: 0.8 }}>
+            {currentModel ? getModelName(currentModel) : ''} - {currentTaskName}
+          </div>
+          
+          <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '120px', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>
+            {formatTime(activeSeconds)}
+          </div>
+
+          <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+             {timerState === 'Idle' && <button className="btn start" style={{ width: '160px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
+             {timerState === 'Running' && <button className="btn pause" style={{ width: '160px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handlePause}>{t('pause')}</button>}
+             {timerState === 'Paused' && (
+               <>
+                 <button className="btn resume" style={{ width: '160px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleResume}>{t('resume')}</button>
+                 <button className="btn complete" style={{ width: '160px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleComplete}>{t('complete')}</button>
+               </>
+             )}
+          </div>
+
+          <div style={{ marginTop: '60px', width: '100%', maxWidth: '500px' }}>
+             {renderChatHistory(false)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // 普通视图
+  // =========================================================================
   return (
     <div className="focus-layout">
       
       <div className="focus-left">
         
         <div className="profile-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
-          <div style={{ 
-            width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden',
-            border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`,
-            background: '#111'
-          }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111' }}>
             <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -242,7 +247,6 @@ export const FocusPanel = ({
               <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
             </div>
           </div>
-          <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>🕒 {localTime}</div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -262,6 +266,11 @@ export const FocusPanel = ({
       </div>
 
       <div className="focus-right">
+        {/* 🌟 沉浸模式入口 */}
+        <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ alignSelf: 'flex-end', marginBottom: '10px', background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+          ⛶ 沉浸模式
+        </button>
+
         <div className="selector-group" style={{ marginBottom: '20px' }}>
           <div className="selector-row">
             <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>

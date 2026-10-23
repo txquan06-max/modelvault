@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom'; // 🌟 引入 Portal
+import { createPortal } from 'react-dom';
 import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType } from '../core/QuoteEngine'; 
 
@@ -24,6 +24,18 @@ export const FocusPanel = ({
   
   const isZh = i18n.language === 'zh';
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
+
+  // 🌟 移动端下滑手势状态记录
+  const touchStartY = useRef<number>(0);
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    // 如果向下滑动超过 80px，则退出沉浸模式
+    if (touchEndY - touchStartY.current > 80) {
+      AudioManager.playClick();
+      setIsImmersive(false);
+    }
+  };
 
   useEffect(() => {
     const lastMsg = chatMessages[chatMessages.length - 1];
@@ -150,47 +162,9 @@ export const FocusPanel = ({
 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', marginTop: '10px' }}>
                 <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '42px', fontWeight: 300, textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>{formatTime(activeSeconds)}</div>
-                
-                {timerState === 'Idle' && !lastSession && (
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                    {[0, 15, 30, 60].map(min => (
-                      <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => handleSetTimeboxTarget(min)}>
-                        {min === 0 ? t('timeboxNone') : `${min}m`}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {isFinishingPart ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '11px', padding: '6px', background: 'rgba(0,0,0,0.4)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} />
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
-                      <button className="btn no" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
-                    </div>
-                  </div>
-                ) : lastSession ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '12px', color: '#10b981', textAlign: 'center', fontWeight: 'bold' }}>{t('saved')}: {formatTime(lastSession.duration)}</div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleConfirmStageDone}>{t('yesDone')}</button>
-                      <button className="btn no" style={{ flex: 1, padding: '6px', fontSize: '12px', borderRadius: '6px' }} onClick={handleCancelDone}>{t('keepWorking')}</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {timerState === 'Idle' && <button className="btn start" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
-                    {timerState === 'Running' && <button className="btn pause" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handlePause}>{t('pause')}</button>}
-                    {timerState === 'Paused' && (
-                      <>
-                        <button className="btn resume" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleResume}>{t('resume')}</button>
-                        <button className="btn complete" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleComplete}>{t('complete')}</button>
-                      </>
-                    )}
-                  </div>
-                )}
                 {renderChatHistory(true)}
               </div>
             </>
@@ -200,10 +174,14 @@ export const FocusPanel = ({
     );
   }
 
-  // 🌟 核心修复：使用 createPortal 把沉浸模式挂载到 body 上
+  // 🌟 沉浸模式：增加 onTouchStart 和 onTouchEnd
   if (isImmersive) {
     const immersiveContent = (
-      <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}
+      >
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
         
         <button 
@@ -238,8 +216,10 @@ export const FocusPanel = ({
                </>
              )}
           </div>
+          
+          <div style={{ color: '#555', fontSize: '12px', marginTop: '40px' }}>↓ 向下滑动退出 ↓</div>
 
-          <div style={{ marginTop: '40px', width: '100%', maxWidth: '500px' }}>
+          <div style={{ marginTop: '20px', width: '100%', maxWidth: '500px' }}>
              {renderChatHistory(false)}
           </div>
         </div>
@@ -252,7 +232,7 @@ export const FocusPanel = ({
     <div className="focus-layout">
       
       <div className="focus-left">
-        
+        {/* 🌟 这里复用之前的资料卡片代码... （保持原本样式不动） */}
         <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111', flexShrink: 0 }}>

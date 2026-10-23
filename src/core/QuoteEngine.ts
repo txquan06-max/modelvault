@@ -24,6 +24,7 @@ export interface BotData {
   pause: QuoteSet;
   complete: QuoteSet;
   quotes: QuoteSet[];
+  stageQuotes?: Record<string, QuoteSet[]>; 
 }
 
 export const BOTS: Record<BotType, BotData> = {
@@ -652,6 +653,7 @@ export const BOTS: Record<BotType, BotData> = {
 export class QuoteEngine {
   private static currentBot: BotType = 'tu';
   private static queues: Record<BotType, number[]> = { tu: [], milkfoam: [], xiaoran: [] };
+  private static stageQueues: Record<string, number[]> = {};
 
   static setBot(bot: BotType) {
     this.currentBot = bot;
@@ -661,7 +663,6 @@ export class QuoteEngine {
     return BOTS[this.currentBot];
   }
 
-  // Fisher-Yates 洗牌
   private static shuffle(array: number[]): number[] {
     const newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -671,19 +672,33 @@ export class QuoteEngine {
     return newArr;
   }
 
-  static getRandom(lang: string): string {
+  // 🌟 新增：根据当前工序获取专属台词
+  static getRandom(lang: string, stageId?: string | null): string {
     const botData = BOTS[this.currentBot];
-    if (!botData || !botData.quotes || botData.quotes.length === 0) {
+    if (!botData) return lang === 'zh' ? "开始专注吧！" : "Let's focus!";
+
+    // 如果当前阶段有专属台词，优先使用专属台词
+    if (stageId && botData.stageQuotes && botData.stageQuotes[stageId] && botData.stageQuotes[stageId].length > 0) {
+      const queueKey = `${this.currentBot}_${stageId}`;
+      if (!this.stageQueues[queueKey] || this.stageQueues[queueKey].length === 0) {
+        const indices = Array.from({ length: botData.stageQuotes[stageId].length }, (_, i) => i);
+        this.stageQueues[queueKey] = this.shuffle(indices);
+      }
+      const idx = this.stageQueues[queueKey].pop()!;
+      const q = botData.stageQuotes[stageId][idx];
+      return lang === 'zh' ? q.zh : q.en;
+    }
+
+    // 否则走通用台词库
+    if (!botData.quotes || botData.quotes.length === 0) {
       return lang === 'zh' ? "开始专注吧！" : "Let's focus!";
     }
 
-    // 如果队列为空，重新洗牌填充索引
     if (this.queues[this.currentBot].length === 0) {
       const indices = Array.from({ length: botData.quotes.length }, (_, i) => i);
       this.queues[this.currentBot] = this.shuffle(indices);
     }
 
-    // 从队列弹出一个索引
     const randomIndex = this.queues[this.currentBot].pop()!;
     const q = botData.quotes[randomIndex] || { zh: "开始专注吧！", en: "Let's focus!" };
     return lang === 'zh' ? q.zh : q.en;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { StorageManager } from '../core/StorageManager';
+import { SessionManager } from '../core/SessionManager'; // 🌟 引入
 
 const LocalCover = ({ image, fallback }: { image: string, fallback: string }) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -27,6 +28,17 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
   const backlogModels = models.filter((m: any) => m.status === 'NotStarted' || m.status === 'InProgress').sort((a: any, b: any) => b.createdAt - a.createdAt);
 
   const displayList = activeSubTab === 'completed' ? completedModels : backlogModels;
+  const allSessions = SessionManager.getAllSessions();
+
+  // 🌟 辅助函数：计算模型总耗时
+  const getModelTotalTime = (model: any) => {
+    const taskIds = model.tasks.map((t: any) => t.id);
+    const totalSec = allSessions.filter((s: any) => taskIds.includes(s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
 
   return (
     <div className="view-content hangar-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
@@ -78,7 +90,11 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
                 {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{isZh ? '拼装中' : 'In Progress'}</span>}
               </div>
               <div className="hangar-info">
-                <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6' }}>{model.grade}</div>
+                <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{model.grade}</span>
+                  {/* 🌟 显示该模型总耗时 */}
+                  <span style={{ color: '#10b981', fontWeight: 'bold' }}>⏱ {getModelTotalTime(model)}</span>
+                </div>
                 <div className="hangar-name" title={getModelName(model)}>{getModelName(model)}</div>
                 <div className="hangar-series" title={getModelSeries(model)}>{getModelSeries(model)}</div>
               </div>

@@ -237,7 +237,7 @@ function App() {
   useEffect(() => {
     let chatTimer: any;
     const tick = () => {
-      const newText = QuoteEngine.getRandom(i18n.language);
+      const newText = QuoteEngine.getRandom(i18n.language, currentStageId); // 🌟 传入当前工序
       setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text: newText, timestamp: Date.now() }].slice(-5));
     };
     const updateTimer = () => {
@@ -253,7 +253,7 @@ function App() {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
-  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow]);
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, currentStageId]);
 
   const triggerAutoBackup = async () => {
     if (isAutoBackupEnabled) {

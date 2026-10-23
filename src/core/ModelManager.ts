@@ -105,12 +105,22 @@ export class ModelManager {
     return xp;
   }
 
-  static addModel(nameObj: { en: string; zh: string }, grade: string, seriesObj: { en: string; zh: string }, useTemplate: boolean = true): Model[] {
+  static addModel(nameObj: { en: string; zh: string }, grade: string, seriesObj: { en: string; zh: string }, useTemplate: boolean = true, isWholeBuild: boolean = false): Model[] {
     const models = this.getAllModels();
     const modelId = crypto.randomUUID();
+    
+    let tasks: Task[] = [];
+    if (useTemplate) {
+      if (isWholeBuild) {
+        tasks = [{ id: crypto.randomUUID(), modelId, name: 'part_whole', status: 'NotStarted', stages: generateStages() }];
+      } else {
+        tasks = DEFAULT_TASK_KEYS.map(key => ({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() }));
+      }
+    }
+
     const newModel: Model = {
       id: modelId, name: nameObj, series: seriesObj, grade, status: 'NotStarted',
-      tasks: useTemplate ? DEFAULT_TASK_KEYS.map(key => ({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() })) : []
+      tasks
     };
     models.push(newModel);
     this.saveModels(models);
@@ -145,21 +155,29 @@ export class ModelManager {
     return { models, count };
   }
 
-  static startLegacyRebuild(modelId: string, completedStageKeys: string[]): Model[] {
+  static startLegacyRebuild(modelId: string, completedStageKeys: string[], isWholeBuild: boolean = false): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
     if (model) {
       model.isRebuilding = true;
       model.status = 'InProgress';
       
-      if (model.tasks.length <= 1) {
-         DEFAULT_TASK_KEYS.forEach(key => {
-           if (!model.tasks.some(t => t.name === key)) {
-             model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() });
-           }
-         });
+      // 根据用户的选择生成任务
+      if (isWholeBuild) {
+        // 如果选整体，检查是否已经有 part_whole
+        if (!model.tasks.some(t => t.name === 'part_whole')) {
+           model.tasks.push({ id: crypto.randomUUID(), modelId, name: 'part_whole', status: 'NotStarted', stages: generateStages() });
+        }
+      } else {
+        // 如果选分部位，补齐所有部位
+        DEFAULT_TASK_KEYS.forEach(key => {
+          if (!model.tasks.some(t => t.name === key)) {
+            model.tasks.push({ id: crypto.randomUUID(), modelId, name: key, status: 'NotStarted', stages: generateStages() });
+          }
+        });
       }
 
+      // 更新历史任务的阶段进度
       const legacyTask = model.tasks.find(t => t.name === 'part_legacy');
       if (legacyTask) {
         legacyTask.status = 'InProgress';
@@ -241,7 +259,6 @@ export class ModelManager {
         changedModelId = m.id; break;
       }
     }
-    // 删除了未使用的 const model = ...
     this.saveModels(models); 
     if (isStageCompletedNow) UserManager.addCoins(10); 
     return models;

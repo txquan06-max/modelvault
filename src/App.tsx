@@ -96,6 +96,9 @@ function App() {
   const [completeModelId, setCompleteModelId] = useState<string | null>(null);
   const [activeAchievement, setActiveAchievement] = useState<AchievementData | null>(null);
   const [achievementQueue, setAchievementQueue] = useState<AchievementData[]>([]);
+  
+  const [isWholeBuild, setIsWholeBuild] = useState(false); 
+  const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part'); 
 
   const [journalFilterMonth, setJournalFilterMonth] = useState('');
   const [models, setModels] = useState<Model[]>([]);
@@ -187,7 +190,24 @@ function App() {
   }, []);
 
   const tutorialSteps: TourStep[] = [
-    // ... 你的教程步骤保持原样
+    { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
+    { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
+    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如“头部”。' : 'After adding a model, click Add Part.', page: 'focus' },
+    { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
+    { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
+    { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
+    { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
+    { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
+    { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
+    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' },
+    { 
+      targetId: 'tour-install', 
+      title: isZh ? '安装至桌面' : 'Install to Desktop', 
+      content: isZh 
+        ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！' 
+        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app.\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!', 
+      page: 'profile' 
+    }
   ];
 
   useEffect(() => {
@@ -587,9 +607,9 @@ function App() {
     AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
-    const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks);
+    const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);
-    setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null); setIsAddingModel(false); setUseDefaultTasks(true); setSearchResults([]); processAchievements();
+    setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null); setIsAddingModel(false); setUseDefaultTasks(true); setIsWholeBuild(false); setSearchResults([]); processAchievements();
     triggerAutoBackup();
   };
 
@@ -643,12 +663,15 @@ function App() {
   const handleStartRebuild = (taskId: string) => {
     AudioManager.playClick(); setPendingRebuildTask(taskId);
     const stages = viewingModel?.tasks.find(t => t.name === 'part_legacy')?.stages.filter(s => s.status === 'Completed').map(s => s.nameKey) || ['stage_assembly'];
-    setImportedStages(stages); setIsEditingImportedStatus(true);
+    setImportedStages(stages); 
+    setRebuildMode('part'); 
+    setIsEditingImportedStatus(true);
   };
 
   const handleConfirmRebuild = () => {
     if (!viewingModel) return;
-    AudioManager.playStageDone(); const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages);
+    AudioManager.playStageDone(); 
+    const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages, rebuildMode === 'whole');
     setModels(updated); setIsEditingImportedStatus(false); setShowRebuildConfirm(true); triggerAutoBackup();
   };
 
@@ -795,7 +818,9 @@ function App() {
     equippedTitleDef,
     generateShareCard: triggerShareCard,
     setViewingModelId,
-    setExpandedTaskId
+    setExpandedTaskId,
+    isWholeBuild, setIsWholeBuild,
+    rebuildMode, setRebuildMode
   };
 
   return (
@@ -867,7 +892,6 @@ function App() {
                 viewingModel={viewingModel} 
                 viewingModelTotalSec={viewingModelTotalSec}
                 expandedTaskId={expandedTaskId}
-                // setExpandedTaskId={setExpandedTaskId} // 🌟 删除了这一行，因为 commonProps 里已经有了
                 isEditingCover={isEditingCover}
                 setIsEditingCover={setIsEditingCover}
                 isEditingImportedStatus={isEditingImportedStatus}

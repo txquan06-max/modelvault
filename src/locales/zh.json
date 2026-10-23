@@ -109,7 +109,8 @@
   "part_backpack": "背包",
   "part_weapons": "武器/盾牌",
   "part_legacy": "历史完成",
-  
+  "part_whole": "整体制作",
+
   "stage_assembly": "素组",
   "stage_scribing": "刻线",
   "stage_lining": "渗线",
@@ -176,5 +177,11 @@
   "ach_early_bird_name": "早起的鸟儿", "ach_early_bird_desc": "在清晨 5-8 点拼装",
   "ach_legacy_1_name": "回忆往昔", "ach_legacy_1_desc": "补录 1 个历史模型",
   "ach_coins_1000_name": "小有积蓄", "ach_coins_1000_desc": "金币余额达到 1000",
-  "ach_coins_5000_name": "富甲一方", "ach_coins_5000_desc": "金币余额达到 5000"
+  "ach_coins_5000_name": "富甲一方", "ach_coins_5000_desc": "金币余额达到 5000",
+  "whole_build": "整体制作模式 (不拆分部位)",
+  "rebuild_mode_title": "选择改造模式",
+  "rebuild_mode_desc": "你想如何继续拼装这台模型？",
+  "rebuild_by_part": "按部位拆分制作",
+  "rebuild_by_whole": "作为一个整体制作",
+  "whole_build_desc": "不区分头、手、脚，将整台模型视为一个大任务来推进。"
 }

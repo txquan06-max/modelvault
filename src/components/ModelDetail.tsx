@@ -27,12 +27,13 @@ export const ModelDetail = (props: any) => {
     t, i18n, viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
     isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus,
     importedStages, setImportedStages, handleConfirmRebuild, showRebuildConfirm, setShowRebuildConfirm,
-    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, generateShareCard
+    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, generateShareCard,
+    rebuildMode, setRebuildMode // 🌟 接收新属性
   } = props;
 
   const isZh = i18n.language === 'zh';
+  const allSessions = SessionManager.getAllSessions();
 
-  // 🌟 当用户点击“开始改造”时，自动滚动到录入表单
   useEffect(() => {
     if (isEditingImportedStatus) {
       setTimeout(() => {
@@ -68,10 +69,29 @@ export const ModelDetail = (props: any) => {
         </div>
       )}
 
-      {/* 🌟 增加 id 用于定位滚动 */}
+      {/* 🌟 历史模型改造模式选择 */}
       {isEditingImportedStatus && (
         <div id="imported-status-form" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
-          <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 {isZh ? '历史模型进度录入' : 'Legacy Model Progress'}</h4>
+          <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 {t('rebuild_mode_title')}</h4>
+          <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '12px' }}>{t('rebuild_mode_desc')}</p>
+          
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <button 
+              className={`btn ${rebuildMode === 'part' ? 'start' : 'no'}`} 
+              style={{ flex: 1, padding: '10px' }}
+              onClick={() => { AudioManager.playClick(); setRebuildMode('part'); }}
+            >
+              {t('rebuild_by_part')}
+            </button>
+            <button 
+              className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`} 
+              style={{ flex: 1, padding: '10px' }}
+              onClick={() => { AudioManager.playClick(); setRebuildMode('whole'); }}
+            >
+              {t('rebuild_by_whole')}
+            </button>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '勾选你当时已经完成的流程：' : 'Check completed stages:'}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
@@ -102,10 +122,11 @@ export const ModelDetail = (props: any) => {
 
       <div className="timeline-container" style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
-          const taskSessions = SessionManager.getAllSessions().filter((s: any) => s.taskId === task.id);
+          const taskSessions = allSessions.filter((s: any) => s.taskId === task.id);
           const taskTime = taskSessions.reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
           const isExpanded = expandedTaskId === task.id;
           const isCompleted = task.status === 'Completed';
+          
           return (
             <div key={task.id} className="timeline-item">
               <div className="timeline-header" onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}>
@@ -117,17 +138,34 @@ export const ModelDetail = (props: any) => {
               </div>
               {isExpanded && (
                 <div className="timeline-content">
-                  {task.stages.map((stage: any) => (
-                    <div key={stage.id} className={`stage-detail-item ${stage.status === 'Completed' ? 'done' : ''}`}>
-                      <div className={`stage-detail-header ${stage.status === 'Completed' ? 'done' : ''}`}>
-                        <span>{t(stage.nameKey)}</span>
-                        <span>{stage.status === 'Completed' ? 'Done' : (stage.status === 'InProgress' ? 'In Progress' : 'Pending')}</span>
+                  {task.stages.map((stage: any) => {
+                    const stageTime = taskSessions.filter((s: any) => s.stageId === stage.id).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
+                    return (
+                      <div key={stage.id} className={`stage-detail-item ${stage.status === 'Completed' ? 'done' : ''}`}>
+                        <div className={`stage-detail-header ${stage.status === 'Completed' ? 'done' : ''}`}>
+                          <span>{t(stage.nameKey)}</span>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {stageTime > 0 && <span style={{ color: '#10b981', fontWeight: 'bold' }}>⏱ {formatTime(stageTime)}</span>}
+                            <span>{stage.status === 'Completed' ? 'Done' : (stage.status === 'InProgress' ? 'In Progress' : 'Pending')}</span>
+                          </div>
+                        </div>
+                        {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                       </div>
-                      {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
-                    </div>
-                  ))}
-                  <button className="mini-btn" style={{ width: '100%', marginTop: '8px', background: '#3b82f6', color: '#fff', border: 'none', padding: '8px' }}
-                    onClick={() => { if (viewingModel.isImported && !viewingModel.isRebuilding) handleStartRebuild(task.id); else handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
+                    );
+                  })}
+                  
+                  {/* 🌟 修复按钮拥挤问题：增加 marginTop，宽度100%，增大 padding */}
+                  <button 
+                    className="mini-btn" 
+                    style={{ width: '100%', marginTop: '16px', background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
+                    onClick={() => { 
+                      AudioManager.playClick();
+                      if (viewingModel.isImported && !viewingModel.isRebuilding) {
+                        handleStartRebuild(task.id); 
+                      } else {
+                        handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); 
+                      }
+                    }}>
                     {viewingModel.isImported && !viewingModel.isRebuilding ? (isZh ? `🔧 开始继续改造` : `🔧 Start Rebuild`) : (isZh ? `⏱ 去专注` : `⏱ Focus`)}
                   </button>
                 </div>

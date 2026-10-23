@@ -176,5 +176,12 @@
   "ach_early_bird_name": "Early Bird", "ach_early_bird_desc": "Build between 5 AM - 8 AM",
   "ach_legacy_1_name": "Reminiscence", "ach_legacy_1_desc": "Import 1 legacy model",
   "ach_coins_1000_name": "Savings", "ach_coins_1000_desc": "Reach 1000 coins",
-  "ach_coins_5000_name": "Wealthy", "ach_coins_5000_desc": "Reach 5000 coins"
+  "ach_coins_5000_name": "Wealthy", "ach_coins_5000_desc": "Reach 5000 coins",
+  "part_whole": "Whole Body",
+  "whole_build": "Whole Model Mode (No parts)",
+  "rebuild_mode_title": "Rebuild Mode",
+  "rebuild_mode_desc": "How do you want to continue building this model?",
+  "rebuild_by_part": "Build by Parts",
+  "rebuild_by_whole": "Build as a Whole",
+  "whole_build_desc": "Treat the entire model as one big task, no head/torso separation."
 }

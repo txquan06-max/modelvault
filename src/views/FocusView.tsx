@@ -7,14 +7,17 @@ export const FocusView = (props: any) => {
     timerState, isFinishingPart, currentModelId, newModelNameInput, setNewModelNameInput,
     selectedGunpla, setSelectedGunpla, searchResults, setSearchResults, newModelGrade, setNewModelGrade,
     newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, newTaskName, setNewTaskName,
-    handleAddModel, handleAddTask, handleFocus
+    handleAddModel, handleAddTask, handleFocus,
+    isWholeBuild, setIsWholeBuild // 🌟 接收新属性
   } = props;
+
+  const isZh = i18n.language === 'zh';
 
   return (
     <div className="view-content">
       <div className="add-controls">
-        <button id="btn-add-model" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
-        <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
+        <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
+        <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
       </div>
 
       {isAddingModel && (
@@ -24,8 +27,8 @@ export const FocusView = (props: any) => {
             {searchResults.length > 0 && (
               <div className="autocomplete-dropdown">
                 {searchResults.map((item: any, idx: number) => {
-                  const displayName = i18n.language === 'zh' ? item.name.zh : item.name.en;
-                  const displaySeries = i18n.language === 'zh' ? item.series.zh : item.series.en;
+                  const displayName = isZh ? item.name.zh : item.name.en;
+                  const displaySeries = isZh ? item.series.zh : item.series.en;
                   return (
                     <div key={idx} className="autocomplete-item" onClick={() => { AudioManager.playClick(); setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="ac-grade">{item.grade}</span><strong style={{ color: '#fff' }}>{displayName}</strong></div>
@@ -38,7 +41,20 @@ export const FocusView = (props: any) => {
           </div>
           <select id="new-model-grade" value={newModelGrade} onChange={e => { AudioManager.playClick(); setNewModelGrade(e.target.value); }}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
           <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} onFocus={handleFocus} />
-          <label className="checkbox-label"><input type="checkbox" checked={useDefaultTasks} onChange={e => { AudioManager.playClick(); setUseDefaultTasks(e.target.checked); }} />{t('useDefaultTasks')}</label>
+          
+          <label className="checkbox-label">
+            <input type="checkbox" checked={useDefaultTasks} onChange={e => { AudioManager.playClick(); setUseDefaultTasks(e.target.checked); }} />
+            {t('useDefaultTasks')}
+          </label>
+
+          {/* 🌟 新增：整体制作模式 */}
+          {useDefaultTasks && (
+            <label className="checkbox-label">
+              <input type="checkbox" checked={isWholeBuild} onChange={e => { AudioManager.playClick(); setIsWholeBuild(e.target.checked); }} />
+              {t('whole_build')}
+            </label>
+          )}
+
           <div style={{display:'flex', gap:'8px', width:'100%'}}>
             <button className="btn start" style={{flex: 1, padding: '6px'}} onClick={handleAddModel}>{t('save')}</button>
             <button className="btn no" style={{flex: 1, padding: '6px'}} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>

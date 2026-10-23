@@ -3,17 +3,33 @@ import { SessionManager } from '../core/SessionManager';
 import { StorageManager } from '../core/StorageManager';
 import { useEffect, useState } from 'react';
 
-const LocalHero = ({ image, children, onClick }: { image: string, children: React.ReactNode, onClick: () => void }) => {
+/**
+ * 🌟 Bug #7 修复：统一处理 local:// 路径。
+ * 所有需要读取 coverImage / photoUrl 的地方都通过这个 hook 转换。
+ */
+const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
+
   useEffect(() => {
-    if (image?.startsWith('local://')) {
-      let objUrl: string | null = null;
-      StorageManager.loadLocalFileUrl(image).then(res => { if (res) { objUrl = res; setUrl(res); } });
+    if (!image) { setUrl(null); return; }
+    let objUrl: string | null = null;
+
+    if (image.startsWith('local://')) {
+      StorageManager.loadLocalFileUrl(image).then((res) => {
+        if (res) { objUrl = res; setUrl(res); }
+        else setUrl(null);
+      });
       return () => { if (objUrl) URL.revokeObjectURL(objUrl); };
     } else {
       setUrl(image);
     }
   }, [image]);
+
+  return url;
+};
+
+const LocalHero = ({ image, children, onClick }: { image: string, children: React.ReactNode, onClick: () => void }) => {
+  const url = useLocalImageSrc(image);
 
   return (
     <div className="detail-hero" style={{ backgroundImage: url ? `url(${url})` : 'none', cursor: 'pointer' }} onClick={onClick}>
@@ -35,6 +51,9 @@ export const ModelDetail = (props: any) => {
   const allSessions = SessionManager.getAllSessions();
 
   const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
+
+  // 🌟 Bug #7 修复：裁剪预览也走 useLocalImageSrc，兼容 local:// 路径
+  const coverPreviewUrl = useLocalImageSrc(viewingModel.coverImage);
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -64,21 +83,21 @@ export const ModelDetail = (props: any) => {
       {isEditingCover && (
         <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '上传/修改模型封面' : 'Upload/Modify Cover'}</span>
-          
-          {/* 🌟 新增：格纳库裁剪预览框 */}
+
+          {/* 格纳库裁剪预览框（已兼容 local:// 路径） */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ 
-              width: '140px', 
-              aspectRatio: '4 / 3', 
-              backgroundImage: viewingModel.coverImage ? `url(${viewingModel.coverImage})` : 'none', 
+            <div style={{
+              width: '140px',
+              aspectRatio: '4 / 3',
+              backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none',
               backgroundColor: '#333',
-              backgroundSize: 'cover', 
-              backgroundPosition: 'center', 
-              borderRadius: '6px', 
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              borderRadius: '6px',
               border: '1px solid #555',
               flexShrink: 0
             }}>
-              {!viewingModel.coverImage && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>No Image</div>}
+              {!coverPreviewUrl && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>No Image</div>}
             </div>
             <div style={{ fontSize: '11px', color: '#aaa', lineHeight: 1.5 }}>
               {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。如果被裁切过多，建议更换横屏图片。' : 'This is how it looks in the Hangar (4:3). If too cropped, try a landscape photo.'}
@@ -93,8 +112,8 @@ export const ModelDetail = (props: any) => {
       )}
 
       {needsRebuild && !isEditingImportedStatus && (
-        <button 
-          className="btn start" 
+        <button
+          className="btn start"
           style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: 'none', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }}
           onClick={() => { AudioManager.playClick(); handleStartRebuild(null); }}
         >
@@ -104,19 +123,19 @@ export const ModelDetail = (props: any) => {
 
       {isEditingImportedStatus && (
         <div id="imported-status-form" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
-          <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 {t('rebuild_mode_title')}</h4>
-          <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '12px' }}>{t('rebuild_mode_desc')}</p>
-          
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            <button 
-              className={`btn ${rebuildMode === 'part' ? 'start' : 'no'}`} 
+          <h4 style={{ color: '#f59e0b', marginBottom: '6px' }}>📦 {t('rebuild_mode_title')}</h4>
+          <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '10px' }}>{t('rebuild_mode_desc')}</p>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <button
+              className={`btn ${rebuildMode === 'part' ? 'start' : 'no'}`}
               style={{ flex: 1, padding: '10px' }}
               onClick={() => { AudioManager.playClick(); setRebuildMode('part'); }}
             >
               {t('rebuild_by_part')}
             </button>
-            <button 
-              className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`} 
+            <button
+              className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`}
               style={{ flex: 1, padding: '10px' }}
               onClick={() => { AudioManager.playClick(); setRebuildMode('whole'); }}
             >
@@ -124,9 +143,9 @@ export const ModelDetail = (props: any) => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '勾选你当时已经完成的流程：' : 'Check completed stages:'}</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
               {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
                 <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={importedStages.includes(stageKey)} disabled={stageKey === 'stage_assembly'} onChange={(e) => { if (e.target.checked) setImportedStages([...importedStages, stageKey]); else setImportedStages(importedStages.filter((k: string) => k !== stageKey)); }} />
@@ -144,7 +163,7 @@ export const ModelDetail = (props: any) => {
 
       {showRebuildConfirm && (
         <div className="inline-confirm" style={{ border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-          <div className="confirm-text" style={{ fontSize: '14px' }}>{isZh ? '改造状态已激活！' : 'Rebuild activated!'}<br/><span>{isZh ? '是否直接跳转至专注页面开始制作？' : 'Jump to focus page now?'}</span></div>
+          <div className="confirm-text" style={{ fontSize: '14px' }}>{isZh ? '改造状态已激活！' : 'Rebuild activated!'}<br /><span>{isZh ? '是否直接跳转至专注页面开始制作？' : 'Jump to focus page now?'}</span></div>
           <div className="confirm-actions">
             <button className="btn yes" onClick={handleDoRebuild}>{isZh ? '是，前往专注' : 'Yes, go to Focus'}</button>
             <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>{isZh ? '留在详情页' : 'Stay here'}</button>
@@ -160,11 +179,11 @@ export const ModelDetail = (props: any) => {
           const taskTime = taskSessions.reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
           const isExpanded = expandedTaskId === task.id;
           const isCompleted = task.status === 'Completed';
-          
+
           return (
             <div key={task.id} className="timeline-item">
-              <div 
-                className="timeline-header" 
+              <div
+                className="timeline-header"
                 style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
                 onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}
               >
@@ -194,14 +213,14 @@ export const ModelDetail = (props: any) => {
                       </div>
                     );
                   })}
-                  
+
                   {(!needsRebuild || task.name !== 'part_legacy') && (
-                    <button 
-                      className="mini-btn" 
+                    <button
+                      className="mini-btn"
                       style={{ width: '100%', marginTop: '20px', background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
-                      onClick={() => { 
+                      onClick={() => {
                         AudioManager.playClick();
-                        handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); 
+                        handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id);
                       }}>
                       {isZh ? `⏱ 开始专注` : `⏱ Start Focus`}
                     </button>

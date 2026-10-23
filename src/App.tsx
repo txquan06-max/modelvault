@@ -28,7 +28,7 @@ import { TutorialTour, type TourStep } from './components/TutorialTour';
 import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
-import { generateShareCard } from './utils/shareCard'; 
+import { generateShareCard } from './utils/shareCard';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
@@ -43,7 +43,7 @@ const LocalImage = ({ src, ...props }: any) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let objectUrl: string | null = null;
-    StorageManager.loadLocalFileUrl(src).then(res => {
+    StorageManager.loadLocalFileUrl(src).then((res) => {
       if (res) { objectUrl = res; setUrl(res); }
     });
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
@@ -56,7 +56,7 @@ const LocalImage = ({ src, ...props }: any) => {
 function App() {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
-  
+
   const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(() => {
     return localStorage.getItem('hasSeenTutorial') === null;
@@ -64,7 +64,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile'>('focus');
   const [pendingTabChange, setPendingTabChange] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile' | null>(null);
-  
+
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -80,7 +80,7 @@ function App() {
   const [equippedTitle, setEquippedTitle] = useState('');
   const [audioSettings, setAudioSettings] = useState<any>({});
   const [customAudios, setCustomAudios] = useState<any>({});
-  
+
   const [bgMain, setBgMain] = useState(() => StorageManager.getBgMain());
   const [bgPip, setBgPip] = useState(() => StorageManager.getBgPip());
   const [bgSize, setBgSize] = useState(() => StorageManager.getBgSize());
@@ -96,9 +96,9 @@ function App() {
   const [completeModelId, setCompleteModelId] = useState<string | null>(null);
   const [activeAchievement, setActiveAchievement] = useState<AchievementData | null>(null);
   const [achievementQueue, setAchievementQueue] = useState<AchievementData[]>([]);
-  
-  const [isWholeBuild, setIsWholeBuild] = useState(false); 
-  const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part'); 
+
+  const [isWholeBuild, setIsWholeBuild] = useState(false);
+  const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part');
 
   const [journalFilterMonth, setJournalFilterMonth] = useState('');
   const [models, setModels] = useState<Model[]>([]);
@@ -112,8 +112,8 @@ function App() {
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
   const [isAddingModel, setIsAddingModel] = useState(false);
-  const [newModelNameInput, setNewModelNameInput] = useState(''); 
-  const [selectedGunpla, setSelectedGunpla] = useState<GunplaItem | null>(null); 
+  const [newModelNameInput, setNewModelNameInput] = useState('');
+  const [selectedGunpla, setSelectedGunpla] = useState<GunplaItem | null>(null);
   const [newModelGrade, setNewModelGrade] = useState('HG');
   const [newModelSeriesInput, setNewModelSeriesInput] = useState('');
   const [useDefaultTasks, setUseDefaultTasks] = useState(true);
@@ -145,7 +145,7 @@ function App() {
     const saved = localStorage.getItem('mv_unlocked_bots');
     return saved ? JSON.parse(saved) : ['tu'];
   });
-  
+
   const [currentBot, setCurrentBot] = useState<BotType>(() => {
     const saved = localStorage.getItem('mv_current_bot') as BotType;
     return (saved && BOTS[saved]) ? saved : 'tu';
@@ -162,7 +162,7 @@ function App() {
       const saved = sessionStorage.getItem('mv_chat_messages');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return []; 
+    return [];
   });
 
   useEffect(() => {
@@ -171,6 +171,7 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
+  // 注册 Service Worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -189,6 +190,19 @@ function App() {
     }
   }, []);
 
+  // 🌟 新增：监听 StorageManager 抛出的存储错误（红线：不阻塞、不用 alert）
+  useEffect(() => {
+    const handleStorageError = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setToastMsg(String(detail));
+        setTimeout(() => setToastMsg(null), 5000);
+      }
+    };
+    window.addEventListener('mv-storage-error', handleStorageError);
+    return () => window.removeEventListener('mv-storage-error', handleStorageError);
+  }, []);
+
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
     { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
@@ -200,13 +214,13 @@ function App() {
     { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
     { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
     { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' },
-    { 
-      targetId: 'tour-install', 
-      title: isZh ? '安装至桌面' : 'Install to Desktop', 
-      content: isZh 
-        ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！' 
-        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app.\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!', 
-      page: 'profile' 
+    {
+      targetId: 'tour-install',
+      title: isZh ? '安装至桌面' : 'Install to Desktop',
+      content: isZh
+        ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！'
+        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app.\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!',
+      page: 'profile'
     }
   ];
 
@@ -262,16 +276,16 @@ function App() {
     };
   }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, currentStageId]);
 
+  // 🌟 Bug #9 修复：未开启自动备份时，直接早退，不做无意义的全量序列化
   const triggerAutoBackup = async () => {
-    if (isAutoBackupEnabled) {
-      const data = StorageManager.exportAll();
-      await StorageManager.autoBackupData(data);
-    }
+    if (!isAutoBackupEnabled) return;
+    const data = StorageManager.exportAll();
+    await StorageManager.autoBackupData(data);
   };
 
   const pushChatMessage = (type: 'start' | 'pause' | 'complete') => {
-    const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language) 
-               : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language) 
+    const text = type === 'start' ? QuoteEngine.getStartQuote(i18n.language)
+               : type === 'pause' ? QuoteEngine.getPauseQuote(i18n.language)
                : QuoteEngine.getCompleteQuote(i18n.language);
     setChatMessages(prev => [...prev, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5));
   };
@@ -303,7 +317,7 @@ function App() {
 
   useEffect(() => {
     if (!showLegacyForm) return;
-    const timer = setTimeout(() => { 
+    const timer = setTimeout(() => {
       if (legacyInput.trim().length > 0) setLegacyResults(GunplaSearch.search(legacyInput));
       else setLegacyResults([]);
     }, 200);
@@ -332,14 +346,14 @@ function App() {
     const available = allModels.filter(m => m.status !== 'Completed');
     if (available.length > 0) {
       if (!currentModelId || !available.some(m => m.id === currentModelId)) setCurrentModelId(available[0].id);
-    } else setCurrentModelId(''); 
+    } else setCurrentModelId('');
 
     const est = await StorageManager.getStorageEstimate();
     setStorageEstimate(est);
   };
 
   useEffect(() => { refreshData(); }, []);
-  
+
   useEffect(() => {
     const handleStorageChange = () => refreshData();
     window.addEventListener('storage', handleStorageChange);
@@ -407,10 +421,10 @@ function App() {
         img.onload = async () => {
           const canvas = document.createElement('canvas');
           let w = img.width; let h = img.height;
-          if(w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
+          if (w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-          
+
           canvas.toBlob(async (blob) => {
             if (!blob) return resolve('');
             const filename = `${type}_${Date.now()}.webp`;
@@ -429,7 +443,7 @@ function App() {
       showToast(isZh ? '处理图片中...' : 'Processing...');
       const result = await processImageUpload(file, type);
       if (result) {
-        if (type === 'main') { setBgMain(result); StorageManager.setBgMain(result); } 
+        if (type === 'main') { setBgMain(result); StorageManager.setBgMain(result); }
         else { setBgPip(result); StorageManager.setBgPip(result); }
         showToast(isZh ? '✅ 背景图上传成功！' : '✅ Background uploaded!');
         triggerAutoBackup();
@@ -457,7 +471,7 @@ function App() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 1024 * 1024) { showToast(isZh ? '音频文件太大（最大1MB）' : 'Audio file too large (max 1MB)'); return; }
-    
+
     const filename = `audio_${type}_${Date.now()}.mp3`;
     StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
       const finalPath = localPath || await new Promise<string>((res) => {
@@ -496,10 +510,10 @@ function App() {
     AudioManager.playClick(); setTimeboxTarget(min * 60); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
   };
 
-  const handleStart = () => { 
+  const handleStart = () => {
     if (!currentTaskId) { showToast(isZh ? '请先添加并选择一个部位' : 'Please select a part first'); return; }
-    AudioManager.playStart(); engineRef.current.start(); 
-    setModels(ModelManager.startStage(currentTaskId, currentStageId)); 
+    AudioManager.playStart(); engineRef.current.start();
+    setModels(ModelManager.startStage(currentTaskId, currentStageId));
     setHasPlayedTimeboxSound(false); refreshData(); pushChatMessage('start');
   };
   const handlePause = () => { AudioManager.playPause(); engineRef.current.pause(); pushChatMessage('pause'); };
@@ -602,11 +616,23 @@ function App() {
     triggerAutoBackup();
   };
 
+  // 🌟 Bug #3 修复：新增防重复校验（同名同规格拦截）
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
+
+    // 防重复：同名（中/英任一）且同 grade 视为重复
+    const duplicate = models.find(m =>
+      (m.name.en === nameObj.en || m.name.zh === nameObj.zh) &&
+      m.grade.toUpperCase() === newModelGrade.toUpperCase()
+    );
+    if (duplicate) {
+      showToast(isZh ? '⚠️ 你已添加过同名同规格的模型，请勿重复添加。' : '⚠️ Duplicate model (same name & grade) already exists.');
+      return;
+    }
+
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);
     setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null); setIsAddingModel(false); setUseDefaultTasks(true); setIsWholeBuild(false); setSearchResults([]); processAchievements();
@@ -648,7 +674,7 @@ function App() {
 
   const handleDeleteModel = (modelId: string) => {
     AudioManager.playClick(); const updated = ModelManager.deleteModel(modelId);
-    setModels(updated); setViewingModelId(null); refreshData(); showToast(isZh ? "已删除" : "Deleted"); triggerAutoBackup();
+    setModels(updated); setViewingModelId(null); refreshData(); showToast(isZh ? '已删除' : 'Deleted'); triggerAutoBackup();
   };
 
   const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
@@ -661,48 +687,48 @@ function App() {
   };
 
   const handleStartRebuild = (taskId: string | null) => {
-    AudioManager.playClick(); 
+    AudioManager.playClick();
     setPendingRebuildTask(taskId);
     const stages = viewingModel?.tasks.find(t => t.name === 'part_legacy')?.stages.filter(s => s.status === 'Completed').map(s => s.nameKey) || ['stage_assembly'];
-    setImportedStages(stages); 
-    setRebuildMode('part'); 
+    setImportedStages(stages);
+    setRebuildMode('part');
     setIsEditingImportedStatus(true);
   };
 
   const handleConfirmRebuild = () => {
     if (!viewingModel) return;
-    AudioManager.playStageDone(); 
+    AudioManager.playStageDone();
     const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages, rebuildMode === 'whole');
-    
+
     let targetTaskId = null;
     const currentModelUpdated = updated.find(m => m.id === viewingModel.id);
     if (currentModelUpdated) {
-       if (rebuildMode === 'whole') {
-           const wholeTask = currentModelUpdated.tasks.find(t => t.name === 'part_whole');
-           if (wholeTask) targetTaskId = wholeTask.id;
-       } else {
-           const firstPart = currentModelUpdated.tasks.find(t => t.name !== 'part_legacy' && t.status !== 'Completed');
-           if (firstPart) targetTaskId = firstPart.id;
-           else {
-               const legacyTask = currentModelUpdated.tasks.find(t => t.name === 'part_legacy');
-               if (legacyTask) targetTaskId = legacyTask.id;
-           }
-       }
+      if (rebuildMode === 'whole') {
+        const wholeTask = currentModelUpdated.tasks.find(t => t.name === 'part_whole');
+        if (wholeTask) targetTaskId = wholeTask.id;
+      } else {
+        const firstPart = currentModelUpdated.tasks.find(t => t.name !== 'part_legacy' && t.status !== 'Completed');
+        if (firstPart) targetTaskId = firstPart.id;
+        else {
+          const legacyTask = currentModelUpdated.tasks.find(t => t.name === 'part_legacy');
+          if (legacyTask) targetTaskId = legacyTask.id;
+        }
+      }
     }
-    
+
     setPendingRebuildTask(targetTaskId || null);
-    setModels(updated); 
-    setIsEditingImportedStatus(false); 
-    setShowRebuildConfirm(true); 
+    setModels(updated);
+    setIsEditingImportedStatus(false);
+    setShowRebuildConfirm(true);
     triggerAutoBackup();
   };
 
   const handleDoRebuild = () => {
-    AudioManager.playClick(); 
+    AudioManager.playClick();
     setShowRebuildConfirm(false);
-    if (pendingRebuildTask) { 
-      handleJumpToFocus(pendingRebuildTask); 
-      setPendingRebuildTask(null); 
+    if (pendingRebuildTask) {
+      handleJumpToFocus(pendingRebuildTask);
+      setPendingRebuildTask(null);
     } else {
       setActiveTab('focus');
       setViewingModelId(null);
@@ -717,17 +743,22 @@ function App() {
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => { setUsername(e.target.value); StorageManager.setUsername(e.target.value); };
-  const updateAudioSetting = (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); StorageManager.setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); };
+  const updateAudioSetting = (type: string, style: string) => {
+    const newSettings = { ...audioSettings, [type]: style };
+    setAudioSettings(newSettings);
+    StorageManager.setAudioSettings(newSettings);
+    if (style !== 'off') AudioManager.previewSound(type as any);
+  };
 
   const openPreview = () => { AudioManager.playClick(); setBgSize(StorageManager.getBgSize()); setBgPosition(StorageManager.getBgPosition()); setIsPreviewOpen(true); };
   const applyBackground = () => { AudioManager.playClick(); StorageManager.setBgSize(bgSize); StorageManager.setBgPosition(bgPosition); setIsPreviewOpen(false); showToast(isZh ? '✅ 适配设置应用成功！' : '✅ Settings applied!'); };
 
-  const buyTitle = (id: string) => { 
+  const buyTitle = (id: string) => {
     const result = UserManager.buyTitle(id);
-    if (result.success) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); } 
-    else { AudioManager.playClick(); if (result.error === 'level_too_low') showToast(t('levelTooLow')); else if (result.error === 'not_enough_coins') showToast(t('notEnoughCoins')); else showToast(t('notEnoughCoins')); } 
+    if (result.success) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); }
+    else { AudioManager.playClick(); if (result.error === 'level_too_low') showToast(t('levelTooLow')); else if (result.error === 'not_enough_coins') showToast(t('notEnoughCoins')); else showToast(t('notEnoughCoins')); }
   };
-  
+
   const equipTitle = (id: string) => { AudioManager.playClick(); StorageManager.setEquippedTitle(id); setEquippedTitle(id); AudioManager.playStageDone(); };
 
   const handleOpenPiP = async () => {
@@ -735,37 +766,37 @@ function App() {
     if (isWeChat) { showToast(isZh ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.'); return; }
     if (!('documentPictureInPicture' in window)) { showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
     try {
-      // 🌟 改为 1:1 比例
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 450, height: 450 });
+      // 🌟 悬浮窗比例调整为 1.75 : 1 (700 × 400)
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
       [...document.styleSheets].forEach((styleSheet) => {
-        try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
+        try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); }
         catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
       });
       pipWin.document.body.style.backgroundColor = '#1e1e1e'; pipWin.document.body.style.margin = '0'; pipWin.document.body.style.display = 'flex'; pipWin.document.body.style.justifyContent = 'center'; pipWin.document.body.style.alignItems = 'center'; pipWin.document.body.style.height = '100vh'; pipWin.document.body.style.overflow = 'hidden';
       setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
     } catch (err) { console.error(err); showToast(isZh ? '画中画打开失败' : 'Failed to open PiP'); }
   };
-  
+
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
-  
-  const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
+
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return; AudioManager.playClick();
-    const reader = new FileReader(); 
-    reader.onload = async (event) => { 
-      try { 
-        const data = JSON.parse(event.target?.result as string); 
-        const success = await StorageManager.importAll(data); 
-        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); } 
-        else showToast(t('importError')); 
-      } catch (err) { showToast(t('importError')); } 
-    }; 
-    reader.readAsText(file); e.target.value = ''; 
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        const success = await StorageManager.importAll(data);
+        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); }
+        else showToast(t('importError'));
+      } catch (err) { showToast(t('importError')); }
+    };
+    reader.readAsText(file); e.target.value = '';
   };
-  
+
   const handleResetData = async () => { AudioManager.playClick(); setIsResetting(true); try { await StorageManager.resetAll(); } catch (e) { console.error(e); } window.location.href = window.location.origin + window.location.pathname; };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
-  const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
+  const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); };
 
   const triggerShareCard = async (model: Model, totalTime: number) => {
@@ -805,15 +836,15 @@ function App() {
     }
   };
 
-  const getHistoryLogs = () => { 
-    let sessions = SessionManager.getAllSessions(); 
+  const getHistoryLogs = () => {
+    let sessions = SessionManager.getAllSessions();
     if (journalFilterMonth) {
       sessions = sessions.filter(s => {
         const d = new Date(s.startedAt); const year = d.getFullYear(); const month = (d.getMonth() + 1).toString().padStart(2, '0');
         return `${year}-${month}` === journalFilterMonth;
       });
     }
-    return sessions.sort((a, b) => b.startedAt - a.startedAt).map(s => ({ ...s, details: ModelManager.getTaskDetails(s.taskId), stageNameKey: ModelManager.getStageNameKey(s.taskId, s.stageId) })); 
+    return sessions.sort((a, b) => b.startedAt - a.startedAt).map(s => ({ ...s, details: ModelManager.getTaskDetails(s.taskId), stageNameKey: ModelManager.getStageNameKey(s.taskId, s.stageId) }));
   };
 
   const currentModel = models.find(m => m.id === currentModelId);
@@ -857,14 +888,14 @@ function App() {
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       {showTutorial && !showSplash && (
-        <TutorialTour 
-          steps={tutorialSteps} 
+        <TutorialTour
+          steps={tutorialSteps}
           onClose={() => {
             setShowTutorial(false);
             localStorage.setItem('hasSeenTutorial', 'true');
-          }} 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
+          }}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
         />
       )}
 
@@ -879,10 +910,10 @@ function App() {
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
         <div className="mini-window">
-          
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
-            <button 
-              onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
+            <button
+              onClick={() => { AudioManager.playClick(); setShowTutorial(true); }}
               style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               title="新手教程"
             >?</button>
@@ -918,8 +949,8 @@ function App() {
 
           <div className="scroll-content">
             {viewingModel ? (
-              <ModelDetail 
-                viewingModel={viewingModel} 
+              <ModelDetail
+                viewingModel={viewingModel}
                 viewingModelTotalSec={viewingModelTotalSec}
                 expandedTaskId={expandedTaskId}
                 isEditingCover={isEditingCover}
@@ -943,7 +974,7 @@ function App() {
                 {activeTab === 'focus' && <FocusView {...commonProps} />}
                 {activeTab === 'journal' && <JournalView {...commonProps} />}
                 {activeTab === 'hangar' && <HangarView {...commonProps} />}
-                {activeTab === 'gundam' && <GundamGalleryView {...commonProps} />} 
+                {activeTab === 'gundam' && <GundamGalleryView {...commonProps} />}
                 {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
                 {activeTab === 'profile' && <ProfileView {...commonProps} />}
               </>

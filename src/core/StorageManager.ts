@@ -29,8 +29,15 @@ export const KEYS = {
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
-  click: 'default', start: 'default', pause: 'default', complete: 'default',
-  finishPart: 'default', stage: 'default', timebox: 'default', achievement: 'default',
+  click: 'default',
+  start: 'default',
+  pause: 'default',
+  complete: 'default',
+  finishPart: 'default',
+  stage: 'default',
+  timebox: 'default',
+  achievement: 'default',
+  typing: 'default',
 });
 
 const memoryCache: Record<string, string> = {};
@@ -44,13 +51,22 @@ export const StorageManager = {
     if (isInit) return;
     await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
-    const legacyKeys = Object.keys(localStorage).filter(k => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data');
+    const legacyKeys = Object.keys(localStorage).filter(
+      (k) =>
+        k.startsWith('mv_') ||
+        k === 'modelvault_sessions' ||
+        k === 'modelvault_achievements' ||
+        k === 'modelvault_core_data'
+    );
     if (legacyKeys.length > 0) {
       for (const key of legacyKeys) {
         const val = localStorage.getItem(key);
-        if (val) { memoryCache[key] = val; await localforage.setItem(key, val); }
+        if (val) {
+          memoryCache[key] = val;
+          await localforage.setItem(key, val);
+        }
       }
-      legacyKeys.forEach(k => localStorage.removeItem(k));
+      legacyKeys.forEach((k) => localStorage.removeItem(k));
     }
 
     const keys = await localforage.keys();
@@ -67,7 +83,7 @@ export const StorageManager = {
         if (storedVersion < CURRENT_SCHEMA_VERSION) {
           console.log(`🔄 数据迁移: v${storedVersion} -> v${CURRENT_SCHEMA_VERSION}`);
           await localforage.setItem('modelvault_backup_before_migration', rawData);
-          let migratedModels = parsed.models || [];
+          const migratedModels = parsed.models || [];
           const newData = { schemaVersion: CURRENT_SCHEMA_VERSION, models: migratedModels };
           memoryCache[DATA_KEY] = JSON.stringify(newData);
           await localforage.setItem(DATA_KEY, JSON.stringify(newData));
@@ -92,7 +108,11 @@ export const StorageManager = {
       const estimate = await navigator.storage.estimate();
       const usage = (estimate.usage || 0) / (1024 * 1024 * 1024);
       const quota = (estimate.quota || 0) / (1024 * 1024 * 1024);
-      return { usage: Number(usage.toFixed(2)), quota: Number(quota.toFixed(2)), percent: quota > 0 ? (usage / quota) * 100 : 0 };
+      return {
+        usage: Number(usage.toFixed(2)),
+        quota: Number(quota.toFixed(2)),
+        percent: quota > 0 ? (usage / quota) * 100 : 0,
+      };
     }
     return { usage: 0, quota: 0, percent: 0 };
   },
@@ -102,21 +122,29 @@ export const StorageManager = {
     try {
       backupDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
       return true;
-    } catch (err) { return false; }
+    } catch (err) {
+      return false;
+    }
   },
 
   async autoBackupData(data: any) {
     if (!backupDirHandle) return false;
     try {
-      if (await backupDirHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
-        if (await backupDirHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') return false;
+      if ((await backupDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        if ((await backupDirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+          return false;
+        }
       }
-      const fileHandle = await backupDirHandle.getFileHandle('modelvault_auto_backup.json', { create: true });
+      const fileHandle = await backupDirHandle.getFileHandle('modelvault_auto_backup.json', {
+        create: true,
+      });
       const writable = await fileHandle.createWritable();
       await writable.write(JSON.stringify(data, null, 2));
       await writable.close();
       return true;
-    } catch (err) { return false; }
+    } catch (err) {
+      return false;
+    }
   },
 
   async selectAssetsFolder() {
@@ -124,21 +152,27 @@ export const StorageManager = {
     try {
       assetsDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
       return true;
-    } catch (err) { return false; }
+    } catch (err) {
+      return false;
+    }
   },
 
   async saveFileToLocal(filename: string, blob: Blob) {
     if (!assetsDirHandle) return null;
     try {
-      if (await assetsDirHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
-        if (await assetsDirHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') return null;
+      if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        if ((await assetsDirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+          return null;
+        }
       }
       const fileHandle = await assetsDirHandle.getFileHandle(filename, { create: true });
       const writable = await fileHandle.createWritable();
       await writable.write(blob);
       await writable.close();
       return `local://${filename}`;
-    } catch (err) { return null; }
+    } catch (err) {
+      return null;
+    }
   },
 
   async loadLocalFileUrl(filename: string) {
@@ -148,16 +182,42 @@ export const StorageManager = {
       const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
       const file = await fileHandle.getFile();
       return URL.createObjectURL(file);
-    } catch (err) { return null; }
+    } catch (err) {
+      return null;
+    }
   },
 
+  /**
+   * 🌟 红线修复：不再使用 window.alert 阻塞用户。
+   * 写入失败时通过 console.error 记录，并派发 mv-storage-error 事件，
+   * 由 App.tsx 注册监听后显示非阻塞的顶部 Toast。
+   */
   async _set(key: string, val: string) {
     memoryCache[key] = val;
-    try { await localforage.setItem(key, val); } catch (err) { console.error('Storage save failed', err); alert('本地存储空间已满。'); }
+    try {
+      await localforage.setItem(key, val);
+    } catch (err) {
+      console.error('Storage save failed:', err);
+      try {
+        window.dispatchEvent(
+          new CustomEvent('mv-storage-error', {
+            detail:
+              '⚠️ 本地存储空间可能已满。请前往「个人中心 → 数据备份 → 挂载本地图库」进行扩容。',
+          })
+        );
+      } catch (e) {
+        // 事件派发失败时静默处理，不影响主流程
+      }
+    }
   },
 
   async resetAll() {
-    try { await localforage.clear(); await localforage.dropInstance({ name: 'ModelVault' }); } catch (e) { console.warn(e); }
+    try {
+      await localforage.clear();
+      await localforage.dropInstance({ name: 'ModelVault' });
+    } catch (e) {
+      console.warn(e);
+    }
     localStorage.clear();
     Object.keys(memoryCache).forEach((key) => delete memoryCache[key]);
     isInit = false;
@@ -168,8 +228,13 @@ export const StorageManager = {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        return { schemaVersion: parsed.schemaVersion || CURRENT_SCHEMA_VERSION, models: Array.isArray(parsed.models) ? parsed.models : [] };
-      } catch (e) { return { schemaVersion: CURRENT_SCHEMA_VERSION, models: [] }; }
+        return {
+          schemaVersion: parsed.schemaVersion || CURRENT_SCHEMA_VERSION,
+          models: Array.isArray(parsed.models) ? parsed.models : [],
+        };
+      } catch (e) {
+        return { schemaVersion: CURRENT_SCHEMA_VERSION, models: [] };
+      }
     }
     return { schemaVersion: CURRENT_SCHEMA_VERSION, models: [] };
   },
@@ -187,14 +252,30 @@ export const StorageManager = {
   getCoinsBalance: () => Number(memoryCache[KEYS.COINS_BALANCE]) || 0,
   getCoinsTotalEarned: () => Number(memoryCache[KEYS.COINS_TOTAL_EARNED]) || 0,
   getEquippedTitle: () => memoryCache[KEYS.EQUIPPED_TITLE] || '',
-  getEarnedTitles: () => { try { return JSON.parse(memoryCache[KEYS.EARNED_TITLES] || '[]'); } catch { return []; } },
+  getEarnedTitles: () => {
+    try {
+      return JSON.parse(memoryCache[KEYS.EARNED_TITLES] || '[]');
+    } catch {
+      return [];
+    }
+  },
   getAudioSettings: () => {
     const stored = memoryCache[KEYS.AUDIO_SETTINGS];
     const defaults = JSON.parse(DEFAULT_AUDIO);
     if (!stored) return defaults;
-    try { return { ...defaults, ...JSON.parse(stored) }; } catch { return defaults; }
+    try {
+      return { ...defaults, ...JSON.parse(stored) };
+    } catch {
+      return defaults;
+    }
   },
-  getCustomAudios: () => { try { return JSON.parse(memoryCache[KEYS.CUSTOM_AUDIOS] || '{}'); } catch { return {}; } },
+  getCustomAudios: () => {
+    try {
+      return JSON.parse(memoryCache[KEYS.CUSTOM_AUDIOS] || '{}');
+    } catch {
+      return {};
+    }
+  },
   getBgMain: () => memoryCache[KEYS.BG_IMAGE_MAIN] || '',
   getBgPip: () => memoryCache[KEYS.BG_IMAGE_PIP] || '',
   getBgSize: () => memoryCache[KEYS.BG_SIZE] || 'cover',
@@ -213,27 +294,41 @@ export const StorageManager = {
   setTimeboxTarget: (data: number) => StorageManager._set(KEYS.TIMEBOX_TARGET, data.toString()),
   setTimeboxElapsed: (data: number) => StorageManager._set(KEYS.TIMEBOX_ELAPSED, data.toString()),
   setCoinsBalance: (val: number) => StorageManager._set(KEYS.COINS_BALANCE, val.toString()),
-  setCoinsTotalEarned: (val: number) => StorageManager._set(KEYS.COINS_TOTAL_EARNED, val.toString()),
+  setCoinsTotalEarned: (val: number) =>
+    StorageManager._set(KEYS.COINS_TOTAL_EARNED, val.toString()),
   setEquippedTitle: (val: string) => StorageManager._set(KEYS.EQUIPPED_TITLE, val),
   setEarnedTitles: (val: string[]) => StorageManager._set(KEYS.EARNED_TITLES, JSON.stringify(val)),
-  setAudioSettings: (val: any) => StorageManager._set(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
-  setCustomAudios: (val: any) => StorageManager._set(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
+  setAudioSettings: (val: any) =>
+    StorageManager._set(KEYS.AUDIO_SETTINGS, JSON.stringify(val)),
+  setCustomAudios: (val: any) =>
+    StorageManager._set(KEYS.CUSTOM_AUDIOS, JSON.stringify(val)),
   setBgMain: (val: string) => StorageManager._set(KEYS.BG_IMAGE_MAIN, val),
   setBgPip: (val: string) => StorageManager._set(KEYS.BG_IMAGE_PIP, val),
   setBgSize: (val: string) => StorageManager._set(KEYS.BG_SIZE, val),
   setBgPosition: (val: string) => StorageManager._set(KEYS.BG_POSITION, val),
   setLegacyXP: (val: number) => StorageManager._set(KEYS.LEGACY_XP, val.toString()),
-  setReminderInterval: (val: number) => StorageManager._set(KEYS.REMINDER_INTERVAL, val.toString()),
-  setCheckinStreak: (val: number) => StorageManager._set(KEYS.CHECKIN_STREAK, val.toString()),
+  setReminderInterval: (val: number) =>
+    StorageManager._set(KEYS.REMINDER_INTERVAL, val.toString()),
+  setCheckinStreak: (val: number) =>
+    StorageManager._set(KEYS.CHECKIN_STREAK, val.toString()),
   setLastCheckinDate: (val: string) => StorageManager._set(KEYS.LAST_CHECKIN_DATE, val),
-  setTotalCheckinDays: (val: number) => StorageManager._set(KEYS.TOTAL_CHECKIN_DAYS, val.toString()),
-  setWebChatInterval: (val: number) => StorageManager._set(KEYS.WEB_CHAT_INTERVAL, val.toString()),
-  setPipChatInterval: (val: number) => StorageManager._set(KEYS.PIP_CHAT_INTERVAL, val.toString()),
+  setTotalCheckinDays: (val: number) =>
+    StorageManager._set(KEYS.TOTAL_CHECKIN_DAYS, val.toString()),
+  setWebChatInterval: (val: number) =>
+    StorageManager._set(KEYS.WEB_CHAT_INTERVAL, val.toString()),
+  setPipChatInterval: (val: number) =>
+    StorageManager._set(KEYS.PIP_CHAT_INTERVAL, val.toString()),
 
   exportAll: () => {
-    const data: any = { version: CURRENT_SCHEMA_VERSION, exportDate: new Date().toISOString(), coreData: memoryCache[DATA_KEY] || null };
-    Object.keys(memoryCache).forEach(key => {
-      if (key.startsWith('mv_') || key === 'modelvault_sessions' || key === 'modelvault_achievements') data[key] = memoryCache[key];
+    const data: any = {
+      version: CURRENT_SCHEMA_VERSION,
+      exportDate: new Date().toISOString(),
+      coreData: memoryCache[DATA_KEY] || null,
+    };
+    Object.keys(memoryCache).forEach((key) => {
+      if (key.startsWith('mv_') || key === 'modelvault_sessions' || key === 'modelvault_achievements') {
+        data[key] = memoryCache[key];
+      }
     });
     return data;
   },
@@ -242,7 +337,7 @@ export const StorageManager = {
     if (!data || !data.coreData) return false;
     try {
       await localforage.clear();
-      Object.keys(memoryCache).forEach(key => delete memoryCache[key]);
+      Object.keys(memoryCache).forEach((key) => delete memoryCache[key]);
 
       if (typeof data.coreData === 'string') await localforage.setItem(DATA_KEY, data.coreData);
       else await localforage.setItem(DATA_KEY, JSON.stringify(data.coreData));
@@ -250,19 +345,26 @@ export const StorageManager = {
       Object.keys(data).forEach(async (key) => {
         if (key !== 'version' && key !== 'exportDate' && key !== 'coreData') {
           const val = data[key];
-          if (val !== undefined && val !== null && typeof val === 'string') await localforage.setItem(key, val);
+          if (val !== undefined && val !== null && typeof val === 'string') {
+            await localforage.setItem(key, val);
+          }
         }
       });
 
       isInit = false;
-      await StorageManager.init(); 
+      await StorageManager.init();
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   },
 
   getStorageUsage: () => {
     let total = 0;
-    for (const x in memoryCache) { const val = memoryCache[x]; if (val) total += (val.length * 2); }
+    for (const x in memoryCache) {
+      const val = memoryCache[x];
+      if (val) total += val.length * 2;
+    }
     return (total / 1024 / 1024).toFixed(2);
-  }
+  },
 };

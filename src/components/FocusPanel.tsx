@@ -31,19 +31,7 @@ export const FocusPanel = ({
   });
   const [localTime, setLocalTime] = useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-  // 🌟 PC 抽屉状态
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-
-  // 🌟 关键修复：选完机体后，App.tsx 的 200ms debounce 会重新弹出搜索下拉。
-  // 在 FocusPanel 侧加守卫：只要 selectedGunpla 非空且 searchResults 又冒出内容，立即清空。
+  // 🌟 修复：搜索选中后，拦截 App.tsx 200ms debounce 导致的下拉框重新弹出
   useEffect(() => {
     if (selectedGunpla && searchResults.length > 0) {
       setSearchResults([]);
@@ -185,7 +173,7 @@ export const FocusPanel = ({
   );
 
   // ==============================
-  // 🌟 悬浮窗视图（适配 700×400 1.75:1）
+  // 🌟 悬浮窗视图 (700x400)
   // ==============================
   if (isPip) {
     const controlPanel = (
@@ -339,7 +327,7 @@ export const FocusPanel = ({
   }
 
   // ==============================
-  // 🌟 普通网页视图 - 左侧（陪伴与聊天区）
+  // 🌟 普通网页视图 - 左侧
   // ==============================
   const leftContent = (
     <>
@@ -387,7 +375,7 @@ export const FocusPanel = ({
   );
 
   // ==============================
-  // 🌟 普通网页视图 - 右侧（控制区，抽出为变量供抽屉与移动端共享）
+  // 🌟 普通网页视图 - 右侧 (计时器及操作区)
   // ==============================
   const rightContent = (
     <>
@@ -398,7 +386,7 @@ export const FocusPanel = ({
           <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
 
-        {/* 🌟 排版修正：悬浮窗 / 沉浸模式按钮左对齐（原来右对齐） */}
+        {/* 悬浮窗 / 沉浸模式按钮：左侧对齐 */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
           <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>
             📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
@@ -489,7 +477,6 @@ export const FocusPanel = ({
         {currentStage ? `${t(currentStage.nameKey)} (+${currentStage.xpReward}XP)` : t('noStage')}
       </div>
 
-      {/* 🌟 番茄钟：上下间距收紧 20 → 10 */}
       {timerState === 'Idle' && !lastSession && (
         <div className="timebox-selector" style={{ justifyContent: 'center', margin: '10px 0', flexWrap: 'wrap', gap: '8px' }}>
           <span className="timebox-label" style={{ fontSize: '14px' }}>{t('timebox')}:</span>
@@ -501,14 +488,12 @@ export const FocusPanel = ({
         </div>
       )}
 
-      {/* 🌟 计时器：上下间距收紧 30 → 14 */}
       <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '88px', textShadow: '0 0 30px rgba(255,255,255,0.2)', width: '100%', margin: '14px 0' }}>{formatTime(activeSeconds)}</div>
 
       {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
         <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '14px', marginBottom: '8px' }}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
       )}
 
-      {/* 🌟 白噪音：上下间距收紧 15 → 8 */}
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '8px 0', flexWrap: 'wrap' }}>
         {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
           <button
@@ -527,7 +512,6 @@ export const FocusPanel = ({
         ))}
       </div>
 
-      {/* 🌟 阶段按钮：上下间距收紧 20 → 10 */}
       {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
         <div className="stages-panel" style={{ justifyContent: 'center', margin: '10px 0', flexWrap: 'wrap' }}>
           {currentTask.stages.map((stage: any) => (
@@ -573,107 +557,19 @@ export const FocusPanel = ({
   );
 
   // ==============================
-  // 🌟 PC 双列布局 + 隐藏式抽屉
+  // 🌟 PC 端与移动端正常渲染
   // ==============================
   return (
-    <div
-      className="focus-layout"
-      style={
-        isMobile
-          ? {}
-          : {
-              position: 'relative',
-              display: 'block',
-              padding: 0,
-            }
-      }
-    >
-      {/* 左侧：陪伴与聊天区（PC 端独占全宽） */}
-      <div
-        className="focus-left"
-        style={
-          isMobile
-            ? {}
-            : {
-                width: '100%',
-                borderRight: 'none',
-                paddingRight: 0,
-                height: '100%',
-                minHeight: 0,
-              }
-        }
-      >
+    <div className="focus-layout">
+      {/* 左侧：陪伴与聊天区 */}
+      <div className="focus-left">
         {leftContent}
       </div>
 
-      {/* 移动端：右栏直接展开在下方 */}
-      {isMobile && (
-        <div className="focus-right" style={{ overflowY: 'auto' }}>
-          {rightContent}
-        </div>
-      )}
-
-      {/* PC 端：隐藏式滑动抽屉 */}
-      {!isMobile && (
-        <div
-          onMouseEnter={() => setDrawerOpen(true)}
-          onMouseLeave={() => setDrawerOpen(false)}
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            bottom: 0,
-            width: drawerOpen ? '340px' : '18px',
-            background: drawerOpen ? 'rgba(20, 25, 35, 0.95)' : 'rgba(59, 130, 246, 0.5)',
-            borderLeft: drawerOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(59, 130, 246, 0.6)',
-            borderRadius: '12px 0 0 12px',
-            transition: 'width 0.25s ease, background 0.25s ease',
-            overflow: 'hidden',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            zIndex: 10,
-            boxShadow: drawerOpen ? '-8px 0 24px rgba(0,0,0,0.6)' : '-2px 0 8px rgba(0,0,0,0.3)',
-            cursor: drawerOpen ? 'auto' : 'pointer',
-          }}
-          title={isZh ? '悬停展开工具抽屉' : 'Hover to expand tools'}
-        >
-          <div
-            style={{
-              width: '340px',
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              padding: '16px',
-              boxSizing: 'border-box',
-              opacity: drawerOpen ? 1 : 0,
-              transition: 'opacity 0.15s ease',
-              pointerEvents: drawerOpen ? 'auto' : 'none',
-            }}
-          >
-            {rightContent}
-          </div>
-
-          {!drawerOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: '#fff',
-                fontSize: '10px',
-                writingMode: 'vertical-rl',
-                letterSpacing: '4px',
-                fontWeight: 'bold',
-                userSelect: 'none',
-                textShadow: '0 0 6px rgba(59, 130, 246, 0.8)',
-              }}
-            >
-              ◀ {isZh ? '工具' : 'TOOLS'}
-            </div>
-          )}
-        </div>
-      )}
+      {/* 右侧：常驻显示，配合滚动条 */}
+      <div className="focus-right">
+        {rightContent}
+      </div>
     </div>
   );
 };

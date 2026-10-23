@@ -157,6 +157,13 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
+  // ============================================
+  // 🌟 新增：Service Worker 更新状态
+  // ============================================
+  const [updateReady, setUpdateReady] = useState(false);
+  const waitingWorkerRef = useRef<ServiceWorker | null>(null);
+  const toastTimerRef = useRef<any>(null);
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('mv_chat_messages');
@@ -171,32 +178,126 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
-  // 注册 Service Worker
+  // ============================================
+  // 🌟 新增：Service Worker 更新监听
+  // - 只 register，由浏览器检测更新（sw.js 内容变化才会触发）
+  // - updatefound → 判断是否已有旧 SW 在控页面 → 有 = 有更新待激活
+  // - 每小时主动 registration.update() 一次
+  // ============================================
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((registration) => {
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('New content is available; please refresh.');
-                window.location.reload();
-              }
-            };
-          }
+    if (!('serviceWorker' in navigator)) return;
+
+    let intervalId: any = null;
+
+    const setup = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+
+        const handleUpdateFound = () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // 有新 SW 已安装完成，等待用户确认激活
+              setUpdateReady(true);
+              waitingWorkerRef.current = newWorker;
+            }
+          });
         };
-      }).catch((err) => { console.log('SW registration failed: ', err); });
-    }
+
+        registration.addEventListener('updatefound', handleUpdateFound);
+
+        // 如果页面加载前就已存在 waiting worker（罕见但可能）
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          setUpdateReady(true);
+          waitingWorkerRef.current = registration.waiting;
+        }
+
+        // 每小时主动检查一次更新（避免长期打开的标签页永远收不到提示）
+        intervalId = setInterval(() => {
+          registration.update().catch(() => {});
+        }, 60 * 60 * 1000);
+      } catch (err) {
+        console.log('SW registration failed: ', err);
+      }
+    };
+
+    setup();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
+  // ============================================
+  // 🌟 新增：controllerchange 监听
+  // - 用户点"立即更新" → postMessage → SW.skipWaiting → 本页被新 SW 接管
+  // - 此时触发 controllerchange → reload 一次（用 isReloading 防抖）
+  // ============================================
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    let isReloading = false;
+    const handleControllerChange = () => {
+      if (isReloading) return;
+      isReloading = true;
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+    };
+  }, []);
+
+  // ============================================
+  // 🌟 新增：清理 toast timer
+  // ============================================
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // ============================================
+  // 🌟 新增：用户点击「立即更新」
+  // ============================================
+  const applyUpdate = () => {
+    AudioManager.playClick();
+    const worker = waitingWorkerRef.current;
+    if (!worker) {
+      // 没有等待中的 worker（极端情况）：直接刷新
+      window.location.reload();
+      return;
+    }
+    worker.postMessage({ type: 'SKIP_WAITING' });
+    // reload 会由上面的 controllerchange 监听触发
+  };
+
+  const skipUpdate = () => {
+    AudioManager.playClick();
+    setUpdateReady(false);
+  };
+
+  // ============================================
+  // 🌟 新增：Toast 计时器（避免连续调用时旧 timer 清空新 toast）
+  // ============================================
+  const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMsg(msg);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  // ============================================
   // 🌟 新增：监听 StorageManager 抛出的存储错误（红线：不阻塞、不用 alert）
+  // ============================================
   useEffect(() => {
     const handleStorageError = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToastMsg(String(detail));
-        setTimeout(() => setToastMsg(null), 5000);
+        toastTimerRef.current = setTimeout(() => setToastMsg(null), 5000);
       }
     };
     window.addEventListener('mv-storage-error', handleStorageError);
@@ -276,7 +377,7 @@ function App() {
     };
   }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, currentStageId]);
 
-  // 🌟 Bug #9 修复：未开启自动备份时，直接早退，不做无意义的全量序列化
+  // Bug #9 修复：未开启自动备份时，直接早退，不做无意义的全量序列化
   const triggerAutoBackup = async () => {
     if (!isAutoBackupEnabled) return;
     const data = StorageManager.exportAll();
@@ -408,7 +509,6 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
-  const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
   const toggleLanguage = () => { AudioManager.playClick(); const next = isZh ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); };
 
   const processImageUpload = async (file: File, type: 'main' | 'pip' | 'cover') => {
@@ -616,14 +716,13 @@ function App() {
     triggerAutoBackup();
   };
 
-  // 🌟 Bug #3 修复：新增防重复校验（同名同规格拦截）
+  // Bug #3 修复：新增防重复校验（同名同规格拦截）
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
-    // 防重复：同名（中/英任一）且同 grade 视为重复
     const duplicate = models.find(m =>
       (m.name.en === nameObj.en || m.name.zh === nameObj.zh) &&
       m.grade.toUpperCase() === newModelGrade.toUpperCase()
@@ -766,7 +865,7 @@ function App() {
     if (isWeChat) { showToast(isZh ? '微信内不支持画中画，请用浏览器打开' : 'PiP not supported in WeChat.'); return; }
     if (!('documentPictureInPicture' in window)) { showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); return; }
     try {
-      // 🌟 悬浮窗比例调整为 1.75 : 1 (700 × 400)
+      // 悬浮窗 1.75:1 比例（700 × 400）
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
       [...document.styleSheets].forEach((styleSheet) => {
         try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); }
@@ -897,6 +996,69 @@ function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
         />
+      )}
+
+      {/* ============================================
+          🌟 新增：顶部更新提示条
+          - 非模态，不阻塞用户操作
+          - 用户点击"立即更新"才触发 SW 激活 + reload
+          - 点击"稍后"仅关闭提示，下次打开还会再提示
+          ============================================ */}
+      {updateReady && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 99998,
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            color: '#fff',
+            padding: '10px 16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            animation: 'fadeIn 0.3s ease-out',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>✨ {isZh ? '新版本已就绪，是否立即更新？' : 'New version ready. Update now?'}</span>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <button
+              onClick={applyUpdate}
+              style={{
+                background: 'rgba(255,255,255,0.25)',
+                border: '1px solid rgba(255,255,255,0.6)',
+                color: '#fff',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+            >
+              {isZh ? '立即更新' : 'Update Now'}
+            </button>
+            <button
+              onClick={skipUpdate}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'rgba(255,255,255,0.8)',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              {isZh ? '稍后' : 'Later'}
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>

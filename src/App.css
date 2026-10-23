@@ -4,6 +4,27 @@
 * {
   box-sizing: border-box;
 }
+
+/* 🌟 新增：全局极细半透明滚动条（适配所有主流浏览器） */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
 body {
   margin: 0;
   background-color: #1e1e1e;
@@ -86,10 +107,6 @@ body {
   flex-direction: column;
   -webkit-overflow-scrolling: touch;
 }
-
-.scroll-content::-webkit-scrollbar { width: 4px; }
-.scroll-content::-webkit-scrollbar-track { background: transparent; }
-.scroll-content::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
 
 /* 🌟 强制让内部视图继承 100% 高度 */
 .view-content {
@@ -420,9 +437,6 @@ body {
    ========================================= */
 .journal-view {display: flex; flex-direction: column; height: 100%; min-height: 300px;}
 .journal-list {width: 100%; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;}
-.journal-list::-webkit-scrollbar { width: 4px; }
-.journal-list::-webkit-scrollbar-track { background: transparent; }
-.journal-list::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
 
 .journal-item { display: flex; align-items: center; background: rgba(51, 51, 51, 0.85); padding: 10px; border-radius: 8px; gap: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 .journal-time { font-size: 11px; color: #aaa; width: 65px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -609,8 +623,6 @@ body {
   z-index: 100;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
-.autocomplete-dropdown::-webkit-scrollbar { width: 4px; }
-.autocomplete-dropdown::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
 
 .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #444; font-size: 13px; color: #fff; display: flex; flex-direction: column; gap: 4px; }
 .autocomplete-item:hover { background: #3b82f6; }
@@ -670,10 +682,8 @@ body {
 .pip-container select { padding: 4px; font-size: clamp(10px, 3vw, 14px); }
 
 /* =========================================
-   PC 双列布局
+   PC 双列布局 (恢复常驻双列)
    ========================================= */
-/* 找到 .focus-layout, .focus-left, .focus-right 的 PC 端媒体查询并修改为如下： */
-
 @media (min-width: 768px) {
   body { align-items: center; }
   
@@ -687,12 +697,13 @@ body {
 
   .focus-layout {
     display: flex;
-    gap: 32px;
+    flex-direction: row;
+    gap: 24px;
     width: 100%;
     height: 100%;
     align-items: stretch;
     flex: 1;
-    min-height: 0; /* 🌟 修复子元素撑破父容器 */
+    min-height: 0;
   }
 
   .focus-left {
@@ -700,8 +711,8 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-    padding-right: 32px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    padding-right: 24px;
     min-height: 0;
   }
 
@@ -710,8 +721,10 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    justify-content: flex-start; /* 改为从顶部开始 */
+    justify-content: flex-start;
     min-height: 0;
+    overflow-y: auto; /* 启用滚动，配合我们做的全局细滚动条 */
+    padding-right: 4px;
   }
 
   .add-controls { justify-content: center; gap: 16px; }

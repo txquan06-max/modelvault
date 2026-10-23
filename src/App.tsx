@@ -163,6 +163,25 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
+  // 🌟 强制更新 SW
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('New content is available; please refresh.');
+                window.location.reload();
+              }
+            };
+          }
+        };
+      }).catch((err) => { console.log('SW registration failed: ', err); });
+    }
+  }, []);
+
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
     { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
@@ -179,7 +198,7 @@ function App() {
       title: isZh ? '安装至桌面' : 'Install to Desktop', 
       content: isZh 
         ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！' 
-        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app (or click the install icon in the address bar).\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!', 
+        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app.\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!', 
       page: 'profile' 
     }
   ];
@@ -790,6 +809,9 @@ function App() {
   const viewingModel = models.find(m => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
+  // 🌟 获取当前佩戴的称号定义
+  const equippedTitleDef = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
+
   const commonProps = {
     t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     timerState, activeSeconds, lastSession, timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
@@ -810,7 +832,8 @@ function App() {
     chatMessages,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
     setActiveTab, ambientType, setAmbientType,
-    handleOpenPiP
+    handleOpenPiP,
+    equippedTitleDef // 🌟 透传称号定义
   };
 
   return (
@@ -840,7 +863,16 @@ function App() {
 
         <div className="mini-window">
           
-          {/* 🌟 统一导航栏 (除详情页外全部展示) */}
+          {/* 🌟 统一置顶工具栏：语言切换与教程 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
+            <button 
+              onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
+              style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="新手教程"
+            >?</button>
+            <button className="lang-btn" onClick={toggleLanguage}>{isZh ? 'EN' : '中'}</button>
+          </div>
+
           {!viewingModel && (
             <div className="tabs">
               <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
@@ -864,18 +896,11 @@ function App() {
                 ) : (
                   <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(viewingModel.id); }}>🗑️</button>
                 )}
-                <button className="lang-btn" onClick={toggleLanguage}>{isZh ? 'EN' : '中'}</button>
               </div>
             </div>
           )}
 
           <div className="scroll-content">
-            <button 
-              onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
-              style={{ position: 'absolute', right: '16px', top: '60px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', zIndex: 100, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="新手教程"
-            >?</button>
-
             {viewingModel ? (
               <ModelDetail 
                 viewingModel={viewingModel} 

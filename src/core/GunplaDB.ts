@@ -34,9 +34,11 @@ export const CORE_DB: GunplaItem[] = [
   { id: 'gelgoog-char-hg', name: { en: 'MS-14S Gelgoog Char Custom', jp: 'MS-14S シャア専用ゲルググ', zh: '夏亚专用勇士' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
   { id: 'gelgoog-char-mg', name: { en: 'MS-14S Gelgoog Char Custom', jp: 'MS-14S シャア専用ゲルググ', zh: '夏亚专用勇士' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'MG' },
   { id: 'zgok-hg', name: { en: 'MSM-07 Z\'Gok', jp: 'MSM-07 ズゴック', zh: '魔蟹' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
+  { id: 'zgok-mg', name: { en: 'MSM-07 Z\'Gok', jp: 'MSM-07 ズゴック', zh: '魔蟹' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'MG' },
   { id: 'acguy-hg', name: { en: 'MSM-04 Acguy', jp: 'MSM-04 アッガイ', zh: '龟霸' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
   { id: 'gogg-hg', name: { en: 'MSM-03 Gogg', jp: 'MSM-03 ゴッグ', zh: '战蟹' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
   { id: 'zeong-hg', name: { en: 'MSN-02 Zeong', jp: 'MSN-02 ジオング', zh: '吉翁号' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
+  { id: 'zeong-rg', name: { en: 'MSN-02 Zeong', jp: 'MSN-02 ジオング', zh: '吉翁号' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'RG' },
   { id: 'gyan-hg', name: { en: 'YMS-15 Gyan', jp: 'YMS-15 ギャン', zh: '强人' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
   { id: 'guncannon-hg', name: { en: 'RX-77-2 Guncannon', jp: 'RX-77-2 ガンキャノン', zh: '钢加农' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'HG' },
   { id: 'guncannon-rg', name: { en: 'RX-77-2 Guncannon', jp: 'RX-77-2 ガンキャノン', zh: '钢加农' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'RG' },
@@ -328,6 +330,158 @@ export const CORE_DB: GunplaItem[] = [
   // --- 创战 / 创形 ---
   { id: 'hyaku-shiki-crash-mg', name: { en: 'MSN-00100 Hyaku Shiki Crash', jp: 'MSN-00100 百式壊', zh: '百式坏' }, series: { en: 'Gundam Build Divers', jp: 'ガンダムビルドダイバーズ', zh: '高达创形者' }, grade: 'MG' },
   { id: 'gundam-astray-turn-red-mg', name: { en: 'MBF-02VV Gundam Astray Turn Red', jp: 'MBF-02VV ガンダムアストレイ ターンレッド', zh: '异端高达 红龙' }, series: { en: 'Gundam SEED Destiny ASTRAY R', jp: '機動戦士ガンダムSEED DESTINY ASTRAY R', zh: '高达SEED Destiny ASTRAY R' }, grade: 'MG' },
+
+  // ========================================================
+  // ==================== 补充：PB限定 & 特殊规格 ====================
+  // ========================================================
+  { id: 'rg-pb-strike-rouge', name: { en: 'RG Strike Rouge + HG I.W.S.P.', jp: 'RG ストライクルージュ + HG I.W.S.P.', zh: 'RG 嫣红强袭 + HG I.W.S.P.' }, series: { en: 'Gundam SEED', jp: '機動戦士ガンダムSEED', zh: '高达SEED' }, grade: 'RG' },
+  { id: 'mg-pb-marasai-unicorn', name: { en: 'MG Marasai (Unicorn Color Ver.)', jp: 'MG マラサイ (ユニコーンカラーVer.)', zh: 'MG 玛拉赛 (独角兽配色)' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MG' },
+  { id: 'hguc-pb-aqua-hambrabi', name: { en: 'HGUC Aqua-Hambrabi II (A.O.Z. RE-BOOT Ver.)', jp: 'HGUC アクア・ハンブラビII (A.O.Z. RE-BOOT Ver.)', zh: 'HGUC 水中汉布拉比II (AOZ RE-BOOT版)' }, series: { en: 'Advance of Zeta', jp: 'Advance of Zeta', zh: 'Advance of Zeta (AOZ)' }, grade: 'HG' },
+  { id: 'hgce-pb-gyan-strom-hilda', name: { en: 'HGCE Gyan Strom (Hilda Haken Custom)', jp: 'HGCE ギャンシュトローム (ヒルダ・ハーケン専用機)', zh: 'HGCE 强人奔流 (希尔达专用机)' }, series: { en: 'Gundam SEED Freedom', jp: 'ガンダムSEED FREEDOM', zh: '高达SEED FREEDOM' }, grade: 'HG' },
+  { id: 'mg-pb-gundam-dynames-transam', name: { en: 'MG Gundam Dynames (TRANS-AM Mode)', jp: 'MG ガンダムデュナメス (トランザムモード)', zh: 'MG 力天使高达 (Trans-Am模式)' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'MG' },
+  { id: 'rg-pb-blast-impulse-spec2', name: { en: 'RG Blast Impulse Gundam Spec II', jp: 'RG ブラストインパルスガンダム Spec II', zh: 'RG 轰击型脉冲高达 Spec II' }, series: { en: 'Gundam SEED Freedom', jp: 'ガンダムSEED FREEDOM', zh: '高达SEED FREEDOM' }, grade: 'RG' },
+  { id: 'mg-pb-shin-musha', name: { en: 'MG Shin Musha Gundam (Sengoku no Jin Black Robe Large Armor)', jp: 'MG 真武者頑駄無 (戦国の陣 黒衣大鎧)', zh: 'MG 真武者高达 (战国之阵 黑衣大铠)' }, series: { en: 'SD Sengokuden', jp: 'SD戦国伝', zh: 'SD战国传' }, grade: 'MG' },
+  { id: 'mg-pb-astray-noir', name: { en: 'MG Gundam Astray Noir', jp: 'MG ガンダムアストレイ ノワール', zh: 'MG 异端高达 黑色机' }, series: { en: 'Gundam SEED Destiny ASTRAY', jp: '機動戦士ガンダムSEED DESTINY ASTRAY', zh: '高达SEED Destiny ASTRAY' }, grade: 'MG' },
+
+  // --- 近期通贩新品 & 再版精选 (2024-2026) ---
+  { id: 'hg-gundam-zagan', name: { en: 'HG Gundam Zagan', jp: 'HG ガンダムザガン', zh: 'HG 高达扎冈' }, series: { en: 'Gundam Build Metaverse', jp: 'ガンダムビルドメタバース', zh: '高达创战元宇宙' }, grade: 'HG' },
+  { id: 'hg-alis-aris', name: { en: 'HG Alis Aris', jp: 'HG アリズス', zh: 'HG 阿利宙斯' }, series: { en: "Hathaway's Flash", jp: '閃光のハサウェイ', zh: '闪光的哈萨维' }, grade: 'HG' },
+  { id: 'hg-messer-m01-gauman', name: { en: 'HG Messer M01 Type (Gauman Custom)', jp: 'HG メッサーM01型 (ガウマン専用機)', zh: 'HG 梅萨M01型 (加乌曼专用机)' }, series: { en: "Hathaway's Flash", jp: '閃光のハサウェイ', zh: '闪光的哈萨维' }, grade: 'HG' },
+  { id: 'mg-turn-a-2026', name: { en: 'MG Turn A Gundam', jp: 'MG ∀ガンダム', zh: 'MG 倒A高达' }, series: { en: 'Turn A Gundam', jp: '∀ガンダム', zh: '逆A高达' }, grade: 'MG' },
+  { id: 'hg-gquuuuuux-char-zaku-gq', name: { en: "HG Char's Zaku (GQ)", jp: 'HG シャア専用ザク(GQ)', zh: 'HG 夏亚专用扎古 (GQ)' }, series: { en: 'GQuuuuuuX', jp: '機動戦士Gundam GQuuuuuuX', zh: '机动战士Gundam GQuuuuuuX' }, grade: 'HG' },
+  { id: 'hg-rick-dom-gaia-ortega-gq', name: { en: 'HG Rick Dom (Gaia/Ortega Custom) (GQ)', jp: 'HG リック・ドム ガイア機/オルテガ機 (GQ)', zh: 'HG 里克·大魔 盖亚机/奥尔迪加机 (GQ)' }, series: { en: 'GQuuuuuuX', jp: '機動戦士Gundam GQuuuuuuX', zh: '机动战士Gundam GQuuuuuuX' }, grade: 'HG' },
+  { id: 'mg-wing-gundam-ver-ka', name: { en: 'MG Wing Gundam Ver.Ka', jp: 'MG ウイングガンダム Ver.Ka', zh: 'MG 飞翼高达 Ver.Ka' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'MG' },
+  { id: 'mg-unicorn-ver-ka', name: { en: 'MG Unicorn Gundam Ver.Ka', jp: 'MG ユニコーンガンダム Ver.Ka', zh: 'MG 独角兽高达 Ver.Ka' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MG' },
+  { id: 'mg-sinanju-ver-ka', name: { en: 'MG Sinanju Ver.Ka', jp: 'MG シナンジュ Ver.Ka', zh: 'MG 新安洲 Ver.Ka' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MG' },
+  { id: 'mg-v-dash-ver-ka', name: { en: 'MG V-Dash Gundam Ver.Ka', jp: 'MG Vダッシュガンダム Ver.Ka', zh: 'MG V高达突进型 Ver.Ka' }, series: { en: 'Victory Gundam', jp: '機動戦士Vガンダム', zh: '机动战士V高达' }, grade: 'MG' },
+  { id: 'mg-full-armor-unicorn-ver-ka', name: { en: 'MG Full Armor Unicorn Gundam Ver.Ka', jp: 'MG フルアーマーユニコーンガンダム Ver.Ka', zh: 'MG 全装甲型独角兽高达 Ver.Ka' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MG' },
+  { id: 'mg-sinanju-stein-ver-ka', name: { en: 'MG Sinanju Stein Ver.Ka', jp: 'MG シナンジュ・スタイン Ver.Ka', zh: 'MG 新安洲原石型 Ver.Ka' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MG' },
+  { id: 'mg-sazabi-ver-ka', name: { en: 'MG Sazabi Ver.Ka', jp: 'MG サザビー Ver.Ka', zh: 'MG 沙扎比 Ver.Ka' }, series: { en: "Char's Counterattack", jp: '逆襲のシャア', zh: '逆袭的夏亚' }, grade: 'MG' },
+  { id: 'mg-full-armor-gundam-ver-ka-thunderbolt', name: { en: 'MG Full Armor Gundam Ver.Ka (Thunderbolt Ver.)', jp: 'MG フルアーマー・ガンダム Ver.Ka (サンダーボルト版)', zh: 'MG 全装甲高达 Ver.Ka (雷霆宙域版)' }, series: { en: 'Thunderbolt', jp: '機動戦士ガンダム サンダーボルト', zh: '雷霆宙域' }, grade: 'MG' },
+  { id: 'mg-psycho-zaku-ver-ka-thunderbolt', name: { en: 'MG High Mobility Type Zaku "Psycho Zaku" Ver.Ka (Thunderbolt Ver.)', jp: 'MG 高機動型ザク "サイコ・ザク" Ver.Ka (サンダーボルト版)', zh: 'MG 高机动型扎古“脑波传导型扎古” Ver.Ka (雷霆宙域版)' }, series: { en: 'Thunderbolt', jp: '機動戦士ガンダム サンダーボルト', zh: '雷霆宙域' }, grade: 'MG' },
+  { id: 'mg-zz-ver-ka', name: { en: 'MG ZZ Gundam Ver.Ka', jp: 'MG ダブルゼータガンダム Ver.Ka', zh: 'MG ZZ高达 Ver.Ka' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'MG' },
+  { id: 'mg-wing-zero-ew-ver-ka', name: { en: 'MG Wing Gundam Zero EW Ver.Ka', jp: 'MG ウイングガンダムゼロEW Ver.Ka', zh: 'MG 飞翼高达零式 EW Ver.Ka' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'MG' },
+  { id: 'mg-narrative-c-ver-ka', name: { en: 'MG Narrative Gundam C-Packs Ver.Ka', jp: 'MG ナラティブガンダム C装備 Ver.Ka', zh: 'MG 叙事高达 C装备 Ver.Ka' }, series: { en: 'Gundam Narrative', jp: '機動戦士ガンダムNT', zh: '机动战士高达NT' }, grade: 'MG' },
+  { id: 'mg-gouf-custom', name: { en: 'MG MS-07B3 Gouf Custom', jp: 'MG MS-07B3 グフカスタム', zh: 'MG 老虎特装型' }, series: { en: 'The 08th MS Team', jp: '機動戦士ガンダム第08MS小隊', zh: '机动战士高达 第08MS小队' }, grade: 'MG' },
+  { id: 'mgsd-freedom', name: { en: 'MGSD Freedom Gundam', jp: 'MGSD フリーダムガンダム', zh: 'MGSD 自由高达' }, series: { en: 'Gundam SEED', jp: '機動戦士ガンダムSEED', zh: '高达SEED' }, grade: 'MGSD' },
+  { id: 'mgsd-wing-zero-ew', name: { en: 'MGSD Wing Gundam Zero EW', jp: 'MGSD ウイングガンダムゼロ EW', zh: 'MGSD 飞翼高达零式 EW' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'MGSD' },
+  { id: 'mgsd-aerial', name: { en: 'MGSD Gundam Aerial', jp: 'MGSD ガンダムエアリアル', zh: 'MGSD 风灵高达' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'MGSD' },
+  { id: 'mgsd-destiny', name: { en: 'MGSD Destiny Gundam', jp: 'MGSD デスティニーガンダム', zh: 'MGSD 命运高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'MGSD' },
+  { id: 'mgsd-kshatriya', name: { en: 'MGSD Kshatriya', jp: 'MGSD クシャトリヤ', zh: 'MGSD 刹帝利' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'MGSD' },
+  { id: 'pg-strike-freedom', name: { en: 'PG Strike Freedom Gundam', jp: 'PG ストライクフリーダムガンダム', zh: 'PG 强袭自由高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'PG' },
+  { id: 'pg-unleashed-rx-78-2', name: { en: 'PG UNLEASHED RX-78-2 Gundam', jp: 'PG UNLEASHED RX-78-2 ガンダム', zh: 'PG UNLEASHED RX-78-2 高达' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'PG' },
+  { id: 'rg-zeong', name: { en: 'RG Zeong', jp: 'RG ジオング', zh: 'RG 吉翁号' }, series: { en: 'Mobile Suit Gundam', jp: '機動戦士ガンダム', zh: '机动战士高达' }, grade: 'RG' },
+  { id: 'rg-epyon', name: { en: 'RG Gundam Epyon', jp: 'RG ガンダムエピオン', zh: 'RG 艾比安高达' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'RG' },
+  { id: 'rg-god-gundam', name: { en: 'RG God Gundam', jp: 'RG ゴッドガンダム', zh: 'RG 神高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'RG' },
+  { id: 'hg-god-gundam', name: { en: 'HGFC God Gundam', jp: 'HGFC ゴッドガンダム', zh: 'HGFC 神高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hg-shining-gundam', name: { en: 'HGFC Shining Gundam', jp: 'HGFC シャイニングガンダム', zh: 'HGFC 闪光高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hg-master-gundam', name: { en: 'HGFC Master Gundam', jp: 'HGFC マスターガンダム', zh: 'HGFC 尊者高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hg-nobell-gundam', name: { en: 'HGFC Nobel Gundam', jp: 'HGFC ノーベルガンダム', zh: 'HGFC 诺贝尔高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hg-altron-gundam', name: { en: 'HGAC Altron Gundam', jp: 'HGAC アルトロンガンダム', zh: 'HGAC 双头龙高达' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-sandrock-gundam', name: { en: 'HGAC Sandrock Gundam', jp: 'HGAC サンドロックガンダム', zh: 'HGAC 沙漠高达' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-heavyarms-gundam', name: { en: 'HGAC Heavyarms Gundam', jp: 'HGAC ヘビーアームズガンダム', zh: 'HGAC 重装高达' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-deathscythe-gundam', name: { en: 'HGAC Deathscythe Gundam', jp: 'HGAC デスサイズガンダム', zh: 'HGAC 死神高达' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-wing-gundam-zero', name: { en: 'HGAC Wing Gundam Zero', jp: 'HGAC ウイングガンダムゼロ', zh: 'HGAC 飞翼高达零式' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-tallgeese', name: { en: 'HGAC Tallgeese', jp: 'HGAC トールギス', zh: 'HGAC 多鲁基斯' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hg-leo', name: { en: 'HGAC Leo', jp: 'HGAC リーオー', zh: 'HGAC 里奥' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'mg-epyon', name: { en: 'MG Gundam Epyon EW', jp: 'MG ガンダムエピオン EW', zh: 'MG 艾比安高达 EW' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'MG' },
+  { id: 'mg-god-gundam', name: { en: 'MG God Gundam', jp: 'MG ゴッドガンダム', zh: 'MG 神高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'MG' },
+  { id: 'mg-shining-gundam', name: { en: 'MG Shining Gundam', jp: 'MG シャイニングガンダム', zh: 'MG 闪光高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'MG' },
+  { id: 'mg-master-gundam', name: { en: 'MG Master Gundam', jp: 'MG マスターガンダム', zh: 'MG 尊者高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'MG' },
+
+  // ========================================================
+  // ==================== 更多补充机体 (扩充至300+) ====================
+  // ========================================================
+  // UC 补充
+  { id: 'hguc-gm-custom', name: { en: 'RGM-79N GM Custom', jp: 'RGM-79N ジム・カスタム', zh: '吉姆特装型' }, series: { en: '0083: Stardust Memory', jp: '機動戦士ガンダム0083', zh: '机动战士高达0083 星尘的回忆' }, grade: 'HG' },
+  { id: 'hguc-gp04', name: { en: 'RX-78GP04G Gundam GP04G', jp: 'RX-78GP04G ガンダムGP04G', zh: '高达GP04G' }, series: { en: '0083: Stardust Memory', jp: '機動戦士ガンダム0083', zh: '机动战士高达0083 星尘的回忆' }, grade: 'HG' },
+  { id: 'hguc-gundam-mk3', name: { en: 'RX-272 Gundam Mk-III', jp: 'RX-272 ガンダムMk-III', zh: '高达Mk-III' }, series: { en: 'Zeta Gundam', jp: '機動戦士Ζガンダム', zh: '机动战士Z高达' }, grade: 'HG' },
+  { id: 'hguc-baund-doc', name: { en: 'NRX-055 Baund Doc', jp: 'NRX-055 バウンド・ドック', zh: '猎犬' }, series: { en: 'Zeta Gundam', jp: '機動戦士Ζガンダム', zh: '机动战士Z高达' }, grade: 'HG' },
+  { id: 'hguc-gaza-c', name: { en: 'AMX-003 Gaza C', jp: 'AMX-003 ガザC', zh: '加撒C' }, series: { en: 'Zeta Gundam', jp: '機動戦士Ζガンダム', zh: '机动战士Z高达' }, grade: 'HG' },
+  { id: 'hguc-galluss-j', name: { en: 'AMX-101 Galluss-J', jp: 'AMX-101 ガルスJ', zh: '加尔斯J' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'HG' },
+  { id: 'hguc-zssa', name: { en: 'AMX-102 Zssa', jp: 'AMX-102 ズサ', zh: '兹萨' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'HG' },
+  { id: 'hguc-r-jarja', name: { en: 'AMX-104 R-Jarja', jp: 'AMX-104 R・ジャジャ', zh: 'R·贾贾' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'HG' },
+  { id: 'hguc-hamma-hamma', name: { en: 'AMX-004-3 Qubeley Mk-III (Hamma Hamma)', jp: 'AMX-004-3 キュベレイMk-III (ハマーン専用機)', zh: '卡碧尼Mk-III (哈曼专用机)' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'HG' },
+  { id: 'hguc-unicorn-banshee-norn-destroy', name: { en: 'RX-0 Unicorn Gundam 02 Banshee Norn (Destroy Mode)', jp: 'RX-0 ユニコーンガンダム2号機 バンシィ・ノルン (デストロイモード)', zh: '报丧女妖·命运女神 (毁灭模式)' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'HG' },
+  { id: 'hguc-sinanju-stein', name: { en: 'MSN-06S-2 Sinanju Stein', jp: 'MSN-06S-2 シナンジュ・スタイン', zh: '新安洲·原石' }, series: { en: 'Gundam Narrative', jp: '機動戦士ガンダムNT', zh: '机动战士高达NT' }, grade: 'HG' },
+  { id: 'hguc-narrative-a', name: { en: 'RX-9 Narrative Gundam A-Packs', jp: 'RX-9 ナラティブガンダム A装備', zh: '叙事高达 A装备' }, series: { en: 'Gundam Narrative', jp: '機動戦士ガンダムNT', zh: '机动战士高达NT' }, grade: 'HG' },
+
+  // CE 补充 (SEED)
+  { id: 'hgce-dagger-l', name: { en: 'GAT-01A1 Dagger L', jp: 'GAT-01A1 ダガーL', zh: '短剑L' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-windam', name: { en: 'GAT-04 Windam', jp: 'GAT-04 ウィンダム', zh: '温达姆' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-gouf-ignited', name: { en: 'ZGMF-2000 Gouf Ignited', jp: 'ZGMF-2000 グフイグナイテッド', zh: '老虎烈焰' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-zaku-warrior', name: { en: 'ZGMF-1000 Zaku Warrior', jp: 'ZGMF-1000 ザクウォーリア', zh: '扎古勇士' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-gouf-ignited-heine', name: { en: 'ZGMF-2000 Gouf Ignited (Heine Westenfluss Custom)', jp: 'ZGMF-2000 グフイグナイテッド (ハイネ・ヴェステンフルス専用機)', zh: '老虎烈焰 (海涅专用机)' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-blaze-zaku-phantom', name: { en: 'ZGMF-1001/M Blaze Zaku Phantom', jp: 'ZGMF-1001/M ブレイズザクファントム', zh: '烈焰型扎古幻影' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-gaia-gundam', name: { en: 'ZGMF-X88S Gaia Gundam', jp: 'ZGMF-X88S ガイアガンダム', zh: '盖亚高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-chaos-gundam', name: { en: 'ZGMF-X24S Chaos Gundam', jp: 'ZGMF-X24S カオスガンダム', zh: '混沌高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-abyss-gundam', name: { en: 'ZGMF-X31S Abyss Gundam', jp: 'ZGMF-X31S アビスガンダム', zh: '深渊高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-saviour-gundam', name: { en: 'ZGMF-X23S Saviour Gundam', jp: 'ZGMF-X23S セイバーガンダム', zh: '救世主高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-infinity-justice', name: { en: 'ZGMF-X19A Infinite Justice Gundam', jp: 'ZGMF-X19A インフィニットジャスティスガンダム', zh: '无限正义高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'hgce-destiny-gundam', name: { en: 'ZGMF-X42S Destiny Gundam', jp: 'ZGMF-X42S デスティニーガンダム', zh: '命运高达' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+
+  // AD 补充 (00)
+  { id: 'hg00-gundam-throne-eins', name: { en: 'GNW-001 Gundam Throne Eins', jp: 'GNW-001 ガンダムスローネアイン', zh: '座天使高达一型' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-gundam-throne-zwei', name: { en: 'GNW-002 Gundam Throne Zwei', jp: 'GNW-002 ガンダムスローネツヴァイ', zh: '座天使高达二型' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-gundam-throne-drei', name: { en: 'GNW-003 Gundam Throne Drei', jp: 'GNW-003 ガンダムスローネドライ', zh: '座天使高达三型' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-reborns-gundam', name: { en: 'CB-0000G/C Reborns Gundam', jp: 'CB-0000G/C リボーンズガンダム', zh: '再生高达' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-susanowo', name: { en: 'GN-001REIII Gundam Exia Repair III (Susanowo)', jp: 'GN-001REIII ガンダムエクシアリペアIII (スサノオ)', zh: '能天使高达修复型III (须佐之男)' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-gundam-sadalsuud', name: { en: 'GN-002 Gundam Dynames (Saga Typ)', jp: 'GN-002 ガンダムデュナメス (サーガタイプ)', zh: '力天使高达 (传说型)' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-gundam-zabanya', name: { en: 'GN-010 Gundam Zabanya', jp: 'GN-010 ガンダムサバーニャ', zh: '狱天使高达' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'hg00-raphael-gundam', name: { en: 'GN-008RE Seravee Gundam II', jp: 'GN-008RE セラヴィーガンダムII', zh: '炽天使高达II' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'HG' },
+  { id: 'rg-00-raiser', name: { en: 'RG 00 Raiser', jp: 'RG ダブルオーライザー', zh: 'RG 00强化模组' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'RG' },
+  { id: 'rg-00-qant', name: { en: 'RG 00 Qan[T]', jp: 'RG ダブルオークアンタ', zh: 'RG 量子型00高达' }, series: { en: 'Gundam 00', jp: '機動戦士ガンダム00', zh: '机动战士高达00' }, grade: 'RG' },
+
+  // PD 补充 (铁血)
+  { id: 'hg-ibo-gundam-gusion', name: { en: 'ASW-G-11 Gundam Gusion', jp: 'ASW-G-11 ガンダム・グシオン', zh: '高达古辛' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-flauros', name: { en: 'ASW-G-64 Gundam Flauros', jp: 'ASW-G-64 ガンダム・フラウロス', zh: '高达佛劳洛斯' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-bael', name: { en: 'ASW-G-01 Gundam Bael', jp: 'ASW-G-01 ガンダム・バエル', zh: '高达巴耶力' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-kimaris-trooper', name: { en: 'ASW-G-66 Gundam Kimaris Trooper', jp: 'ASW-G-66 ガンダム・キマリストルーパー', zh: '高达锡蒙利骑兵型' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-kimaris-vidar', name: { en: 'ASW-G-66 Gundam Kimaris Vidar', jp: 'ASW-G-66 ガンダム・キマリスヴィダール', zh: '高达锡蒙利维达尔' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-vual', name: { en: 'ASW-G-47 Gundam Vual', jp: 'ASW-G-47 ガンダム・ウヴァル', zh: '高达乌瓦尔' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-astaroth', name: { en: 'ASW-G-29 Gundam Astaroth', jp: 'ASW-G-29 ガンダム・アスタロト', zh: '高达阿斯塔罗特' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-dantalion', name: { en: 'ASW-G-71 Gundam Dantalion', jp: 'ASW-G-71 ガンダム・ダンタリオン', zh: '高达但丁利昂' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+  { id: 'hg-ibo-gundam-gremory', name: { en: 'ASW-G-56 Gundam Gremory', jp: 'ASW-G-56 ガンダム・グレモリー', zh: '高达格莫瑞' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'HG' },
+
+  // AS 补充 (水星)
+  { id: 'hg-wfm-demi-trainer', name: { en: 'Demi Trainer', jp: 'デミトレーナー', zh: '戴米训练机' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-zowort', name: { en: 'Zowort', jp: 'ゾウォート', zh: '佐沃特' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-heindree', name: { en: 'Heindree', jp: 'ハインドリー', zh: '海因德里' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-dilanza', name: { en: 'Dilanza', jp: 'ディランザ', zh: '迪兰扎' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-beguir-pente', name: { en: 'Beguir-Pente', jp: 'ベギルペンデ', zh: '贝吉·彭德' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-desultor', name: { en: 'Desultor', jp: 'デスルター', zh: '德斯尔塔' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-gundam-lfrith-thorn', name: { en: 'Gundam Lfrith Thorn', jp: 'ガンダム・ルブリス・ゾーン', zh: '魔灵高达 索恩' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+  { id: 'hg-wfm-gundam-lfrith-ur', name: { en: 'Gundam Lfrith Ur', jp: 'ガンダム・ルブリス・ウル', zh: '魔灵高达 乌尔' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'HG' },
+
+  // AC 补充 (Wing)
+  { id: 'hgac-wing-gundam-zero-tv', name: { en: 'HGAC Wing Gundam Zero (TV Ver.)', jp: 'HGAC ウイングガンダムゼロ (TV版)', zh: 'HGAC 飞翼高达零式 (TV版)' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hgac-tallgeese-iii', name: { en: 'HGAC Tallgeese III', jp: 'HGAC トールギスIII', zh: 'HGAC 多鲁基斯III' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'hgac-gundam-heavyarms-custom', name: { en: 'HGAC Gundam Heavyarms Custom', jp: 'HGAC ガンダムヘビーアームズ改', zh: 'HGAC 重装高达改' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+
+  // FC 补充 (G)
+  { id: 'hgfc-rising-gundam', name: { en: 'HGFC Rising Gundam', jp: 'HGFC ライジングガンダム', zh: 'HGFC 升腾高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hgfc-gundam-maxter', name: { en: 'HGFC Gundam Maxter', jp: 'HGFC ガンダムマックスター', zh: 'HGFC 麦克之星高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hgfc-dragon-gundam', name: { en: 'HGFC Dragon Gundam', jp: 'HGFC ドラゴンガンダム', zh: 'HGFC 龙高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+  { id: 'hgfc-bolt-gundam', name: { en: 'HGFC Bolt Gundam', jp: 'HGFC ボルトガンダム', zh: 'HGFC 雷霆高达' }, series: { en: 'G Gundam', jp: '機動武闘伝Gガンダム', zh: '机动武斗传G高达' }, grade: 'HG' },
+
+  // 其他系列及PB
+  { id: 'hg-pb-gundam-tr-6-woundwort', name: { en: 'HGUC Gundam TR-6 [Woundwort]', jp: 'HGUC ガンダムTR-6 [ウーンドウォート]', zh: 'HGUC 高达TR-6 [伍德渥特]' }, series: { en: 'Advance of Zeta', jp: 'Advance of Zeta', zh: 'Advance of Zeta (AOZ)' }, grade: 'HG' },
+  { id: 'hg-pb-gundam-tr-6-hazel-ii', name: { en: 'HGUC Gundam TR-6 [Hazel II]', jp: 'HGUC ガンダムTR-6 [ヘイズルII]', zh: 'HGUC 高达TR-6 [海兹尔II]' }, series: { en: 'Advance of Zeta', jp: 'Advance of Zeta', zh: 'Advance of Zeta (AOZ)' }, grade: 'HG' },
+  { id: 'mg-pb-gundam-tr-1-hazel-owsla', name: { en: 'MG Gundam TR-1 [Hazel Owsla]', jp: 'MG ガンダムTR-1 [ヘイズル・アウスラ]', zh: 'MG 高达TR-1 [海兹尔·奥斯拉]' }, series: { en: 'Advance of Zeta', jp: 'Advance of Zeta', zh: 'Advance of Zeta (AOZ)' }, grade: 'MG' },
+  { id: 're-100-nightengale', name: { en: 'RE/100 Nightingale', jp: 'RE/100 ナイチンゲール', zh: 'RE/100 夜莺' }, series: { en: "Char's Counterattack: Beltorchika's Children", jp: '機動戦士ガンダム 逆襲のシャア ベルトーチカ・チルドレン', zh: '机动战士高达 逆袭的夏亚 贝托蒂嘉的子嗣' }, grade: 'RE/100' },
+  { id: 're-100-dijeh', name: { en: 'RE/100 Dijeh', jp: 'RE/100 ディジェ', zh: 'RE/100 迪杰' }, series: { en: 'Zeta Gundam', jp: '機動戦士Ζガンダム', zh: '机动战士Z高达' }, grade: 'RE/100' },
+  { id: 're-100-bawoo', name: { en: 'RE/100 Bawoo', jp: 'RE/100 バウ', zh: 'RE/100 龙飞' }, series: { en: 'Gundam ZZ', jp: '機動戦士ガンダムΖΖ', zh: '机动战士高达ZZ' }, grade: 'RE/100' },
+  { id: 'fm-gundam-barbatos-lupus-rex', name: { en: 'FM Gundam Barbatos Lupus Rex', jp: 'FM ガンダム・バルバトスルプスレクス', zh: 'FM 高达巴巴托斯天狼座帝王形态' }, series: { en: 'Iron-Blooded Orphans', jp: '鉄血のオルフェンズ', zh: '铁血的奥尔芬斯' }, grade: 'FM' },
+  { id: 'fm-gundam-aerial', name: { en: 'FM Gundam Aerial', jp: 'FM ガンダム・エアリアル', zh: 'FM 风灵高达' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'FM' },
+  { id: 'fm-gundam-aerial-rebuild', name: { en: 'FM Gundam Aerial Rebuild', jp: 'FM ガンダム・エアリアル(改修型)', zh: 'FM 风灵高达 改修型' }, series: { en: 'The Witch from Mercury', jp: '水星の魔女', zh: '水星的魔女' }, grade: 'FM' },
+
+  // PB & 限定补充
+  { id: 'pb-hg-gundam-lob', name: { en: 'HGAC PB Gundam L.O. Booster', jp: 'HGAC PB ガンダムL.O.ブースター', zh: 'HGAC PB 高达L.O.推进器' }, series: { en: 'Gundam Wing', jp: '新機動戦記ガンダムW', zh: '新机动战记高达W' }, grade: 'HG' },
+  { id: 'pb-hg-zeta-uc0088', name: { en: 'HGUC PB Zeta Gundam [U.C.0088]', jp: 'HGUC PB ゼータガンダム [U.C.0088]', zh: 'HGUC PB Z高达 [U.C.0088]' }, series: { en: 'Zeta Gundam', jp: '機動戦士Ζガンダム', zh: '机动战士Z高达' }, grade: 'HG' },
+  { id: 'pb-hg-windam-neo', name: { en: 'HGCE PB Windam (Neo Roanoke Custom)', jp: 'HGCE PB ウィンダム (ネオ・ロアノーク専用機)', zh: 'HGCE PB 温达姆 (尼奥专用机)' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'HG' },
+  { id: 'pb-hg-prototype-stark-jegan', name: { en: 'HGUC PB Prototype Stark Jegan', jp: 'HGUC PB プロトスタークジェガン', zh: 'HGUC PB 原型强袭杰刚' }, series: { en: 'Gundam Unicorn', jp: '機動戦士ガンダムUC', zh: '机动战士高达UC' }, grade: 'HG' },
+  { id: 'pb-rg-shiranui-akatsuki', name: { en: 'RG PB Shiranui Pack for Akatsuki Gundam', jp: 'RG PB 不知火装備 for アカツキガンダム', zh: 'RG PB 拂晓高达用不知火背包' }, series: { en: 'Gundam SEED Destiny', jp: '機動戦士ガンダムSEED DESTINY', zh: '高达SEED Destiny' }, grade: 'RG' },
+  { id: 'pb-mg-stormbringer-pf', name: { en: 'MG PB Gundam Stormbringer P.F.', jp: 'MG PB ガンダムストームブリンガー P.F.', zh: 'MG PB 风暴使者高达 P.F.' }, series: { en: 'Gundam Build Divers', jp: 'ガンダムビルドダイバーズ', zh: '高达创形者' }, grade: 'MG' },
 ];
 
 // ==================== 检索逻辑 (纯本地) ====================
@@ -344,7 +498,6 @@ export class GunplaSearch {
     });
   }
 
-  // 保持异步方法结构，方便 App.tsx 无感调用，但瞬间返回
   static async init(): Promise<void> {
     if (!this.fuse) {
       this.buildIndex(this.data);
@@ -357,22 +510,18 @@ export class GunplaSearch {
 
     const rawResults = this.fuse!.search(query.trim()).map(r => r.item);
 
-    // 🌟 排序逻辑: 机体名称 (English) -> 规格 -> 系列
-    const gradeOrder = ['EG', 'HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'];
+    const gradeOrder = ['EG', 'HG', 'RG', 'MG', 'MGEX', 'MGSD', 'RE/100', 'FM', 'PG'];
 
     return rawResults.sort((a, b) => {
-      // 1. 先按机体英文名称排序
       const nameCompare = a.name.en.localeCompare(b.name.en);
       if (nameCompare !== 0) return nameCompare;
 
-      // 2. 如果名称相同，按规格排序
       const idxGradeA = gradeOrder.indexOf(a.grade.toUpperCase());
       const idxGradeB = gradeOrder.indexOf(b.grade.toUpperCase());
       if (idxGradeA !== idxGradeB) {
         return (idxGradeA === -1 ? 999 : idxGradeA) - (idxGradeB === -1 ? 999 : idxGradeB);
       }
 
-      // 3. 如果规格也相同，按系列排序
       return a.series.en.localeCompare(b.series.en);
     });
   }

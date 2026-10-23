@@ -11,7 +11,8 @@ export const FocusPanel = ({
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
   currentBot, chatMessages,
-  ambientType, setAmbientType, handleOpenPiP
+  ambientType, setAmbientType, handleOpenPiP,
+  equippedTitleDef // 🌟 接收称号
 }: any) => {
   
   const [charIndex, setCharIndex] = useState(0);
@@ -20,6 +21,7 @@ export const FocusPanel = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastMsgIdRef = useRef<string | null>(null);
   
+  const isZh = i18n.language === 'zh';
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export const FocusPanel = ({
             setFinishPartPhoto(canvas.toDataURL('image/webp', 0.6));
           };
         };
-      } catch (err) { showToast('图片处理失败'); }
+      } catch (err) { showToast(isZh ? '图片处理失败' : 'Image processing failed'); }
     }
     e.target.value = '';
   };
@@ -103,7 +105,7 @@ export const FocusPanel = ({
       {chatMessages.map((msg: any, idx: number) => {
         const isLatest = idx === chatMessages.length - 1;
         const msgBotData = BOTS[msg.botId as BotType] || BOTS['tu']; 
-        const msgBotName = i18n.language === 'zh' ? msgBotData.name : msgBotData.enName;
+        const msgBotName = isZh ? msgBotData.name : msgBotData.enName;
         const displayTxt = isLatest ? msg.text.slice(0, charIndex) : msg.text;
         
         return (
@@ -237,19 +239,29 @@ export const FocusPanel = ({
       
       <div className="focus-left">
         
-        <div className="profile-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111' }}>
-            <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>
-              {username} <span style={{ fontSize: '11px', color: '#f59e0b', marginLeft: '6px', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
+        {/* 🌟 资料卡重构：名字、等级、称号、经验条 */}
+        <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', border: `2px solid ${botData.color}`, boxShadow: `0 0 10px ${botData.color}50`, background: '#111', flexShrink: 0 }}>
+              <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-            <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-              <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{username}</span>
+                <span style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Lv.{level}</span>
+                {equippedTitleDef && (
+                  <span style={{ fontSize: '11px', color: equippedTitleDef.color, background: `${equippedTitleDef.color}20`, padding: '2px 6px', borderRadius: '4px', border: `1px solid ${equippedTitleDef.color}50`, fontWeight: 'bold' }}>
+                    [{t(equippedTitleDef.nameKey)}]
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>🕒 {localTime}</div>
             </div>
           </div>
-          <div style={{ fontSize: '13px', color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>🕒 {localTime}</div>
+          
+          <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, ${botData.color}, #8b5cf6)`, borderRadius: '3px', transition: 'width 0.3s' }} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -258,10 +270,10 @@ export const FocusPanel = ({
           </div>
           {!isCheckedIn ? (
             <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>
-              📅 打卡
+              📅 {isZh ? '打卡' : 'Check-in'}
             </button>
           ) : (
-            <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ 已打卡 ({checkinStreak}天)</span>
+            <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {isZh ? '已打卡' : 'Checked in'} ({checkinStreak}{isZh ? '天' : 'd'})</span>
           )}
         </div>
 
@@ -271,10 +283,10 @@ export const FocusPanel = ({
       <div className="focus-right">
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
           <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}>
-            📺 开启悬浮窗
+            📺 {isZh ? '开启悬浮窗' : 'Open PiP'}
           </button>
           <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
-            ⛶ 沉浸模式
+            ⛶ {isZh ? '沉浸模式' : 'Immersive'}
           </button>
         </div>
 
@@ -329,7 +341,7 @@ export const FocusPanel = ({
                 padding: '6px 12px', borderRadius: '16px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' 
               }}
             >
-              {type === 'none' ? '🔇 静音' : type === 'rain' ? '🌧️ 雨声' : type === 'wind' ? '🌬️ 风声' : '☕ 白噪音'}
+              {type === 'none' ? (isZh ? '🔇 静音' : '🔇 Mute') : type === 'rain' ? (isZh ? '🌧️ 雨声' : '🌧️ Rain') : type === 'wind' ? (isZh ? '🌬️ 风声' : '🌬️ Wind') : (isZh ? '☕ 白噪音' : '☕ Cafe')}
             </button>
           ))}
         </div>

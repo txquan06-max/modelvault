@@ -54,7 +54,8 @@ export const ProfileView = (props: any) => {
     earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted
+    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
+    level, levelProgress // 🌟 接收等级和经验
   } = props;
 
   const isZh = i18n.language === 'zh';
@@ -62,11 +63,20 @@ export const ProfileView = (props: any) => {
 
   return (
     <div className="view-content profile-view">
-      <div className="profile-header">
-        <div className="avatar">🧑‍🔧</div>
-        <div className="profile-info">
-          <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
-          {equippedTitleDef && <div className="equipped-title" style={{ color: equippedTitleDef.color }}>[{t(equippedTitleDef.nameKey)}]</div>}
+      {/* 🌟 资料卡重构 */}
+      <div className="profile-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="avatar" style={{ flexShrink: 0 }}>🧑‍🔧</div>
+          <div className="profile-info" style={{ flex: 1 }}>
+            <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
+              {equippedTitleDef && <span style={{ fontSize: '12px', color: equippedTitleDef.color, fontWeight: 'bold' }}>[{t(equippedTitleDef.nameKey)}]</span>}
+            </div>
+          </div>
+        </div>
+        <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ width: `${levelProgress.percent}%`, height: '100%', background: `linear-gradient(90deg, #3b82f6, #8b5cf6)`, borderRadius: '4px', transition: 'width 0.3s' }} />
         </div>
       </div>
 

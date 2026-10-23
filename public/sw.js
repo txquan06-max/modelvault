@@ -1,4 +1,4 @@
-const CACHE_NAME = 'modeljourney-v3'; // 🌟 把版本号改大，强制更新
+const CACHE_NAME = 'modeljourney-v4'; // 🌟 改大版本号，强制更新
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

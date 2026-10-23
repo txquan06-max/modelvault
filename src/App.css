@@ -753,4 +753,11 @@ body {
   
   .journal-grid { grid-template-columns: repeat(2, 1fr); }
   .hangar-grid { grid-template-columns: repeat(3, 1fr); }
+  
+/* =========================================
+   Mobile Touch Optimization (移动端点击优化)
+   ========================================= */
+  button, .btn, [role="button"], select, input[type="submit"], a {touch-action: manipulation;}
+  /* 增加所有按钮的点击视觉反馈 */
+  button:active, .btn:active, .hangar-card:active {opacity: 0.8;}
 }

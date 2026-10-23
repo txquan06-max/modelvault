@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom'; // 🌟 引入 Portal
 import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType } from '../core/QuoteEngine'; 
 
@@ -199,12 +200,24 @@ export const FocusPanel = ({
     );
   }
 
+  // 🌟 核心修复：使用 createPortal 把沉浸模式挂载到 body 上
   if (isImmersive) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.5s ease-out' }}>
+    const immersiveContent = (
+      <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
         
-        <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '30px', right: '30px', background: 'transparent', border: 'none', color: '#666', fontSize: '24px', cursor: 'pointer' }}>✕</button>
+        <button 
+          onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} 
+          style={{ 
+            position: 'absolute', top: '20px', right: '20px', 
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', 
+            color: '#fff', fontSize: '24px', width: '48px', height: '48px', 
+            borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            cursor: 'pointer', zIndex: 100000, touchAction: 'manipulation' 
+          }}
+        >
+          ✕
+        </button>
 
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '20px' }}>
           <div style={{ color: botData.color, fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px', opacity: 0.8, textAlign: 'center' }}>
@@ -232,6 +245,7 @@ export const FocusPanel = ({
         </div>
       </div>
     );
+    return createPortal(immersiveContent, document.body);
   }
 
   return (
@@ -328,7 +342,6 @@ export const FocusPanel = ({
           <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
         )}
         
-        {/* 🌟 环境音UI：增加 flex-wrap 防止溢出 */}
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', margin: '15px 0', flexWrap: 'wrap' }}>
           {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
             <button

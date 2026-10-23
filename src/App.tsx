@@ -34,7 +34,6 @@ interface ChatMessage {
   timestamp: number;
 }
 
-// 🌟 辅助组件：处理 local:// 协议的图片加载
 const LocalImage = ({ src, ...props }: any) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -408,7 +407,11 @@ function App() {
       setUnlockedBots(newUnlocked);
       localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
       AudioManager.playAchievement(); refreshData();
-      showToast(i18n.language === 'zh' ? `🎉 成功解锁 ${BOTS[botId].name}！` : `🎉 Unlocked ${BOTS[botId].enName}!`);
+      
+      showToast(i18n.language === 'zh' 
+        ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` 
+        : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`
+      );
     }
   };
 
@@ -606,18 +609,28 @@ function App() {
   };
 
   const exportData = () => { AudioManager.playClick(); const data = StorageManager.exportAll(); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
+  
+  // 🌟 修复 TS 报错的 importData
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
     const file = e.target.files?.[0]; if (!file) return; AudioManager.playClick();
     const reader = new FileReader(); 
-    reader.onload = (event) => { 
+    // 1. 将 onload 回调改为 async
+    reader.onload = async (event) => { 
       try { 
         const data = JSON.parse(event.target?.result as string); 
-        if (StorageManager.importAll(data)) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); } 
-        else showToast(t('importError')); 
+        // 2. 加上 await
+        const success = await StorageManager.importAll(data); 
+        if (success) { 
+          showToast(t('importSuccess')); 
+          setTimeout(() => window.location.reload(), 1000); 
+        } else {
+          showToast(t('importError')); 
+        }
       } catch (err) { showToast(t('importError')); } 
     }; 
     reader.readAsText(file); e.target.value = ''; 
   };
+  
   const handleResetData = async () => { AudioManager.playClick(); setIsResetting(true); try { await StorageManager.resetAll(); } catch (e) { console.error(e); } window.location.href = window.location.origin + window.location.pathname; };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -630,16 +643,30 @@ function App() {
     canvas.width = 800; canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
     ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, 800, 1000);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
     for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
+    
     ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ModelVault', 400, 80);
     ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '我的拼装战报' : 'My Build Report', 400, 120);
+    
     ctx.fillStyle = '#fff'; ctx.font = 'bold 42px sans-serif'; ctx.fillText(i18n.language === 'zh' ? model.name.zh : model.name.en, 400, 560);
     ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 28px sans-serif'; ctx.fillText(`${model.grade}  |  ${i18n.language === 'zh' ? model.series.zh : model.series.en}`, 400, 610);
     ctx.fillStyle = '#10b981'; ctx.font = 'bold 64px monospace'; ctx.fillText(formatTime(totalTime), 400, 700);
     ctx.fillStyle = '#aaa'; ctx.font = '24px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '总专注时长' : 'Total Focus Time', 400, 745);
-    ctx.fillStyle = '#555'; ctx.font = '20px sans-serif'; ctx.fillText(i18n.language === 'zh' ? '用热爱与耐心，铸造属于你的杰作。' : 'Built with love and patience.', 400, 850);
+    
+    ctx.fillStyle = '#555'; ctx.font = '20px sans-serif'; 
+    ctx.fillText(i18n.language === 'zh' ? '用热爱与耐心，铸造属于你的杰作。' : 'Built with love and patience.', 400, 830);
+
+    const activeBotData = BOTS[currentBot];
+    const botName = i18n.language === 'zh' ? activeBotData.name : activeBotData.enName;
+    ctx.fillStyle = '#888'; ctx.font = 'italic 20px sans-serif';
+    ctx.fillText(
+      i18n.language === 'zh' ? `由塑灵【${botName}】见证并记录` : `Witnessed by Animold [${botName}]`, 
+      400, 920
+    );
+
     const url = canvas.toDataURL('image/jpeg', 0.9);
     const a = document.createElement('a'); a.href = url; a.download = `ModelVault_${model.name.en.replace(/\s+/g, '_')}.jpg`; a.click();
     showToast('✅ 战报已保存到相册/下载');
@@ -724,7 +751,7 @@ function App() {
               <button className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
               <button className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
               <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
-              <button className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '图鉴' : 'Gallery'}</button>
+              <button className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
               <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
             </div>
           </>

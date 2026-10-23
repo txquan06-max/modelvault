@@ -10,6 +10,8 @@ export interface BotData {
   id: BotType;
   name: string;
   enName: string;
+  speciesZh: string; // 🌟 新增
+  speciesEn: string; // 🌟 新增
   avatar: string;
   portrait: string;
   color: string;
@@ -29,6 +31,8 @@ export const BOTS: Record<BotType, BotData> = {
     id: 'tu',
     name: '途酱',
     enName: 'Tia',
+    speciesZh: 'ModelJourney 的初代原生塑灵，代号：领航员。',
+    speciesEn: 'The 1st generation native Animold of ModelJourney. Code: Navigator.',    
     avatar: '/bots/tia_avatar.png',
     portrait: '/bots/tia.png',
     color: '#3b82f6',
@@ -200,6 +204,8 @@ export const BOTS: Record<BotType, BotData> = {
     id: 'milkfoam',
     name: '奶盖',
     enName: 'Boba',
+    speciesZh: '万代流水线觉醒的质检塑灵，代号：赛博监工。',
+    speciesEn: 'An awakened QC Animold from the Bandai assembly line. Code: Cyber Supervisor.',
     avatar: '/bots/boba_avatar.png',
     portrait: '/bots/boba.png',
     color: '#ec4899',
@@ -420,6 +426,8 @@ export const BOTS: Record<BotType, BotData> = {
     id: 'xiaoran',
     name: '小燃',
     enName: 'Blaze',
+    speciesZh: '废弃数据中重生的格斗塑灵，代号：热血灵魂伴侣。',
+    speciesEn: 'A combat Animold reborn from discarded data. Code: Hot-blooded Soulmate.',
     avatar: '/bots/blaze_avatar.png',
     portrait: '/bots/blaze.png',
     color: '#10b981',

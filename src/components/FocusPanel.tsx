@@ -25,7 +25,6 @@ export const FocusPanel = ({
   const isZh = i18n.language === 'zh';
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
-  // 移动端下滑手势状态记录
   const touchStartY = useRef<number>(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
   const handleTouchEnd = (e: React.TouchEvent) => {
@@ -150,7 +149,6 @@ export const FocusPanel = ({
             <div style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', margin: 'auto' }}>{t('noActiveModel')}</div>
           ) : (
             <>
-              {/* 顶部控制区 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
                 <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '11px', outline: 'none' }}>
                   {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
@@ -160,7 +158,6 @@ export const FocusPanel = ({
                 </select>
               </div>
 
-              {/* 中间计时区 */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, margin: '4px 0' }}>
                 <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(32px, 12vh, 48px)', margin: '4px 0', lineHeight: 1 }}>{formatTime(activeSeconds)}</div>
                 
@@ -184,7 +181,6 @@ export const FocusPanel = ({
                 )}
               </div>
 
-              {/* 底部操作区 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
                 <div style={{ height: '70px' }}>
                   {renderChatHistory(true)}
@@ -226,7 +222,6 @@ export const FocusPanel = ({
     );
   }
 
-  // 🌟 沉浸模式
   if (isImmersive) {
     const immersiveContent = (
       <div 
@@ -280,7 +275,6 @@ export const FocusPanel = ({
     return createPortal(immersiveContent, document.body);
   }
 
-  // 🌟 普通页面视图
   return (
     <div className="focus-layout">
       

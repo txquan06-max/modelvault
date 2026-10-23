@@ -8,7 +8,7 @@ export const FocusView = (props: any) => {
     selectedGunpla, setSelectedGunpla, searchResults, setSearchResults, newModelGrade, setNewModelGrade,
     newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, newTaskName, setNewTaskName,
     handleAddModel, handleAddTask, handleFocus,
-    isWholeBuild, setIsWholeBuild // 🌟 接收新属性
+    isWholeBuild, setIsWholeBuild
   } = props;
 
   const isZh = i18n.language === 'zh';
@@ -16,8 +16,8 @@ export const FocusView = (props: any) => {
   return (
     <div className="view-content">
       <div className="add-controls">
-        <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
-        <button className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
+        <button id="btn-add-model" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
+        <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
       </div>
 
       {isAddingModel && (
@@ -47,7 +47,6 @@ export const FocusView = (props: any) => {
             {t('useDefaultTasks')}
           </label>
 
-          {/* 🌟 整体制作模式选择 */}
           {useDefaultTasks && (
             <label className="checkbox-label">
               <input type="checkbox" checked={isWholeBuild} onChange={e => { AudioManager.playClick(); setIsWholeBuild(e.target.checked); }} />

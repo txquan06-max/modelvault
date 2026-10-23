@@ -674,7 +674,6 @@ function App() {
     AudioManager.playStageDone(); 
     const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages, rebuildMode === 'whole');
     
-    // 🌟 关键修复：寻找改造后应该去的任务（优先找新生成的未完成部位，找不到就找 legacy）
     let targetTaskId = null;
     const currentModelUpdated = updated.find(m => m.id === viewingModel.id);
     if (currentModelUpdated) {
@@ -682,7 +681,6 @@ function App() {
            const wholeTask = currentModelUpdated.tasks.find(t => t.name === 'part_whole');
            if (wholeTask) targetTaskId = wholeTask.id;
        } else {
-           // 找第一个不是 legacy 并且状态不是 Completed 的任务
            const firstPart = currentModelUpdated.tasks.find(t => t.name !== 'part_legacy' && t.status !== 'Completed');
            if (firstPart) targetTaskId = firstPart.id;
            else {
@@ -706,7 +704,6 @@ function App() {
       handleJumpToFocus(pendingRebuildTask); 
       setPendingRebuildTask(null); 
     } else {
-      // 如果没找到目标，就默认进入专注页，用户自己去下拉框选
       setActiveTab('focus');
       setViewingModelId(null);
     }

@@ -11,7 +11,7 @@ export const FocusPanel = ({
   currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
   username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
   currentBot, chatMessages,
-  ambientType, setAmbientType // 🌟 接收环境音状态
+  ambientType, setAmbientType, handleOpenPiP
 }: any) => {
   
   const [charIndex, setCharIndex] = useState(0);
@@ -22,7 +22,6 @@ export const FocusPanel = ({
   
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
-  // 打字机动画逻辑（修复首字丢失）
   useEffect(() => {
     const lastMsg = chatMessages[chatMessages.length - 1];
     if (!lastMsg) return;
@@ -74,7 +73,7 @@ export const FocusPanel = ({
             if (width > 800) { height = Math.round((height * 800) / width); width = 800; }
             canvas.width = width; canvas.height = height;
             canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
-            setFinishPartPhoto(canvas.toDataURL('image/webp', 0.6)); // 改用 webp
+            setFinishPartPhoto(canvas.toDataURL('image/webp', 0.6));
           };
         };
       } catch (err) { showToast('图片处理失败'); }
@@ -86,7 +85,6 @@ export const FocusPanel = ({
   const availableModels = models.filter((m: any) => m.status !== 'Completed');
   const localTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // 聊天气泡渲染
   const renderChatHistory = (isPipView: boolean) => (
     <div style={{ 
       background: `linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))`, 
@@ -127,7 +125,6 @@ export const FocusPanel = ({
     </div>
   );
 
-  // ================= 悬浮窗视图 =================
   if (isPip) {
     return (
       <div className={pipClass}>
@@ -156,16 +153,6 @@ export const FocusPanel = ({
                     {[0, 15, 30, 60].map(min => (
                       <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => handleSetTimeboxTarget(min)}>
                         {min === 0 ? t('timeboxNone') : `${min}m`}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: '4px' }}>
-                    {currentTask.stages.map((stage: any) => (
-                      <button key={stage.id} style={{ background: stage.id === currentStageId ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: stage.status === 'Completed' ? '#10b981' : '#fff', border: 'none', padding: '4px 6px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
-                        {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
                       </button>
                     ))}
                   </div>
@@ -210,11 +197,9 @@ export const FocusPanel = ({
     );
   }
 
-  // ================= 沉浸模式视图 =================
   if (isImmersive) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.5s ease-out' }}>
-        {/* 呼吸光晕背景 */}
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
         
         <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '30px', right: '30px', background: 'transparent', border: 'none', color: '#666', fontSize: '24px', cursor: 'pointer' }}>✕</button>
@@ -247,7 +232,6 @@ export const FocusPanel = ({
     );
   }
 
-  // ================= 普通视图 =================
   return (
     <div className="focus-layout">
       
@@ -286,7 +270,10 @@ export const FocusPanel = ({
 
       <div className="focus-right">
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
-          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}>
+            📺 开启悬浮窗
+          </button>
+          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: 'none', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
             ⛶ 沉浸模式
           </button>
         </div>
@@ -324,13 +311,12 @@ export const FocusPanel = ({
           </div>
         )}
         
-        <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '72px', textShadow: '0 0 30px rgba(255,255,255,0.2)' }}>{formatTime(activeSeconds)}</div>
+        <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '72px', textShadow: '0 0 30px rgba(255,255,255,0.2)' }}>{formatTime(activeSeconds)}</div>
         
         {timeboxTarget > 0 && timeboxElapsed > 0 && !isFinishingPart && (
           <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>
         )}
         
-        {/* 🌟 环境音切换 UI */}
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '15px 0' }}>
           {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
             <button

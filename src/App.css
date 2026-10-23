@@ -36,7 +36,7 @@ body {
   pointer-events: none;
 }
 
-/* 全局背景遮罩（降低黑度，保证透明度和可见度） */
+/* 全局背景遮罩 */
 .bg-overlay {
   position: absolute;
   top: 0;
@@ -49,32 +49,42 @@ body {
 }
 
 /* =========================================
-   Main Window
+   Main Window (Fixed height, flex column)
    ========================================= */
 .mini-window {
   position: relative;
   z-index: 2;
-  background: rgba(30, 30, 30, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
-  padding: 20px 24px;
-  width: 320px;
+  background: rgba(20, 25, 35, 0.75) !important; /* 磨砂玻璃底材 */
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 16px !important;
+  width: 360px;
+  height: 680px; /* 固定高度，确保内部可滚动 */
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  overflow: hidden; /* 禁止整体页面滚动，由内部容器接管 */
 }
 
-.mini-window::-webkit-scrollbar { width: 4px; }
-.mini-window::-webkit-scrollbar-track { background: transparent; }
-.mini-window::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+/* 🌟 核心修复：内容独立滚动区 */
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll-content::-webkit-scrollbar { width: 4px; }
+.scroll-content::-webkit-scrollbar-track { background: transparent; }
+.scroll-content::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
 
 /* =========================================
-   Top Bar & Tabs & Profile Header
+   Top Bar & Tabs & Profile Header (固定区)
    ========================================= */
 .tabs {
   display: flex;
@@ -82,20 +92,24 @@ body {
   background: rgba(0, 0, 0, 0.4); 
   border-radius: 8px;
   padding: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0; /* 防止被挤压 */
+  overflow-x: auto;
 }
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   flex: 1;
   background: transparent;
   border: none;
   color: #aaa;
-  padding: 8px 0;
+  padding: 8px 4px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .tab.active {
@@ -103,27 +117,15 @@ body {
   color: #fff;
 }
 
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  font-size: 12px;
-  color: #ddd;
-  margin-bottom: 20px;
-  font-weight: bold;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-}
-
-.top-right { display: flex; align-items: center; gap: 10px; }
-
 .profile-topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .back-btn {
@@ -138,6 +140,26 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 .back-btn:hover { color: #fff; }
+
+.top-right { display: flex; align-items: center; gap: 10px; }
+
+.presence-btn {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+.presence-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.5); }
+.presence-btn:active { transform: translateY(1px); }
 
 .lang-btn {
   background: rgba(68, 68, 68, 0.8);
@@ -184,13 +206,16 @@ body {
 .selector-group select:disabled { opacity: 0.5; cursor: not-allowed; }
 .selector-group select:focus { border-color: #3b82f6; }
 
-.add-btn, .add-btn-large {
+.add-controls { display: flex; gap: 8px; width: 100%; margin-bottom: 16px; }
+.add-btn-large {
+  flex: 1;
+  padding: 10px;
+  font-size: 13px;
+  border-radius: 8px;
   background: rgba(68, 68, 68, 0.8);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 18px;
   font-weight: bold;
   display: flex;
   justify-content: center;
@@ -198,32 +223,9 @@ body {
   transition: background 0.2s;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
-.add-btn { width: 36px; }
-.add-btn-large { flex: 1; padding: 10px; font-size: 13px; margin-bottom: 12px; }
-.add-btn:hover, .add-btn-large:hover { background: #555; }
+.add-btn-large:hover { background: #555; }
 
-.add-controls { display: flex; gap: 8px; width: 100%; }
-
-.inline-form { display: flex; gap: 8px; width: 100%; margin-bottom: 16px; }
-.inline-form input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #3b82f6;
-  color: white;
-  padding: 8px;
-  border-radius: 6px;
-  outline: none;
-}
-.inline-form button {
-  background: transparent;
-  border: 1px solid #666;
-  color: #ccc;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 0 12px;
-}
-
-.vertical-form { flex-direction: column; gap: 8px; }
+.vertical-form { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 16px; }
 .vertical-form input, .vertical-form select {
   width: 100%;
   box-sizing: border-box;
@@ -240,12 +242,7 @@ body {
    Task Info & Stages
    ========================================= */
 .task-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; }
-.task-name { 
-  font-size: 18px; 
-  font-weight: 600; 
-  text-align: center; 
-  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-}
+.task-name { font-size: 18px; font-weight: 600; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
 
 .finish-part-btn {
   background: rgba(16, 185, 129, 0.2);
@@ -301,6 +298,7 @@ body {
   margin-bottom: 16px;
   color: #fff;
   transition: color 0.3s;
+  text-align: center;
   text-shadow: 0 4px 15px rgba(0,0,0,0.9);
 }
 .timer-display.running { color: #3b82f6; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 4px 15px rgba(0,0,0,0.9); }
@@ -335,7 +333,7 @@ body {
 /* =========================================
    Controls & Buttons
    ========================================= */
-.controls { display: flex; gap: 12px; width: 100%; }
+.controls { display: flex; gap: 12px; width: 100%; margin-top: 20px; }
 
 .btn {
   flex: 1;
@@ -384,7 +382,7 @@ body {
    ========================================= */
 .toast {
   position: absolute;
-  top: -50px;
+  top: 20px;
   background: rgba(30, 30, 30, 0.95);
   border: 1px solid #555;
   color: #fff;
@@ -429,7 +427,7 @@ body {
 .hangar-series { font-size: 10px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* =========================================
-   Profile View
+   Profile View (个人中心)
    ========================================= */
 .profile-view { width: 100%; display: flex; flex-direction: column; gap: 16px; }
 .profile-header { display: flex; align-items: center; gap: 12px; background: rgba(34, 34, 34, 0.85); padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -451,7 +449,8 @@ body {
 .custom-section h4, .shop-section h4, .achievements-section h4, .data-backup-section h4 { margin: 0 0 12px 0; font-size: 14px; color: #ddd; display: flex; justify-content: space-between; align-items: center; }
 
 .custom-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; font-size: 12px; color: #bbb; }
-.url-input { flex: 1; background: rgba(0, 0, 0, 0.5); border: 1px solid #666; color: #fff; padding: 6px; border-radius: 4px; font-size: 12px; outline: none; }
+.custom-row select { width: 50%; max-width: 150px; }
+
 .mini-btn { background: #555; border: 1px solid #666; color: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: background 0.2s; }
 .mini-btn:hover:not(:disabled) { background: #666; }
 .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -479,7 +478,7 @@ body {
 .ach-desc { font-size: 11px; color: #bbb; }
 .empty-ach { font-size: 12px; color: #888; }
 
-.backup-actions { display: flex; gap: 12px; }
+.backup-actions { display: flex; gap: 12px; margin-bottom: 16px; }
 .backup-btn { flex: 1; background: #555; border: 1px solid #666; color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; text-align: center; cursor: pointer; transition: background 0.2s; }
 .backup-btn:hover { background: #666; }
 .import-label { display: inline-block; box-sizing: border-box; }
@@ -537,7 +536,7 @@ body {
 /* =========================================
    Animations
    ========================================= */
-@keyframes slideDown { from { top: -50px; opacity: 0; } to { top: -60px; opacity: 1; } }
+@keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 @keyframes flash { from { opacity: 1; } to { opacity: 0.5; } }
@@ -555,19 +554,42 @@ body {
 .reopen-btn.active { border-color: #3b82f6; color: #3b82f6; }
 .reopen-btn.active:hover { background: rgba(59, 130, 246, 0.1); }
 
+.photo-input:disabled { color: #10b981; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.05); font-weight: bold; }
+
+/* =========================================
+   Search Autocomplete & Dropdown
+   ========================================= */
+.search-autocomplete { position: relative; width: 100%; }
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #444;
+  border-radius: 6px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.autocomplete-dropdown::-webkit-scrollbar { width: 4px; }
+.autocomplete-dropdown::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+
 .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #444; font-size: 13px; color: #fff; display: flex; flex-direction: column; gap: 4px; }
 .autocomplete-item:hover { background: #3b82f6; }
 .ac-grade { font-size: 10px; background: #555; color: #ddd; padding: 1px 6px; border-radius: 4px; font-weight: bold; }
 .ac-series { font-size: 11px; color: #aaa; }
 .autocomplete-item:hover .ac-series, .autocomplete-item:hover .ac-grade { color: #fff; border-color: #fff; }
 
-.photo-input:disabled { color: #10b981; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.05); font-weight: bold; }
-
 /* =========================================
    Model Detail View (详情页)
    ========================================= */
 .detail-view { width: 100%; display: flex; flex-direction: column; gap: 16px; animation: fadeIn 0.3s ease-out; }
-.detail-hero { width: 100%; height: 180px; border-radius: 12px; background-color: #1a1a1a; background-size: cover; background-position: center; position: relative; display: flex; align-items: flex-end; padding: 16px; box-sizing: border-box; overflow: hidden; }
+.detail-hero { width: 100%; height: 180px; border-radius: 12px; background-color: #1a1a1a; background-size: cover; background-position: center; position: relative; display: flex; align-items: flex-end; padding: 16px; box-sizing: border-box; overflow: hidden; cursor: pointer; }
+.detail-hero:hover::before { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); z-index: 1; border-radius: 12px; }
 .detail-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 60%); z-index: 1; }
 .detail-hero-info { position: relative; z-index: 2; width: 100%; }
 .detail-title { font-size: 22px; font-weight: bold; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
@@ -603,30 +625,25 @@ body {
   overflow: hidden;
   position: relative;
 }
-
-.pip-running {
-  animation: pip-breathing 2s ease-in-out infinite alternate;
-}
-
+.pip-running { animation: pip-breathing 2s ease-in-out infinite alternate; }
 @keyframes pip-breathing {
   0% { border-color: #333; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.1); }
   100% { border-color: #3b82f6; box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.5); }
 }
-
 .pip-container .timer-display { font-size: clamp(32px, 15vh, 64px); margin: 10px 0; }
 .pip-container .task-name { font-size: clamp(14px, 4vw, 18px); }
 .pip-container .btn { padding: clamp(6px, 2vh, 12px); font-size: clamp(10px, 3vw, 14px); }
 .pip-container select { padding: 4px; font-size: clamp(10px, 3vw, 14px); }
 
 /* =========================================
-   Mobile Responsive (移动端适配 - 修复黑屏)
+   Mobile Responsive (移动端适配)
    ========================================= */
 @media (max-width: 600px) {
   body { align-items: flex-start; }
   .app-wrapper { height: 100dvh; align-items: flex-start; overflow-y: auto; }
-  /* 核心修复：去除纯黑背景，改为半透明毛玻璃，让竖屏也能看见背景 */
   .mini-window { 
     width: 100%; 
+    height: 100dvh; 
     min-height: 100dvh; 
     max-height: none; 
     border-radius: 0; 
@@ -639,102 +656,20 @@ body {
   .hangar-grid { grid-template-columns: 1fr; }
   .timer-display { font-size: 64px; margin: 20px 0; }
   .tabs { position: sticky; top: 0; background: rgba(45, 45, 45, 0.95); backdrop-filter: blur(10px); z-index: 10; padding: 8px 0; }
-  .toast { position: fixed; top: 10px; }
+  .toast { position: fixed; top: 20px; }
 }
 
 /* =========================================
-   Detail View 继续制作按钮优化
-   ========================================= */
-.timeline-content .mini-btn:hover {
-  background: #2563eb !important; /* 让蓝色按钮更亮 */
-}
-
-/* 详情页顶部修改封面按钮悬浮效果 */
-.detail-hero {
-  cursor: pointer;
-}
-.detail-hero:hover::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 1;
-  border-radius: 12px;
-}
-
-/* =========================================
-   Legacy Import 更新
-   ========================================= */
-.legacy-temp-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 8px;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* 适配 iOS 底部安全区 */
-.mini-window {
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
-}
-/* =========================================
-   新增：游戏化档案与对话框样式
-   ========================================= */
-.presence-btn {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-  transition: transform 0.1s, box-shadow 0.2s;
-}
-.presence-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 15px rgba(59, 130, 246, 0.5);
-}
-.presence-btn:active {
-  transform: translateY(1px);
-}
-
-/* 磨砂玻璃卡片底材 */
-.mini-window {
-  background: rgba(20, 25, 35, 0.75) !important; /* 稍微带点蓝调的黑，不那么死板 */
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
-}
-
-/* 打字机光标闪烁动画 */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-/* ... 保留之前的样式 ... */
-
-/* =========================================
-   PC 横屏布局 (Media Query)
+   PC 端双列布局
    ========================================= */
 @media (min-width: 768px) {
-  body {
-    align-items: center;
-  }
+  body { align-items: center; }
   
   .mini-window {
     width: 900px !important;
     max-width: 95vw;
-    min-height: 600px;
-    max-height: 85vh;
-    height: auto;
+    height: 85vh;
+    max-height: 700px;
     padding: 24px !important;
   }
 
@@ -762,81 +697,9 @@ body {
     justify-content: center;
   }
 
-  .add-controls {
-    justify-content: center;
-    gap: 16px;
-  }
-  .add-btn-large {
-    max-width: 200px;
-    margin-bottom: 0;
-  }
+  .add-controls { justify-content: center; gap: 16px; }
+  .add-btn-large { max-width: 200px; margin-bottom: 0; }
   
-  .journal-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .hangar-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* =========================================
-   新增：搜索自动补全下拉框样式
-   ========================================= */
-.search-autocomplete {
-  position: relative;
-  width: 100%;
-}
-
-.autocomplete-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid #444;
-  border-radius: 6px;
-  margin-top: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-}
-
-.autocomplete-dropdown::-webkit-scrollbar { width: 4px; }
-.autocomplete-dropdown::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-
-/* =========================================
-   搜索自动补全下拉框样式修复
-   ========================================= */
-.search-autocomplete {
-  position: relative;
-  width: 100%;
-}
-
-.autocomplete-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid #444;
-  border-radius: 6px;
-  margin-top: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-}
-
-.autocomplete-dropdown::-webkit-scrollbar { width: 4px; }
-.autocomplete-dropdown::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-
-/* =========================================
-   新增设置下拉框样式微调
-   ========================================= */
-.custom-row select {
-  width: 50%;
-  max-width: 150px;
+  .journal-grid { grid-template-columns: repeat(2, 1fr); }
+  .hangar-grid { grid-template-columns: repeat(3, 1fr); }
 }

@@ -19,12 +19,13 @@ import { JournalView } from './views/JournalView';
 import { HangarView } from './views/HangarView';
 import { ProfileView } from './views/ProfileView';
 import { BotGalleryView } from './views/BotGalleryView';
-import { GundamGalleryView } from './views/GundamGalleryView'; // 🌟 新增引入
+import { GundamGalleryView } from './views/GundamGalleryView';
 import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
 import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
+
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
@@ -54,9 +55,10 @@ function App() {
   const { t, i18n } = useTranslation();
   
   const [showSplash, setShowSplash] = useState(true);
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(() => {
+    return localStorage.getItem('hasSeenTutorial') === null;
+  });
 
-  // 🌟 新增：图鉴 Tab
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile'>('focus');
   
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
@@ -144,8 +146,6 @@ function App() {
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
   const [isAssetsMounted, setIsAssetsMounted] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  // 🌟 新增：环境音状态
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -156,13 +156,9 @@ function App() {
     return []; 
   });
 
-  // 🌟 监听计时器状态，控制白噪音播放
   useEffect(() => {
-    if (timerState === 'Running') {
-      AudioManager.playAmbient(ambientType);
-    } else {
-      AudioManager.stopAmbient();
-    }
+    if (timerState === 'Running') AudioManager.playAmbient(ambientType);
+    else AudioManager.stopAmbient();
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
@@ -805,14 +801,23 @@ function App() {
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     chatMessages,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
-    setActiveTab, ambientType, setAmbientType
+    setActiveTab, ambientType, setAmbientType,
+    handleOpenPiP
   };
 
   return (
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       {showTutorial && !showSplash && (
-        <TutorialTour steps={tutorialSteps} onClose={() => setShowTutorial(false)} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TutorialTour 
+          steps={tutorialSteps} 
+          onClose={() => {
+            setShowTutorial(false);
+            localStorage.setItem('hasSeenTutorial', 'true');
+          }} 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+        />
       )}
 
       <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>
@@ -826,6 +831,7 @@ function App() {
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
         <div className="mini-window">
+          
           {viewingModel ? (
             <div className="profile-topbar">
               <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); setShowRebuildConfirm(false); }}>← {t('backToHangar')}</button>
@@ -845,62 +851,62 @@ function App() {
             <div className="profile-topbar">
               <button className="back-btn" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>{t('backToFocus')}</button>
               <div className="top-right">
-                <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗模式</button>
+                <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗</button>
                 <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
               </div>
             </div>
           ) : (
-            <>
-              <div className="tabs" style={{ display: 'flex', overflowX: 'auto', paddingBottom: '4px' }}>
-                <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
-                <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
-                <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
-                <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {i18n.language === 'zh' ? '机体' : 'Mecha'}</button>
-                <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
-                <button id="tab-profile" className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
-              </div>
-              
-              <button 
-                onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
-                style={{ position: 'absolute', right: '24px', top: '60px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', zIndex: 100, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="新手教程"
-              >?</button>
-            </>
+            <div className="tabs">
+              <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
+              <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
+              <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
+              <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {i18n.language === 'zh' ? '机体' : 'Mecha'}</button>
+              <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
+              <button id="tab-profile" className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
+            </div>
           )}
 
-          {viewingModel ? (
-            <ModelDetail 
-              viewingModel={viewingModel} 
-              viewingModelTotalSec={viewingModelTotalSec}
-              expandedTaskId={expandedTaskId}
-              setExpandedTaskId={setExpandedTaskId}
-              isEditingCover={isEditingCover}
-              setIsEditingCover={setIsEditingCover}
-              isEditingImportedStatus={isEditingImportedStatus}
-              setIsEditingImportedStatus={setIsEditingImportedStatus}
-              importedStages={importedStages}
-              setImportedStages={setImportedStages}
-              showRebuildConfirm={showRebuildConfirm}
-              setShowRebuildConfirm={setShowRebuildConfirm}
-              handleConfirmRebuild={handleConfirmRebuild}
-              handleDoRebuild={handleDoRebuild}
-              handleStartRebuild={handleStartRebuild}
-              handleJumpToFocus={handleJumpToFocus}
-              handleCoverUpload={handleCoverUpload}
-              handleSaveImportedStages={handleSaveImportedStages}
-              generateShareCard={generateShareCard}
-              {...commonProps}
-            />
-          ) : (
-            <>
-              {activeTab === 'focus' && <FocusView {...commonProps} />}
-              {activeTab === 'journal' && <JournalView {...commonProps} />}
-              {activeTab === 'hangar' && <HangarView {...commonProps} />}
-              {activeTab === 'gundam' && <GundamGalleryView {...commonProps} />} 
-              {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
-              {activeTab === 'profile' && <ProfileView {...commonProps} />}
-            </>
-          )}
+          <div className="scroll-content">
+            <button 
+              onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
+              style={{ position: 'absolute', right: '16px', top: '60px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', zIndex: 100, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="新手教程"
+            >?</button>
+
+            {viewingModel ? (
+              <ModelDetail 
+                viewingModel={viewingModel} 
+                viewingModelTotalSec={viewingModelTotalSec}
+                expandedTaskId={expandedTaskId}
+                setExpandedTaskId={setExpandedTaskId}
+                isEditingCover={isEditingCover}
+                setIsEditingCover={setIsEditingCover}
+                isEditingImportedStatus={isEditingImportedStatus}
+                setIsEditingImportedStatus={setIsEditingImportedStatus}
+                importedStages={importedStages}
+                setImportedStages={setImportedStages}
+                showRebuildConfirm={showRebuildConfirm}
+                setShowRebuildConfirm={setShowRebuildConfirm}
+                handleConfirmRebuild={handleConfirmRebuild}
+                handleDoRebuild={handleDoRebuild}
+                handleStartRebuild={handleStartRebuild}
+                handleJumpToFocus={handleJumpToFocus}
+                handleCoverUpload={handleCoverUpload}
+                handleSaveImportedStages={handleSaveImportedStages}
+                generateShareCard={generateShareCard}
+                {...commonProps}
+              />
+            ) : (
+              <>
+                {activeTab === 'focus' && <FocusView {...commonProps} />}
+                {activeTab === 'journal' && <JournalView {...commonProps} />}
+                {activeTab === 'hangar' && <HangarView {...commonProps} />}
+                {activeTab === 'gundam' && <GundamGalleryView {...commonProps} />} 
+                {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
+                {activeTab === 'profile' && <ProfileView {...commonProps} />}
+              </>
+            )}
+          </div>
         </div>
 
         <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} />

@@ -61,6 +61,7 @@ function App() {
   });
 
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile'>('focus');
+  const [pendingTabChange, setPendingTabChange] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile' | null>(null);
   
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -163,7 +164,6 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
-  // 🌟 强制更新 SW
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
@@ -490,6 +490,7 @@ function App() {
   };
 
   const handleStart = () => { 
+    if (!currentTaskId) { showToast(isZh ? '请先添加并选择一个部位' : 'Please select a part first'); return; }
     AudioManager.playStart(); engineRef.current.start(); 
     setModels(ModelManager.startStage(currentTaskId, currentStageId)); 
     setHasPlayedTimeboxSound(false); refreshData(); pushChatMessage('start');
@@ -506,6 +507,38 @@ function App() {
       triggerAutoBackup();
     }
   };
+
+  // 🌟 新增：拦截 Tab 切换
+  const handleTabChange = (newTab: typeof activeTab) => {
+    if (activeTab === 'focus' && timerState === 'Running') {
+      setPendingTabChange(newTab);
+    } else {
+      AudioManager.playClick();
+      setActiveTab(newTab);
+    }
+  };
+
+  // 🌟 新增：全局空格键快捷键控制
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        const target = e.target as HTMLElement;
+        // 如果焦点在输入框/下拉框，则不触发
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) return;
+        
+        // 如果当前正在看详情页、教程、启动页、预览图、弹窗等，屏蔽快捷键
+        if (viewingModelId || showTutorial || showSplash || isPreviewOpen || showCompleteModelConfirm || pendingTabChange) return;
+
+        e.preventDefault(); // 阻止空格键导致页面滚动
+
+        if (timerState === 'Idle') handleStart();
+        else if (timerState === 'Running') handlePause();
+        else if (timerState === 'Paused') handleResume();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [timerState, handleStart, handlePause, handleResume, viewingModelId, showTutorial, showSplash, isPreviewOpen, showCompleteModelConfirm, pendingTabChange]);
 
   const processAchievements = () => {
     const newlyEarned = AchievementManager.checkAll();
@@ -809,7 +842,6 @@ function App() {
   const viewingModel = models.find(m => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
 
-  // 🌟 获取当前佩戴的称号定义
   const equippedTitleDef = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
 
   const commonProps = {
@@ -833,7 +865,7 @@ function App() {
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
     setActiveTab, ambientType, setAmbientType,
     handleOpenPiP,
-    equippedTitleDef // 🌟 透传称号定义
+    equippedTitleDef
   };
 
   return (
@@ -863,7 +895,6 @@ function App() {
 
         <div className="mini-window">
           
-          {/* 🌟 统一置顶工具栏：语言切换与教程 */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
             <button 
               onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
@@ -875,12 +906,13 @@ function App() {
 
           {!viewingModel && (
             <div className="tabs">
-              <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
-              <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
-              <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
-              <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gundam'); }}>🤖 {isZh ? '机体' : 'Mecha'}</button>
-              <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {isZh ? '塑灵' : 'Animold'}</button>
-              <button id="tab-profile" className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
+              {/* 🌟 使用 handleTabChange 拦截 */}
+              <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => handleTabChange('focus')}>⏱ {t('focus')}</button>
+              <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => handleTabChange('journal')}>📖 {t('journal')}</button>
+              <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => handleTabChange('hangar')}>📦 {t('hangar')}</button>
+              <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => handleTabChange('gundam')}>🤖 {isZh ? '机体' : 'Mecha'}</button>
+              <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => handleTabChange('gallery')}>👥 {isZh ? '塑灵' : 'Animold'}</button>
+              <button id="tab-profile" className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => handleTabChange('profile')}>👤 {t('profile')}</button>
             </div>
           )}
 
@@ -938,6 +970,26 @@ function App() {
         </div>
 
         <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} i18n={i18n} />
+
+        {/* 🌟 新增：防误触拦截弹窗 */}
+        {pendingTabChange && (
+          <div className="modal-overlay" style={{ zIndex: 9999 }}>
+            <div className="modal-content" style={{ width: '280px', textAlign: 'center' }}>
+              <h3 style={{ color: '#f59e0b', fontSize: '18px', marginBottom: '12px' }}>⏱️ {isZh ? '专注中...' : 'Focusing...'}</h3>
+              <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', marginBottom: '16px' }}>
+                {isZh ? '你正在进行计时。离开该页面可能会导致注意力分散，确定要离开吗？' : 'Timer is running. Leaving might distract you. Are you sure?'}
+              </p>
+              <div className="modal-actions" style={{ justifyContent: 'center' }}>
+                <button className="btn yes" style={{ flex: 1 }} onClick={() => { setPendingTabChange(null); setActiveTab(pendingTabChange); }}>
+                  {isZh ? '确定离开' : 'Leave'}
+                </button>
+                <button className="btn no" style={{ flex: 1 }} onClick={() => { setPendingTabChange(null); }}>
+                  {isZh ? '继续专注' : 'Stay'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
       </div>

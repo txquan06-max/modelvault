@@ -340,7 +340,7 @@ export const ProfileView = (props: any) => {
         )}
       </div>
 
-      <div className="data-backup-section">
+      <div id="tour-install" className="data-backup-section">
         <h4>{t('dataBackup')} <span style={{float:'right', fontSize:'11px', color:'#888'}}>Used: {storageUsage} MB</span></h4>
         <div className="backup-actions" style={{ marginBottom: '16px' }}>
           <button className="backup-btn" onClick={exportData}>{t('exportData')}</button>

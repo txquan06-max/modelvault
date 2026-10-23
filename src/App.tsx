@@ -23,6 +23,10 @@ import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
 
+// 🌟 新增引入
+import { SplashScreen } from './components/SplashScreen';
+import { TutorialTour, type TourStep } from './components/TutorialTour';
+
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
@@ -50,6 +54,11 @@ const LocalImage = ({ src, ...props }: any) => {
 
 function App() {
   const { t, i18n } = useTranslation();
+  
+  // 🌟 状态控制
+  const [showSplash, setShowSplash] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'profile' | 'gallery'>('focus');
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -136,7 +145,6 @@ function App() {
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
   const [isAssetsMounted, setIsAssetsMounted] = useState(false);
   
-  // 🌟 PWA 安装状态
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -147,15 +155,56 @@ function App() {
     return []; 
   });
 
+  // 🌟 配置教程步骤
+  const tutorialSteps: TourStep[] = [
+    {
+      targetId: 'tour-welcome', title: '欢迎来到模途',
+      content: '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始，我们将用一分钟带你了解核心功能。', page: 'focus'
+    },
+    {
+      targetId: 'btn-add-model', title: '第一步：建立目标',
+      content: '点击这里【添加模型】。可以搜索你的机体，或者手动输入。', page: 'focus'
+    },
+    {
+      targetId: 'btn-add-task', title: '第二步：拆分部位',
+      content: '添加模型后，点击【添加部位】，比如“头部”、“躯干”。你可以使用默认模板。', page: 'focus'
+    },
+    {
+      targetId: 'btn-pip', title: '悬浮窗模式',
+      content: '如果你用的是电脑或安卓，点击这里开启悬浮窗（画中画），边看视频边拼胶！', page: 'focus'
+    },
+    {
+      targetId: 'tour-timer', title: '番茄钟与专注',
+      content: '选择时间，点击【开始】。注意：计时必须超过 10 秒才能【完成】记录哦，防作弊！', page: 'focus'
+    },
+    {
+      targetId: 'tab-journal', title: '制作日程',
+      content: '在【日志】里，你可以回顾过去的每一分专注，数据一目了然。', page: 'journal'
+    },
+    {
+      targetId: 'tab-hangar', title: '格纳库',
+      content: '拼完的模型都会陈列在这里。还有你的“堆积区”，随时看看那些吃灰的盒子。', page: 'hangar'
+    },
+    {
+      targetId: 'tab-gallery', title: '塑灵',
+      content: '在这里解锁不同的【塑灵】。她们会陪你聊天，为你见证战报。', page: 'gallery'
+    },
+    {
+      targetId: 'tab-profile', title: '个人中心',
+      content: '在这里可以换背景、补录以前做过的历史模型，还可以导出数据备份。', page: 'profile'
+    },
+    {
+      targetId: 'tour-install', title: '安装至桌面',
+      content: '强烈建议安装！\nAndroid：点击右上角菜单“安装应用”。\niOS (Safari)：点击底部“分享”，选择“添加到主屏幕”。\n安装后体验完全像原生 App 一样流畅！', page: 'profile'
+    }
+  ];
+
   useEffect(() => {
-    // 🌟 PWA 安装事件监听
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
-      // 延迟 5 秒弹出，避免一进来就弹太突兀
       setTimeout(() => setDeferredPrompt(e), 5000);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
@@ -779,104 +828,129 @@ function App() {
   };
 
   return (
-    <div className="app-wrapper">
-      {bgMain && (
-        bgMain.startsWith('local://') ? (
-          <LocalImage src={bgMain} className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
-        ) : (
-          <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
-        )
+    <>
+      {/* 🌟 启动页 */}
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+
+      {/* 🌟 教程遮罩 */}
+      {showTutorial && !showSplash && (
+        <TutorialTour 
+          steps={tutorialSteps} 
+          onClose={() => setShowTutorial(false)} 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab}
+        />
       )}
-      {toastMsg && <div className="toast">{toastMsg}</div>}
 
-      <div className="mini-window">
-        {viewingModel ? (
-          <div className="profile-topbar">
-            <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); setShowRebuildConfirm(false); }}>← {t('backToHangar')}</button>
-            <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {confirmDeleteId === viewingModel.id ? (
-                <>
-                  <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>确认删除</button>
-                  <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(null); }}>{t('cancel')}</button>
-                </>
-              ) : (
-                <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(viewingModel.id); }}>🗑️</button>
-              )}
-              <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
-            </div>
-          </div>
-        ) : activeTab === 'profile' ? (
-          <div className="profile-topbar">
-            <button className="back-btn" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>{t('backToFocus')}</button>
-            <div className="top-right">
-              <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗模式</button>
-              <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="tabs">
-              <button className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
-              <button className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
-              <button className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
-              <button className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
-              <button className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
-            </div>
-          </>
+      <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>
+        {bgMain && (
+          bgMain.startsWith('local://') ? (
+            <LocalImage src={bgMain} className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
+          ) : (
+            <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
+          )
         )}
+        {toastMsg && <div className="toast">{toastMsg}</div>}
 
-        {viewingModel ? (
-          <ModelDetail 
-            viewingModel={viewingModel} 
-            viewingModelTotalSec={viewingModelTotalSec}
-            expandedTaskId={expandedTaskId}
-            setExpandedTaskId={setExpandedTaskId}
-            isEditingCover={isEditingCover}
-            setIsEditingCover={setIsEditingCover}
-            isEditingImportedStatus={isEditingImportedStatus}
-            setIsEditingImportedStatus={setIsEditingImportedStatus}
-            importedStages={importedStages}
-            setImportedStages={setImportedStages}
-            showRebuildConfirm={showRebuildConfirm}
-            setShowRebuildConfirm={setShowRebuildConfirm}
-            handleConfirmRebuild={handleConfirmRebuild}
-            handleDoRebuild={handleDoRebuild}
-            handleStartRebuild={handleStartRebuild}
-            handleJumpToFocus={handleJumpToFocus}
-            handleCoverUpload={handleCoverUpload}
-            handleSaveImportedStages={handleSaveImportedStages}
-            generateShareCard={generateShareCard}
-            {...commonProps}
-          />
-        ) : (
-          <>
-            {activeTab === 'focus' && <FocusView {...commonProps} />}
-            {activeTab === 'journal' && <JournalView {...commonProps} />}
-            {activeTab === 'hangar' && <HangarView {...commonProps} />}
-            {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
-            {activeTab === 'profile' && <ProfileView {...commonProps} />}
-          </>
-        )}
+        <div className="mini-window">
+          {viewingModel ? (
+            <div className="profile-topbar">
+              <button className="back-btn" onClick={() => { AudioManager.playClick(); setViewingModelId(null); setIsEditingCover(false); setIsEditingImportedStatus(false); setShowRebuildConfirm(false); }}>← {t('backToHangar')}</button>
+              <div className="top-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {confirmDeleteId === viewingModel.id ? (
+                  <>
+                    <button className="mini-btn" style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { handleDeleteModel(viewingModel.id); setConfirmDeleteId(null); }}>确认删除</button>
+                    <button className="mini-btn" style={{ background: 'transparent', color: '#ccc', border: '1px solid #555', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(null); }}>{t('cancel')}</button>
+                  </>
+                ) : (
+                  <button className="icon-btn" style={{ color: '#ef4444', padding: '4px' }} onClick={() => { AudioManager.playClick(); setConfirmDeleteId(viewingModel.id); }}>🗑️</button>
+                )}
+                <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
+              </div>
+            </div>
+          ) : activeTab === 'profile' ? (
+            <div className="profile-topbar">
+              <button className="back-btn" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>{t('backToFocus')}</button>
+              <div className="top-right">
+                <button className="presence-btn" onClick={handleOpenPiP}>📺 悬浮窗模式</button>
+                <button className="lang-btn" onClick={toggleLanguage}>{i18n.language === 'zh' ? 'EN' : '中'}</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="tabs">
+                {/* 🌟 在这里加入了 ID 以便定位 */}
+                <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>⏱ {t('focus')}</button>
+                <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('journal'); }}>📖 {t('journal')}</button>
+                <button id="tab-hangar" className={`tab ${activeTab === 'hangar' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('hangar'); }}>📦 {t('hangar')}</button>
+                <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { AudioManager.playClick(); setActiveTab('gallery'); }}>👥 {i18n.language === 'zh' ? '塑灵' : 'Animold'}</button>
+                <button id="tab-profile" className="tab" onClick={() => { AudioManager.playClick(); setActiveTab('profile'); }}>👤 {t('profile')}</button>
+              </div>
+              
+              {/* 🌟 始终显示的新手教程按钮 */}
+              <button 
+                onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} 
+                style={{ position: 'absolute', right: '24px', top: '60px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', zIndex: 100, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="新手教程"
+              >
+                ?
+              </button>
+            </>
+          )}
+
+          {viewingModel ? (
+            <ModelDetail 
+              viewingModel={viewingModel} 
+              viewingModelTotalSec={viewingModelTotalSec}
+              expandedTaskId={expandedTaskId}
+              setExpandedTaskId={setExpandedTaskId}
+              isEditingCover={isEditingCover}
+              setIsEditingCover={setIsEditingCover}
+              isEditingImportedStatus={isEditingImportedStatus}
+              setIsEditingImportedStatus={setIsEditingImportedStatus}
+              importedStages={importedStages}
+              setImportedStages={setImportedStages}
+              showRebuildConfirm={showRebuildConfirm}
+              setShowRebuildConfirm={setShowRebuildConfirm}
+              handleConfirmRebuild={handleConfirmRebuild}
+              handleDoRebuild={handleDoRebuild}
+              handleStartRebuild={handleStartRebuild}
+              handleJumpToFocus={handleJumpToFocus}
+              handleCoverUpload={handleCoverUpload}
+              handleSaveImportedStages={handleSaveImportedStages}
+              generateShareCard={generateShareCard}
+              {...commonProps}
+            />
+          ) : (
+            <>
+              {activeTab === 'focus' && <FocusView {...commonProps} />}
+              {activeTab === 'journal' && <JournalView {...commonProps} />}
+              {activeTab === 'hangar' && <HangarView {...commonProps} />}
+              {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
+              {activeTab === 'profile' && <ProfileView {...commonProps} />}
+            </>
+          )}
+        </div>
+
+        <Modals 
+          showCompleteModelConfirm={showCompleteModelConfirm} 
+          setShowCompleteModelConfirm={setShowCompleteModelConfirm} 
+          handleConfirmCompleteModel={handleConfirmCompleteModel} 
+          isPreviewOpen={isPreviewOpen} 
+          setIsPreviewOpen={setIsPreviewOpen} 
+          bgMain={bgMain} 
+          bgSize={bgSize} 
+          bgPosition={bgPosition} 
+          setBgSize={setBgSize} 
+          setBgPosition={setBgPosition} 
+          applyBackground={applyBackground} 
+          deferredPrompt={deferredPrompt}
+          setDeferredPrompt={setDeferredPrompt}
+        />
+
+        {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
       </div>
-
-      <Modals 
-        showCompleteModelConfirm={showCompleteModelConfirm} 
-        setShowCompleteModelConfirm={setShowCompleteModelConfirm} 
-        handleConfirmCompleteModel={handleConfirmCompleteModel} 
-        isPreviewOpen={isPreviewOpen} 
-        setIsPreviewOpen={setIsPreviewOpen} 
-        bgMain={bgMain} 
-        bgSize={bgSize} 
-        bgPosition={bgPosition} 
-        setBgSize={setBgSize} 
-        setBgPosition={setBgPosition} 
-        applyBackground={applyBackground} 
-        deferredPrompt={deferredPrompt}
-        setDeferredPrompt={setDeferredPrompt}
-      />
-
-      {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
-    </div>
+    </>
   );
 }
 

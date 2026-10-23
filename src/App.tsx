@@ -29,6 +29,8 @@ import { TutorialTour, type TourStep } from './components/TutorialTour';
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 import { generateShareCard } from './utils/shareCard'; 
 
+import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
+
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
 interface ChatMessage {
@@ -103,6 +105,8 @@ function App() {
 
   const [lastSession, setLastSession] = useState<{ duration: number; stageId: string | null } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [activeAchievement, setActiveAchievement] = useState<AchievementData | null>(null);
+  const [achievementQueue, setAchievementQueue] = useState<AchievementData[]>([]);
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
   const [isAddingModel, setIsAddingModel] = useState(false);
@@ -537,9 +541,20 @@ function App() {
   const processAchievements = () => {
     const newlyEarned = AchievementManager.checkAll();
     if (newlyEarned.length > 0) {
-      AudioManager.playAchievement(); newlyEarned.forEach(ach => showToast(`🏆 ${t(ach.nameKey)}`));
+      // 将新解锁的成就加入队列
+      setAchievementQueue(prev => [...prev, ...newlyEarned as AchievementData[]]);
     }
   };
+
+  // 监听队列，依次弹出特效
+  useEffect(() => {
+    if (!activeAchievement && achievementQueue.length > 0) {
+      // 取出第一个
+      const next = achievementQueue[0];
+      setAchievementQueue(prev => prev.slice(1));
+      setActiveAchievement(next);
+    }
+  }, [achievementQueue, activeAchievement]);
 
   const handleCheckin = () => {
     const result = CheckinManager.checkin();
@@ -924,7 +939,14 @@ function App() {
         )}
 
         {pipWindow && createPortal(<FocusPanel {...commonProps} isPip={true} bgImage={bgPip} />, pipWindow.document.body)}
-      </div>
+              {/* 🌟 全屏成就特效 */}
+        <AchievementOverlay 
+          achievement={activeAchievement} 
+          onClose={() => setActiveAchievement(null)} 
+          t={t} 
+          i18n={i18n} 
+        />
+        </div>
     </>
   );
 }

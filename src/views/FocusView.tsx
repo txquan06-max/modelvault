@@ -47,7 +47,7 @@ export const FocusView = (props: any) => {
             {t('useDefaultTasks')}
           </label>
 
-          {/* 🌟 新增：整体制作模式 */}
+          {/* 🌟 整体制作模式选择 */}
           {useDefaultTasks && (
             <label className="checkbox-label">
               <input type="checkbox" checked={isWholeBuild} onChange={e => { AudioManager.playClick(); setIsWholeBuild(e.target.checked); }} />
@@ -55,9 +55,9 @@ export const FocusView = (props: any) => {
             </label>
           )}
 
-          <div style={{display:'flex', gap:'8px', width:'100%'}}>
-            <button className="btn start" style={{flex: 1, padding: '6px'}} onClick={handleAddModel}>{t('save')}</button>
-            <button className="btn no" style={{flex: 1, padding: '6px'}} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
+          <div style={{display:'flex', gap:'8px', width:'100%', marginTop: '8px'}}>
+            <button className="btn start" style={{flex: 1, padding: '8px'}} onClick={handleAddModel}>{t('save')}</button>
+            <button className="btn no" style={{flex: 1, padding: '8px'}} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
           </div>
         </div>
       )}

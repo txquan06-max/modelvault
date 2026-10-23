@@ -28,11 +28,14 @@ export const ModelDetail = (props: any) => {
     isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus,
     importedStages, setImportedStages, handleConfirmRebuild, showRebuildConfirm, setShowRebuildConfirm,
     handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, generateShareCard,
-    rebuildMode, setRebuildMode // 🌟 接收新属性
+    rebuildMode, setRebuildMode
   } = props;
 
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
+
+  // 判断是否为需要改造的历史模型
+  const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -69,7 +72,17 @@ export const ModelDetail = (props: any) => {
         </div>
       )}
 
-      {/* 🌟 历史模型改造模式选择 */}
+      {/* 🌟 全局改造入口 */}
+      {needsRebuild && !isEditingImportedStatus && (
+        <button 
+          className="btn start" 
+          style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: 'none', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }}
+          onClick={() => { AudioManager.playClick(); handleStartRebuild(null); }}
+        >
+          🔧 {isZh ? '开始改造这台历史模型' : 'Start Rebuilding This Model'}
+        </button>
+      )}
+
       {isEditingImportedStatus && (
         <div id="imported-status-form" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'rgba(245, 158, 11, 0.1)' }}>
           <h4 style={{ color: '#f59e0b', marginBottom: '8px' }}>📦 {t('rebuild_mode_title')}</h4>
@@ -122,6 +135,9 @@ export const ModelDetail = (props: any) => {
 
       <div className="timeline-container" style={{ maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
+          // 🌟 如果是需要改造的模型，暂时不显示新部位，只显示历史记录
+          if (needsRebuild && task.name !== 'part_legacy') return null;
+
           const taskSessions = allSessions.filter((s: any) => s.taskId === task.id);
           const taskTime = taskSessions.reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
           const isExpanded = expandedTaskId === task.id;
@@ -129,15 +145,23 @@ export const ModelDetail = (props: any) => {
           
           return (
             <div key={task.id} className="timeline-item">
-              <div className="timeline-header" onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}>
-                <div className="timeline-title">{isCompleted ? '✅' : '⏳'} {t(task.name)}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="timeline-time">{formatTime(taskTime)}</span>
-                  <span style={{ color: '#666', fontSize: '10px' }}>{isExpanded ? '▲' : '▼'}</span>
+              {/* 🌟 修复 UI 挤压：使用 flex 布局，增加 padding 和 gap */}
+              <div 
+                className="timeline-header" 
+                style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
+                onClick={() => { AudioManager.playClick(); setExpandedTaskId(isExpanded ? null : task.id); }}
+              >
+                <div className="timeline-title" style={{ flex: 1, minWidth: 0 }}>
+                  <span>{isCompleted ? '✅' : '⏳'}</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t(task.name)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <span className="timeline-time" style={{ fontSize: '13px' }}>{formatTime(taskTime)}</span>
+                  <span style={{ color: '#666', fontSize: '12px', width: '16px', textAlign: 'center' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
               </div>
               {isExpanded && (
-                <div className="timeline-content">
+                <div className="timeline-content" style={{ padding: '16px' }}>
                   {task.stages.map((stage: any) => {
                     const stageTime = taskSessions.filter((s: any) => s.stageId === stage.id).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
                     return (
@@ -154,20 +178,18 @@ export const ModelDetail = (props: any) => {
                     );
                   })}
                   
-                  {/* 🌟 修复按钮拥挤问题：增加 marginTop，宽度100%，增大 padding */}
-                  <button 
-                    className="mini-btn" 
-                    style={{ width: '100%', marginTop: '16px', background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
-                    onClick={() => { 
-                      AudioManager.playClick();
-                      if (viewingModel.isImported && !viewingModel.isRebuilding) {
-                        handleStartRebuild(task.id); 
-                      } else {
+                  {/* 🌟 去专注按钮（只对非 legacy 或已改造的任务显示） */}
+                  {(!needsRebuild || task.name !== 'part_legacy') && (
+                    <button 
+                      className="mini-btn" 
+                      style={{ width: '100%', marginTop: '20px', background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold' }}
+                      onClick={() => { 
+                        AudioManager.playClick();
                         handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); 
-                      }
-                    }}>
-                    {viewingModel.isImported && !viewingModel.isRebuilding ? (isZh ? `🔧 开始继续改造` : `🔧 Start Rebuild`) : (isZh ? `⏱ 去专注` : `⏱ Focus`)}
-                  </button>
+                      }}>
+                      {isZh ? `⏱ 开始专注` : `⏱ Start Focus`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

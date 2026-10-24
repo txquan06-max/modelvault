@@ -25,7 +25,7 @@ import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
 import { SplashScreen } from './components/SplashScreen';
-import { TutorialTour } from './components/TutorialTour';
+import { TutorialTour, type TourStep } from './components/TutorialTour';
 import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
@@ -74,7 +74,6 @@ function App() {
     unlockedBots, setUnlockedBots, currentBot, setCurrentBot,
     checkinStreak, level, levelProgress, refreshData, storageEstimate, isCheckedIn,
     timerState, activeSeconds, setTimerState, setActiveSeconds,
-    // 🌟 新增：从 Store 取 activeTab / webChatInterval / pipChatInterval / isAssetsMounted
     activeTab, setActiveTab,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     isAssetsMounted, setIsAssetsMounted
@@ -85,7 +84,6 @@ function App() {
     return localStorage.getItem('hasSeenTutorial') === null;
   });
 
-  // 🌟 移除本地 activeTab / pendingTabChange 保留
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
 
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
@@ -142,6 +140,10 @@ function App() {
 
   const toastTimerRef = useRef<any>(null);
 
+  // 🌟 新增：Tauri 更新相关状态
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('mv_chat_messages');
@@ -153,6 +155,37 @@ function App() {
   const sendNativeNotification = (title: string, body: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(title, { body, icon: '/bots/tia_avatar.png' });
+    }
+  };
+
+  // 🌟 监听 Tauri 更新事件，弹出自定义 Modal
+  useEffect(() => {
+    const handleUpdate = (e: any) => setUpdateInfo(e.detail);
+    window.addEventListener('tauri-update-available', handleUpdate);
+    return () => window.removeEventListener('tauri-update-available', handleUpdate);
+  }, []);
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo) return;
+    setUpdateProgress(0);
+    try {
+      let downloaded = 0;
+      let contentLength = 0;
+      await updateInfo.downloadAndInstall((event: any) => {
+        if (event.event === 'Started') {
+          contentLength = event.data.contentLength || 0;
+        } else if (event.event === 'Progress') {
+          downloaded += event.data.chunkLength;
+          setUpdateProgress(Math.floor((downloaded / contentLength) * 100));
+        } else if (event.event === 'Finished') {
+          setUpdateProgress(100);
+        }
+      });
+      const { relaunch } = await import('@tauri-apps/plugin-process');
+      await relaunch();
+    } catch (err) {
+      showToast('❌ 更新失败');
+      setUpdateProgress(null);
     }
   };
 
@@ -267,6 +300,20 @@ function App() {
   }, [activeSeconds, timerState, reminderInterval, lastRemindedAt, isZh]);
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
+
+  // 🌟 补全：新手引导步骤
+  const tutorialSteps: TourStep[] = [
+    { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
+    { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
+    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如“头部”。' : 'After adding a model, click Add Part.', page: 'focus' },
+    { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
+    { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
+    { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
+    { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
+    { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
+    { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
+    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' }
+  ];
 
   const handleStart = () => { 
     if (!currentTaskId) { showToast(t('toast_select_part')); return; }
@@ -699,7 +746,7 @@ function App() {
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       {showTutorial && !showSplash && (
         <TutorialTour 
-          steps={[]} 
+          steps={tutorialSteps} 
           onClose={() => { setShowTutorial(false); localStorage.setItem('hasSeenTutorial', 'true'); }} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
@@ -787,6 +834,29 @@ function App() {
                 <button className="btn yes" style={{ flex: 1 }} onClick={() => { const target = pendingTabChange; setPendingTabChange(null); setActiveTab(target); }}>{t('confirm')}</button>
                 <button className="btn no" style={{ flex: 1 }} onClick={() => { setPendingTabChange(null); }}>{t('cancel')}</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🌟 自定义 Tauri 更新弹窗（赛博朋克风） */}
+        {updateInfo && (
+          <div className="modal-overlay" style={{ zIndex: 10000, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+            <div className="modal-content" style={{ width: '320px', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)', textAlign: 'center' }}>
+              <h3 style={{ color: '#3b82f6', fontSize: '18px', marginBottom: '12px' }}>🚀 发现新版本 v{updateInfo.version}</h3>
+              <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '16px', lineHeight: 1.5, maxHeight: '80px', overflowY: 'auto', textAlign: 'left', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '4px' }}>
+                {updateInfo.body || '包含常规更新与 Bug 修复。'}
+              </p>
+              
+              {updateProgress !== null ? (
+                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
+                  <div style={{ width: `${updateProgress}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', transition: 'width 0.2s' }} />
+                </div>
+              ) : (
+                <div className="modal-actions" style={{ justifyContent: 'center' }}>
+                  <button className="btn start" style={{ flex: 1 }} onClick={handleDownloadUpdate}>{isZh ? '立即更新' : 'Update Now'}</button>
+                  <button className="btn no" style={{ flex: 1 }} onClick={() => setUpdateInfo(null)}>{isZh ? '稍后提醒' : 'Later'}</button>
+                </div>
+              )}
             </div>
           </div>
         )}

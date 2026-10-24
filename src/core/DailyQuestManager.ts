@@ -1,3 +1,4 @@
+// src/core/DailyQuestManager.ts
 import { StorageManager } from './StorageManager';
 import { UserManager } from './UserManager';
 
@@ -44,19 +45,29 @@ export class DailyQuestManager {
       return raw.quests;
     }
 
-    // 跨天或首次生成：随机抽 3 个不重复的任务
-    const shuffled = [...QUEST_POOL].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 3).map(q => ({
-      id: crypto.randomUUID(),
-      type: q.type,
-      titleZh: q.titleZh,
-      titleEn: q.titleEn,
-      target: q.target,
-      progress: 0,
-      completed: false,
-      claimed: false,
-      reward: q.reward,
-    }));
+    // 🌟 体验优化：按 type 去重抽签，保证 3 个任务类型互不相同
+    const byType: Record<string, typeof QUEST_POOL[number][]> = {};
+    QUEST_POOL.forEach(q => {
+      if (!byType[q.type]) byType[q.type] = [];
+      byType[q.type].push(q);
+    });
+    const shuffledTypes = Object.keys(byType).sort(() => 0.5 - Math.random()).slice(0, 3);
+
+    const selected = shuffledTypes.map(t => {
+      const candidates = byType[t];
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      return {
+        id: crypto.randomUUID(),
+        type: pick.type,
+        titleZh: pick.titleZh,
+        titleEn: pick.titleEn,
+        target: pick.target,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        reward: pick.reward,
+      };
+    });
 
     this.saveQuests(today, selected);
     return selected;

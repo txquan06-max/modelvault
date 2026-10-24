@@ -1,8 +1,11 @@
+// src/core/StorageManager.ts
 import localforage from 'localforage';
 
 const CURRENT_SCHEMA_VERSION = 5; 
 const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
+// 🌟 快照最小间隔：10 分钟内不重复快照，避免高频写入消耗快照名额
+const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
 
 export const KEYS = {
   SESSIONS: 'modelvault_sessions',
@@ -29,6 +32,9 @@ export const KEYS = {
   PIP_CHAT_INTERVAL: 'mv_pip_chat_interval',
   CUSTOM_WAKEUP_SOUND: 'mv_custom_wakeup_sound',
   DAILY_QUESTS: 'mv_daily_quests_data',
+  // 🌟 新增：塑灵相关从 localStorage 迁到 IndexedDB
+  UNLOCKED_BOTS: 'mv_unlocked_bots_v2',
+  CURRENT_BOT: 'mv_current_bot_v2',
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
@@ -44,6 +50,9 @@ let assetsDirHandle: any = null;
 
 const localUrlCache = new Map<string, { url: string, lastAccess: number }>();
 const MAX_URL_CACHE_SIZE = 50;
+
+// 🌟 快照节流器
+let lastSnapshotAt = 0;
 
 export const StorageManager = {
   async init() {
@@ -62,6 +71,20 @@ export const StorageManager = {
         }
       }
       legacyKeys.forEach((k) => localStorage.removeItem(k));
+    }
+
+    // 🌟 一次性迁移：旧版 localStorage 中的塑灵状态 -> IndexedDB
+    const legacyUnlocked = localStorage.getItem('mv_unlocked_bots');
+    if (legacyUnlocked && !memoryCache[KEYS.UNLOCKED_BOTS]) {
+      memoryCache[KEYS.UNLOCKED_BOTS] = legacyUnlocked;
+      await localforage.setItem(KEYS.UNLOCKED_BOTS, legacyUnlocked);
+      localStorage.removeItem('mv_unlocked_bots');
+    }
+    const legacyCurrent = localStorage.getItem('mv_current_bot');
+    if (legacyCurrent && !memoryCache[KEYS.CURRENT_BOT]) {
+      memoryCache[KEYS.CURRENT_BOT] = legacyCurrent;
+      await localforage.setItem(KEYS.CURRENT_BOT, legacyCurrent);
+      localStorage.removeItem('mv_current_bot');
     }
 
     const keys = await localforage.keys();
@@ -202,21 +225,32 @@ export const StorageManager = {
   },
 
   async _set(key: string, val: string) {
-    // 🌟 自动快照机制：如果即将修改的是核心数据，先备份当前状态
+    // 🌟 Bug Fix: 快照加入时间锁（10分钟内不重复），避免高频写入把 5 个名额瞬间用光
     if (key === DATA_KEY && memoryCache[DATA_KEY]) {
-      try {
-        for (let i = 4; i >= 1; i--) {
-          const prevSnapshot = memoryCache[`${SNAPSHOT_PREFIX}${i}`];
-          if (prevSnapshot) {
-            memoryCache[`${SNAPSHOT_PREFIX}${i + 1}`] = prevSnapshot;
-            await localforage.setItem(`${SNAPSHOT_PREFIX}${i + 1}`, prevSnapshot);
+      const now = Date.now();
+      if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
+        try {
+          for (let i = 4; i >= 1; i--) {
+            const prevSnapshot = memoryCache[`${SNAPSHOT_PREFIX}${i}`];
+            if (prevSnapshot) {
+              memoryCache[`${SNAPSHOT_PREFIX}${i + 1}`] = prevSnapshot;
+              await localforage.setItem(`${SNAPSHOT_PREFIX}${i + 1}`, prevSnapshot);
+            }
           }
+          const currentData = memoryCache[DATA_KEY];
+          // 🌟 注入 _snapshotAt，方便 UI 显示恢复时间
+          let dataWithTs = currentData;
+          try {
+            const parsed = JSON.parse(currentData);
+            parsed._snapshotAt = now;
+            dataWithTs = JSON.stringify(parsed);
+          } catch {}
+          memoryCache[`${SNAPSHOT_PREFIX}1`] = dataWithTs;
+          await localforage.setItem(`${SNAPSHOT_PREFIX}1`, dataWithTs);
+          lastSnapshotAt = now;
+        } catch (e) {
+          console.warn('生成快照失败', e);
         }
-        const currentData = memoryCache[DATA_KEY];
-        memoryCache[`${SNAPSHOT_PREFIX}1`] = currentData;
-        await localforage.setItem(`${SNAPSHOT_PREFIX}1`, currentData);
-      } catch (e) {
-        console.warn('生成快照失败', e);
       }
     }
 
@@ -231,7 +265,7 @@ export const StorageManager = {
     }
   },
 
-  // 🌟 恢复快照的方法
+  // 🌟 恢复快照
   async restoreSnapshot(snapshotIndex: number) {
     const snapshotKey = `${SNAPSHOT_PREFIX}${snapshotIndex}`;
     const snapshotData = await localforage.getItem<string>(snapshotKey);
@@ -241,6 +275,24 @@ export const StorageManager = {
       return true;
     }
     return false;
+  },
+
+  // 🌟 列出所有快照（供 ProfileView 的恢复面板使用）
+  async listSnapshots(): Promise<{ index: number; timestamp: number | null; size: number }[]> {
+    const result: { index: number; timestamp: number | null; size: number }[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const key = `${SNAPSHOT_PREFIX}${i}`;
+      const data = memoryCache[key] || await localforage.getItem<string>(key);
+      if (data) {
+        let ts: number | null = null;
+        try {
+          const parsed = JSON.parse(data);
+          ts = parsed._snapshotAt || null;
+        } catch {}
+        result.push({ index: i, timestamp: ts, size: data.length });
+      }
+    }
+    return result;
   },
 
   async resetAll() {
@@ -253,6 +305,7 @@ export const StorageManager = {
     localUrlCache.forEach(val => URL.revokeObjectURL(val.url));
     localUrlCache.clear();
     isInit = false;
+    lastSnapshotAt = 0;
   },
 
   getRawStorage(): { schemaVersion: number; models: any[] } {
@@ -300,6 +353,9 @@ export const StorageManager = {
   getPipChatInterval: () => Number(memoryCache[KEYS.PIP_CHAT_INTERVAL]) || 60000,
   getCustomWakeupSound: () => memoryCache[KEYS.CUSTOM_WAKEUP_SOUND] || '',
   getRawDailyQuests: () => { try { return JSON.parse(memoryCache[KEYS.DAILY_QUESTS] || 'null'); } catch { return null; } },
+  // 🌟 塑灵持久化
+  getUnlockedBots: (): string[] => { try { return JSON.parse(memoryCache[KEYS.UNLOCKED_BOTS] || '["tu"]'); } catch { return ['tu']; } },
+  getCurrentBot: (): string => memoryCache[KEYS.CURRENT_BOT] || 'tu',
 
   setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
   setAchievements: (data: string) => StorageManager._set(KEYS.ACHIEVEMENTS, data),
@@ -325,6 +381,8 @@ export const StorageManager = {
   setPipChatInterval: (val: number) => StorageManager._set(KEYS.PIP_CHAT_INTERVAL, val.toString()),
   setCustomWakeupSound: (val: string) => StorageManager._set(KEYS.CUSTOM_WAKEUP_SOUND, val),
   _setDailyQuests: (val: string) => StorageManager._set(KEYS.DAILY_QUESTS, val),
+  setUnlockedBots: (val: string[]) => StorageManager._set(KEYS.UNLOCKED_BOTS, JSON.stringify(val)),
+  setCurrentBot: (val: string) => StorageManager._set(KEYS.CURRENT_BOT, val),
 
   exportAll: () => {
     const data: any = { version: CURRENT_SCHEMA_VERSION, exportDate: new Date().toISOString(), coreData: memoryCache[DATA_KEY] || null };
@@ -345,12 +403,15 @@ export const StorageManager = {
       if (typeof data.coreData === 'string') await localforage.setItem(DATA_KEY, data.coreData);
       else await localforage.setItem(DATA_KEY, JSON.stringify(data.coreData));
 
-      Object.keys(data).forEach(async (key) => {
+      // 🌟 Bug Fix: 原 forEach(async) 无法 await，改用 for...of 确保导入完整
+      for (const key of Object.keys(data)) {
         if (key !== 'version' && key !== 'exportDate' && key !== 'coreData') {
           const val = data[key];
-          if (val !== undefined && val !== null && typeof val === 'string') await localforage.setItem(key, val);
+          if (val !== undefined && val !== null && typeof val === 'string') {
+            await localforage.setItem(key, val);
+          }
         }
-      });
+      }
 
       isInit = false;
       await StorageManager.init();

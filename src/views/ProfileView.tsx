@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
+import { DailyQuestManager, type DailyQuest } from '../core/DailyQuestManager';
 
 const toLocalDateStr = (ts: number): string => {
   const d = new Date(ts);
@@ -57,11 +58,30 @@ export const ProfileView = (props: any) => {
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
-    level, levelProgress, showToast
+    level, levelProgress, showToast, refreshData
   } = props;
 
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
+
+  // 每日委托状态
+  const [quests, setQuests] = useState<DailyQuest[]>([]);
+
+  useEffect(() => {
+    setQuests(DailyQuestManager.getTodayQuests());
+  }, []);
+
+  const handleClaim = (questId: string) => {
+    AudioManager.playAchievement();
+    const success = DailyQuestManager.claimReward(questId);
+    if (success) {
+      showToast(isZh ? '🎉 奖励已领取！' : '🎉 Reward claimed!');
+      setQuests(DailyQuestManager.getTodayQuests());
+      if (refreshData) refreshData();
+    }
+  };
+
+  const allCompleted = quests.length > 0 && quests.every(q => q.claimed);
 
   const typingLabel = (() => {
     const raw = t('audioTyping');
@@ -109,6 +129,43 @@ export const ProfileView = (props: any) => {
         </div>
       </div>
 
+      {/* 🌟 全新：每日委托面板 */}
+      <div className="custom-section" style={{ background: 'linear-gradient(145deg, rgba(59,130,246,0.1), rgba(0,0,0,0.2))', border: '1px solid rgba(59,130,246,0.3)' }}>
+        <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📋 {isZh ? '每日委托' : 'Daily Quests'}</span>
+          {allCompleted && <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.2)', padding: '2px 6px', borderRadius: '4px' }}>✨ {isZh ? '今日大满贯' : 'All Done'}</span>}
+        </h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {quests.map(quest => (
+            <div key={quest.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', borderLeft: `3px solid ${quest.completed ? '#10b981' : '#3b82f6'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: quest.completed ? '#10b981' : '#fff' }}>
+                  {isZh ? quest.titleZh : quest.titleEn}
+                </span>
+                <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold' }}>+{quest.reward} 🪙</span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: `${(quest.progress / quest.target) * 100}%`, height: '100%', background: quest.completed ? '#10b981' : '#3b82f6', transition: 'width 0.3s' }} />
+                </div>
+                <span style={{ fontSize: '11px', color: '#aaa', minWidth: '40px', textAlign: 'right' }}>
+                  {quest.type === 'focus_time' ? `${Math.floor(quest.progress / 60)}/${Math.floor(quest.target / 60)}m` : `${quest.progress}/${quest.target}`}
+                </span>
+                
+                {quest.completed && !quest.claimed ? (
+                  <button className="mini-btn" onClick={() => handleClaim(quest.id)} style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
+                    {isZh ? '领取' : 'Claim'}
+                  </button>
+                ) : quest.claimed ? (
+                  <span style={{ fontSize: '12px', color: '#10b981', minWidth: '40px', textAlign: 'center' }}>✓</span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="custom-section" style={{ paddingBottom: '10px' }}>
         <h4>📊 {isZh ? '近 7 天专注势能' : '7-Day Focus Energy'}</h4>
         <WeeklyChart sessions={allSessions} i18n={i18n} />
@@ -139,22 +196,22 @@ export const ProfileView = (props: any) => {
         </div>
       </div>
 
-      <div id="tour-install" className="custom-section" style={{ border: '1px solid #f59e0b', background: 'linear-gradient(145deg, rgba(245, 158, 11, 0.1), rgba(0,0,0,0.2))' }}>
-        <h4>📲 {isZh ? '安装到桌面 (PWA)' : 'Install to Desktop'}</h4>
+      <div id="tour-install" className="custom-section" style={{ border: '1px solid #10b981', background: 'linear-gradient(145deg, rgba(16, 185, 129, 0.1), rgba(0,0,0,0.2))' }}>
+        <h4>🛡️ {isZh ? '桌面客户端已激活' : 'Desktop Client Activated'}</h4>
         <p style={{ fontSize: '11px', color: '#ccc', lineHeight: '1.6', marginBottom: '8px' }}>
-          {isZh ? '安装后去除浏览器边框，体验原生 App 级全屏沉浸感！' : 'Install to remove browser borders and enjoy native app-like fullscreen immersion!'}
+          {isZh 
+            ? '你正在使用独立桌面版。所有数据均加密储存在您的本地电脑中，彻底告别网络延迟与断连。' 
+            : 'You are using the Desktop version. All data is stored locally on your PC, no more network latency.'}
         </p>
-        <div style={{ fontSize: '11px', color: '#f59e0b', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '6px', lineHeight: '1.6' }}>
-          {isZh ? '💻 电脑端 (Edge/Chrome)：点击右上角三个点菜单 → 更多工具 → 应用 → 将此站点安装为应用（或点击地址栏右侧的安装图标）。' : '💻 PC (Edge/Chrome): Click the 3-dots menu → More tools → Apps → Install this site as an app.'}
-          <br />
-          {isZh ? '📱 移动端：Android 浏览器菜单选“添加到主屏幕”；iOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。' : '📱 Mobile: Android → Add to Home screen; iOS Safari → Share → Add to Home Screen.'}
+        <div style={{ fontSize: '11px', color: '#10b981', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '6px', lineHeight: '1.6' }}>
+          {isZh ? '💡 更新提示：当有新版本时，群主会发布新的安装包，直接覆盖安装即可，您的本地数据不会丢失。' : '💡 Update tip: Install the new package over the old one, data will be preserved.'}
         </div>
       </div>
 
       <div className="custom-section" style={{ border: '1px dashed #10b981' }}>
-        <h4>🛡️ {isZh ? '本地数据安全与扩容' : 'Data Security & Expansion'}</h4>
+        <h4>🛡️ {isZh ? '本地数据扩容' : 'Data Expansion'}</h4>
         <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>
-          {isZh ? '浏览器默认容量有限。绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！' : 'Browser storage is limited. Bind a local folder to store media directly on your disk!'}
+          {isZh ? '绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！' : 'Bind a local folder to store media directly on your disk!'}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -170,18 +227,6 @@ export const ProfileView = (props: any) => {
               else showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
             }} style={{ background: isAssetsMounted ? '#10b981' : '#555', flexShrink: 0 }}>
               {isAssetsMounted ? (isZh ? '已挂载本地图库' : 'Mounted') : (isZh ? '📁 挂载本地图库 (扩容)' : '📁 Mount Local Gallery')}
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ fontSize: '12px' }}>{isZh ? '自动无感备份' : 'Auto Backup'}</div>
-            <button className="mini-btn" onClick={async () => {
-              AudioManager.playClick();
-              const success = await StorageManager.selectBackupFolder();
-              if (success) { setIsAutoBackupEnabled(true); showToast(isZh ? '✅ 自动备份已开启！' : '✅ Auto backup enabled!'); }
-              else showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
-            }} style={{ background: isAutoBackupEnabled ? '#10b981' : '#555', flexShrink: 0 }}>
-              {isAutoBackupEnabled ? (isZh ? '自动备份中' : 'Backing up') : (isZh ? '📁 选择备份文件夹' : '📁 Select Backup Folder')}
             </button>
           </div>
         </div>
@@ -409,7 +454,7 @@ export const ProfileView = (props: any) => {
         </div>
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.2.0</p>
+          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.3.0 (Desktop)</p>
           <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { StorageManager } from './core/StorageManager';
 import { UserManager } from './core/UserManager';
 import { CheckinManager } from './core/CheckinManager';
 import { GunplaSearch } from './core/GunplaDB';
+import { DailyQuestManager } from './core/DailyQuestManager'; // 🌟 新增
 import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
@@ -57,15 +58,6 @@ const LocalImage = ({ src, ...props }: any) => {
 function App() {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
-
-  // 🌟 新增：设备与响应式判断
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(() => {
@@ -164,12 +156,9 @@ function App() {
   const [storageEstimate, setStorageEstimate] = useState({ usage: 0, quota: 0, percent: 0 });
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
   const [isAssetsMounted, setIsAssetsMounted] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
-  // Service Worker 更新状态
-  const [updateReady, setUpdateReady] = useState(false);
-  const waitingWorkerRef = useRef<ServiceWorker | null>(null);
+  // 离线单机模式，屏蔽 PWA 更新状态
   const toastTimerRef = useRef<any>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -186,62 +175,9 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
-  // SW 监听
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    let intervalId: any = null;
-    const setup = async () => {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        const handleUpdateFound = () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              setUpdateReady(true);
-              waitingWorkerRef.current = newWorker;
-            }
-          });
-        };
-        registration.addEventListener('updatefound', handleUpdateFound);
-        if (registration.waiting && navigator.serviceWorker.controller) {
-          setUpdateReady(true);
-          waitingWorkerRef.current = registration.waiting;
-        }
-        intervalId = setInterval(() => { registration.update().catch(() => {}); }, 60 * 60 * 1000);
-      } catch (err) { console.log('SW registration failed: ', err); }
-    };
-    setup();
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, []);
-
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    let isReloading = false;
-    const handleControllerChange = () => {
-      if (isReloading) return;
-      isReloading = true;
-      window.location.reload();
-    };
-    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-  }, []);
-
   useEffect(() => {
     return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
   }, []);
-
-  const applyUpdate = () => {
-    AudioManager.playClick();
-    const worker = waitingWorkerRef.current;
-    if (!worker) { window.location.reload(); return; }
-    worker.postMessage({ type: 'SKIP_WAITING' });
-  };
-
-  const skipUpdate = () => {
-    AudioManager.playClick();
-    setUpdateReady(false);
-  };
 
   const showToast = (msg: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -262,6 +198,7 @@ function App() {
     return () => window.removeEventListener('mv-storage-error', handleStorageError);
   }, []);
 
+  // 🌟 精简后的教程（移除了 PWA 安装）
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
     { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
@@ -272,25 +209,8 @@ function App() {
     { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
     { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
     { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
-    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' },
-    {
-      targetId: 'tour-install',
-      title: isZh ? '安装至桌面' : 'Install to Desktop',
-      content: isZh
-        ? '强烈建议安装！\n💻 电脑端：点击浏览器右上角菜单（三个点） → 更多工具 → 应用 → 将此站点安装为应用（或直接点击地址栏右侧的安装图标）。\n📱 移动端：\nAndroid 浏览器菜单选“添加到主屏幕”；\niOS Safari 点击底部“分享”按钮，选择“添加到主屏幕”。\n安装后能去除浏览器边框，体验原生 App 全屏沉浸感！'
-        : 'Highly recommended!\n💻 PC: Click the browser menu (three dots) → More tools → Apps → Install this site as an app.\n📱 Mobile:\nAndroid: Menu → Add to Home screen;\niOS Safari: Share → Add to Home Screen.\nEnjoy a native app-like fullscreen experience!',
-      page: 'profile'
-    }
+    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' }
   ];
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setTimeout(() => setDeferredPrompt(e), 5000);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
 
   useEffect(() => {
     if (chatMessages.length > 0) sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
@@ -582,8 +502,12 @@ function App() {
     const result = engineRef.current.complete();
     if (result) {
       if (result.activeSeconds < 10) { showToast(isZh ? '计时太短，无法记录（至少10秒）。' : 'Time too short, not saved (min 10s).'); return; }
-      AudioManager.playWakeup(); // 🌟 触发自定义起床铃
+      AudioManager.playWakeup(); 
       SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
+      
+      // 🌟 每日委托埋点：专注时间
+      DailyQuestManager.updateProgress('focus_time', result.activeSeconds);
+      
       refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId }); pushChatMessage('complete');
       triggerAutoBackup();
     }
@@ -664,6 +588,10 @@ function App() {
   const handleConfirmFinishPart = () => {
     AudioManager.playFinishPart(); const result = ModelManager.finishTask(currentTaskId, finishPartPhoto);
     if (result.error) { showToast(t(result.error)); return; }
+    
+    // 🌟 每日委托埋点：完成部位
+    DailyQuestManager.updateProgress('complete_part', 1);
+
     setModels(result.models); refreshData(); processAchievements(); setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false); setIsFinishingPart(false); checkAndPromptCompleteModel(result.models);
     triggerAutoBackup();
   };
@@ -692,6 +620,10 @@ function App() {
     }
 
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
+    
+    // 🌟 每日委托埋点：添加模型
+    DailyQuestManager.updateProgress('add_model', 1);
+
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);
     setNewModelNameInput(''); setNewModelSeriesInput(''); setSelectedGunpla(null); setIsAddingModel(false); setUseDefaultTasks(true); setIsWholeBuild(false); setSearchResults([]); processAchievements();
     triggerAutoBackup();
@@ -924,7 +856,7 @@ function App() {
     handleBgFileUpload, openPreview, updateAudioSetting, customAudios, handleAudioUpload, getHistoryLogs, journalFilterMonth, setJournalFilterMonth,
     setBgMain, setBgPip, StorageManager, level, levelProgress, todayTotal, isCheckedIn, checkinStreak, handleCheckin,
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    chatMessages, setChatMessages, // 🌟 传给 FocusPanel
+    chatMessages, setChatMessages, 
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
     setActiveTab, ambientType, setAmbientType,
     handleOpenPiP,
@@ -952,26 +884,6 @@ function App() {
         />
       )}
 
-      {/* 🌟 顶部更新提示条 */}
-      {updateReady && (
-        <div
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99998,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            color: '#fff', padding: '10px 16px',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)', animation: 'fadeIn 0.3s ease-out',
-            fontSize: '13px', fontWeight: 'bold', flexWrap: 'wrap',
-          }}
-        >
-          <span>✨ {isZh ? '新版本已就绪，是否立即更新？' : 'New version ready. Update now?'}</span>
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            <button onClick={applyUpdate} style={{ background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.6)', color: '#fff', padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>{isZh ? '立即更新' : 'Update Now'}</button>
-            <button onClick={skipUpdate} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>{isZh ? '稍后' : 'Later'}</button>
-          </div>
-        </div>
-      )}
-
       <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>
         {bgMain && (
           bgMain.startsWith('local://') ? (
@@ -982,7 +894,7 @@ function App() {
         )}
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
-        <div className={`mini-window ${isMobile ? 'mobile-mode' : ''}`}>
+        <div className="mini-window">
           
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
             <button 
@@ -993,8 +905,7 @@ function App() {
             <button className="lang-btn" onClick={toggleLanguage}>{isZh ? 'EN' : '中'}</button>
           </div>
 
-          {/* 🌟 PC端才显示顶部 Tab，移动端隐藏 */}
-          {!viewingModel && !isMobile && (
+          {!viewingModel && (
             <div className="tabs">
               <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => handleTabChange('focus')}>⏱ {t('focus')}</button>
               <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => handleTabChange('journal')}>📖 {t('journal')}</button>
@@ -1021,7 +932,7 @@ function App() {
             </div>
           )}
 
-          <div className="scroll-content" style={{ paddingBottom: isMobile && !viewingModel ? '70px' : '0' }}>
+          <div className="scroll-content">
             {viewingModel ? (
               <ModelDetail 
                 viewingModel={viewingModel} 
@@ -1056,19 +967,7 @@ function App() {
           </div>
         </div>
 
-        {/* 🌟 移动端底部悬浮导航栏 */}
-        {isMobile && !viewingModel && (
-          <div className="mobile-bottom-nav">
-            <button className={activeTab === 'focus' ? 'active' : ''} onClick={() => handleTabChange('focus')}><span>⏱</span>{t('focus')}</button>
-            <button className={activeTab === 'journal' ? 'active' : ''} onClick={() => handleTabChange('journal')}><span>📖</span>{t('journal')}</button>
-            <button className={activeTab === 'hangar' ? 'active' : ''} onClick={() => handleTabChange('hangar')}><span>📦</span>{t('hangar')}</button>
-            <button className={activeTab === 'gundam' ? 'active' : ''} onClick={() => handleTabChange('gundam')}><span>🤖</span>{isZh ? '机体' : 'Mecha'}</button>
-            <button className={activeTab === 'gallery' ? 'active' : ''} onClick={() => handleTabChange('gallery')}><span>👥</span>{isZh ? '塑灵' : 'Animold'}</button>
-            <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => handleTabChange('profile')}><span>👤</span>{t('profile')}</button>
-          </div>
-        )}
-
-        <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={deferredPrompt} setDeferredPrompt={setDeferredPrompt} i18n={i18n} />
+        <Modals showCompleteModelConfirm={showCompleteModelConfirm} setShowCompleteModelConfirm={setShowCompleteModelConfirm} handleConfirmCompleteModel={handleConfirmCompleteModel} isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen} bgMain={bgMain} bgSize={bgSize} bgPosition={bgPosition} setBgSize={setBgSize} setBgPosition={setBgPosition} applyBackground={applyBackground} deferredPrompt={null} setDeferredPrompt={() => {}} i18n={i18n} />
 
         <AchievementOverlay achievement={activeAchievement} onClose={() => setActiveAchievement(null)} t={t} i18n={i18n} />
 

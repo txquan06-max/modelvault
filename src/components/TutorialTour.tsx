@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AudioManager } from '../core/AudioManager';
 
 export interface TourStep {
@@ -20,8 +20,15 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
   const [currentStep, setCurrentStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [ready, setReady] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
   const step = steps[currentStep];
+
+  useEffect(() => {
+    const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!step) return;
@@ -47,6 +54,7 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
         setReady(true);
       }, 300);
     } else {
+      // 兜底：如果找不到元素，居中显示气泡
       setRect(new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0));
       setReady(true);
     }
@@ -54,28 +62,50 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
   if (!step) return null;
 
+  // 🌟 核心修复：智能防越界计算算法
   const getTooltipStyle = () => {
     if (!rect || rect.width === 0) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
-    const padding = 20;
-    let top = rect.bottom + padding;
-    let left = rect.left;
 
-    if (top + 200 > window.innerHeight) top = rect.top - 200 - padding;
-    if (left + 300 > window.innerWidth) left = window.innerWidth - 300 - 20;
-    if (left < 10) left = 10;
+    const padding = 16;
+    const tooltipWidth = 300;
+    const tooltipHeight = 200; // 预估高度
+
+    let top = rect.bottom + padding;
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+
+    // 防底部越界：如果下方放不下，翻转到上方
+    if (top + tooltipHeight > windowSize.height) {
+      top = rect.top - tooltipHeight - padding;
+    }
+    
+    // 防顶部越界：如果上方也放不下，强行贴紧顶部
+    if (top < padding) {
+      top = padding;
+    }
+
+    // 防右侧越界
+    if (left + tooltipWidth > windowSize.width) {
+      left = windowSize.width - tooltipWidth - padding;
+    }
+
+    // 防左侧越界
+    if (left < padding) {
+      left = padding;
+    }
 
     return { top: `${top}px`, left: `${left}px` };
   };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+      {/* 高亮遮罩层 */}
       {rect && rect.width > 0 ? (
         <div style={{
           position: 'fixed',
-          top: rect.top - 4, left: rect.left - 4,
-          width: rect.width + 8, height: rect.height + 8,
+          top: rect.top - 6, left: rect.left - 6,
+          width: rect.width + 12, height: rect.height + 12,
           borderRadius: '8px',
           boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
           border: '2px solid #3b82f6',
@@ -88,13 +118,15 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9998, opacity: ready ? 1 : 0 }} />
       )}
 
+      {/* 气泡内容 */}
       <div
         style={{
           position: 'fixed', ...getTooltipStyle(),
-          width: '300px', background: '#1e1e24', border: '1px solid #3b82f6',
+          width: `${300}px`, background: '#1e1e24', border: '1px solid #3b82f6',
           borderRadius: '12px', padding: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
           zIndex: 10000, display: 'flex', flexDirection: 'column', gap: '10px',
-          opacity: ready ? 1 : 0, transition: 'opacity 0.3s'
+          opacity: ready ? 1 : 0, transition: 'opacity 0.3s',
+          maxHeight: '80vh', overflowY: 'auto'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

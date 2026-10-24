@@ -5,18 +5,17 @@ import { SessionManager } from '../core/SessionManager';
 import { StorageManager } from '../core/StorageManager';
 import { UserManager } from '../core/UserManager';
 import { CheckinManager } from '../core/CheckinManager';
-import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
-import { AudioManager } from '../core/AudioManager';
+import { QuoteEngine, type BotType } from '../core/QuoteEngine';
+
+export type MainTab = 'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile';
 
 interface AppState {
-  // 核心数据
   models: Model[];
   currentModelId: string;
   tasks: Task[];
   currentTaskId: string;
   currentStageId: string | null;
 
-  // 用户数据
   username: string;
   level: number;
   levelProgress: { current: number; next: number; percent: number };
@@ -27,23 +26,26 @@ interface AppState {
   checkinStreak: number;
   isCheckedIn: boolean;
   
-  // 塑灵数据
   unlockedBots: BotType[];
   currentBot: BotType;
   
-  // 设置与外观
   bgMain: string;
   bgPip: string;
   bgSize: string;
   bgPosition: string;
   audioSettings: any;
   customAudios: any;
+  storageEstimate: any;
 
-  // 计时器状态 (仅存 UI 态，TimerEngine 依然由组件持有以防重渲染丢失)
   timerState: 'Idle' | 'Running' | 'Paused';
   activeSeconds: number;
 
-  // Actions
+  // 🌟 全局 Tab & 聊天频率 & 挂载状态
+  activeTab: MainTab;
+  webChatInterval: number;
+  pipChatInterval: number;
+  isAssetsMounted: boolean;
+
   refreshData: () => Promise<void>;
   setModels: (models: Model[]) => void;
   setCurrentModelId: (id: string) => void;
@@ -62,10 +64,15 @@ interface AppState {
   setAudioSettings: (settings: any) => void;
   setCustomAudios: (audios: any) => void;
   setStorageEstimate: (est: any) => void;
-  storageEstimate: any;
+  setTimerState: (state: 'Idle' | 'Running' | 'Paused') => void;
+  setActiveSeconds: (sec: number) => void;
+  setActiveTab: (tab: MainTab) => void;
+  setWebChatInterval: (val: number) => void;
+  setPipChatInterval: (val: number) => void;
+  setIsAssetsMounted: (val: boolean) => void;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set: any, get: any) => ({
   models: [],
   currentModelId: '',
   tasks: [],
@@ -91,21 +98,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   bgPosition: StorageManager.getBgPosition(),
   audioSettings: StorageManager.getAudioSettings(),
   customAudios: StorageManager.getCustomAudios(),
+  storageEstimate: { usage: 0, quota: 0, percent: 0 },
 
   timerState: 'Idle',
   activeSeconds: 0,
-  storageEstimate: { usage: 0, quota: 0, percent: 0 },
+
+  activeTab: 'focus',
+  webChatInterval: StorageManager.getWebChatInterval(),
+  pipChatInterval: StorageManager.getPipChatInterval(),
+  isAssetsMounted: false,
 
   refreshData: async () => {
     const xp = ModelManager.getTotalXP();
     const allModels = ModelManager.getAllModels();
-    const available = allModels.filter(m => m.status !== 'Completed');
+    const available = allModels.filter((m: Model) => m.status !== 'Completed');
     
     let { currentModelId, currentTaskId, currentStageId } = get();
 
-    // 检查当前模型是否依然有效
     if (available.length > 0) {
-      if (!currentModelId || !available.some(m => m.id === currentModelId)) {
+      if (!currentModelId || !available.some((m: Model) => m.id === currentModelId)) {
         currentModelId = available[0].id;
       }
     } else {
@@ -114,19 +125,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentStageId = null;
     }
 
-    // 同步 tasks
     let tasks: Task[] = [];
     if (currentModelId) {
-      const model = allModels.find(m => m.id === currentModelId);
+      const model = allModels.find((m: Model) => m.id === currentModelId);
       if (model) {
         tasks = model.tasks;
-        if (!tasks.some(t => t.id === currentTaskId) && tasks.length > 0) {
+        if (!tasks.some((t: Task) => t.id === currentTaskId) && tasks.length > 0) {
           currentTaskId = tasks[0].id;
         }
         
-        const task = tasks.find(t => t.id === currentTaskId);
-        if (task && !task.stages.some(s => s.id === currentStageId)) {
-          const nextStage = task.stages.find(s => s.status !== 'Completed');
+        const task = tasks.find((t: Task) => t.id === currentTaskId);
+        if (task && !task.stages.some((s: any) => s.id === currentStageId)) {
+          const nextStage = task.stages.find((s: any) => s.status !== 'Completed');
           currentStageId = nextStage ? nextStage.id : (task.stages[0]?.id || null);
         }
       }
@@ -158,41 +168,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setModels: (models) => {
+  setModels: (models: Model[]) => {
     set({ models });
-    // 重新计算当前选中的模型/任务/工序
     get().refreshData();
   },
 
-  setCurrentModelId: (id) => set({ currentModelId: id }),
-  setCurrentTaskId: (id) => set({ currentTaskId: id }),
-  setCurrentStageId: (id) => set({ currentStageId: id }),
-
-  setUsername: (name) => {
-    StorageManager.setUsername(name);
-    set({ username: name });
-  },
-
-  setBgMain: (url) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
-  setBgPip: (url) => { StorageManager.setBgPip(url); set({ bgPip: url }); },
-  setBgSize: (size) => { StorageManager.setBgSize(size); set({ bgSize: size }); },
-  setBgPosition: (pos) => { StorageManager.setBgPosition(pos); set({ bgPosition: pos }); },
-  setCoinsBalance: (val) => { StorageManager.setCoinsBalance(val); set({ coinsBalance: val }); },
-  setEarnedTitles: (titles) => { StorageManager.setEarnedTitles(titles); set({ earnedTitles: titles }); },
-  setEquippedTitle: (title) => { StorageManager.setEquippedTitle(title); set({ equippedTitle: title }); },
-  
-  setCurrentBot: (bot) => {
-    StorageManager.setCurrentBot(bot);
-    QuoteEngine.setBot(bot);
-    set({ currentBot: bot });
-  },
-  
-  setUnlockedBots: (bots) => {
-    StorageManager.setUnlockedBots(bots);
-    set({ unlockedBots: bots });
-  },
-
-  setAudioSettings: (settings) => { StorageManager.setAudioSettings(settings); set({ audioSettings: settings }); },
-  setCustomAudios: (audios) => { StorageManager.setCustomAudios(audios); set({ customAudios: audios }); },
-  setStorageEstimate: (est) => set({ storageEstimate: est }),
+  setCurrentModelId: (id: string) => set({ currentModelId: id }),
+  setCurrentTaskId: (id: string) => set({ currentTaskId: id }),
+  setCurrentStageId: (id: string | null) => set({ currentStageId: id }),
+  setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
+  setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
+  setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },
+  setBgSize: (size: string) => { StorageManager.setBgSize(size); set({ bgSize: size }); },
+  setBgPosition: (pos: string) => { StorageManager.setBgPosition(pos); set({ bgPosition: pos }); },
+  setCoinsBalance: (val: number) => { StorageManager.setCoinsBalance(val); set({ coinsBalance: val }); },
+  setEarnedTitles: (titles: string[]) => { StorageManager.setEarnedTitles(titles); set({ earnedTitles: titles }); },
+  setEquippedTitle: (title: string) => { StorageManager.setEquippedTitle(title); set({ equippedTitle: title }); },
+  setCurrentBot: (bot: BotType) => { StorageManager.setCurrentBot(bot); QuoteEngine.setBot(bot); set({ currentBot: bot }); },
+  setUnlockedBots: (bots: BotType[]) => { StorageManager.setUnlockedBots(bots); set({ unlockedBots: bots }); },
+  setAudioSettings: (settings: any) => { StorageManager.setAudioSettings(settings); set({ audioSettings: settings }); },
+  setCustomAudios: (audios: any) => { StorageManager.setCustomAudios(audios); set({ customAudios: audios }); },
+  setStorageEstimate: (est: any) => set({ storageEstimate: est }),
+  setTimerState: (state: 'Idle' | 'Running' | 'Paused') => set({ timerState: state }),
+  setActiveSeconds: (sec: number) => set({ activeSeconds: sec }),
+  setActiveTab: (tab: MainTab) => set({ activeTab: tab }),
+  setWebChatInterval: (val: number) => { StorageManager.setWebChatInterval(val); set({ webChatInterval: val }); },
+  setPipChatInterval: (val: number) => { StorageManager.setPipChatInterval(val); set({ pipChatInterval: val }); },
+  setIsAssetsMounted: (val: boolean) => set({ isAssetsMounted: val }),
 }));

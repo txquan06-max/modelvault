@@ -11,7 +11,7 @@ import { UserManager } from './core/UserManager';
 import { CheckinManager } from './core/CheckinManager';
 import { GunplaSearch } from './core/GunplaDB';
 import { DailyQuestManager } from './core/DailyQuestManager';
-import { useAppStore } from './store/useAppStore';
+import { useAppStore, type MainTab } from './store/useAppStore';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
 
@@ -25,12 +25,10 @@ import { ModelDetail } from './components/ModelDetail';
 import { FocusPanel } from './components/FocusPanel';
 import { Modals } from './components/Modals';
 import { SplashScreen } from './components/SplashScreen';
-import { TutorialTour, type TourStep } from './components/TutorialTour';
+import { TutorialTour } from './components/TutorialTour';
 import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
-import { generateShareCard } from './utils/shareCard';
-import type { ShareCardTemplate } from './utils/shareCard';
 
 const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
 
@@ -66,17 +64,20 @@ function App() {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 从 Zustand 获取全局状态
   const {
     models, setModels, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     username, setUsername, coinsBalance, setCoinsBalance,
-    earnedTitles, setEarnedTitles, equippedTitle, setEquippedTitle,
-    bgMain, setBgMain, bgPip, setBgPip, bgSize, setBgSize, bgPosition, setBgPosition,
+    earnedTitles, equippedTitle, setEquippedTitle,
+    bgMain, bgPip, bgSize, bgPosition, setBgMain, setBgPip, setBgSize, setBgPosition,
     audioSettings, setAudioSettings, customAudios, setCustomAudios,
     unlockedBots, setUnlockedBots, currentBot, setCurrentBot,
-    checkinStreak, level, levelProgress, refreshData, storageEstimate,
-    timerState, activeSeconds, setTimerState, setActiveSeconds
+    checkinStreak, level, levelProgress, refreshData, storageEstimate, isCheckedIn,
+    timerState, activeSeconds, setTimerState, setActiveSeconds,
+    // 🌟 新增：从 Store 取 activeTab / webChatInterval / pipChatInterval / isAssetsMounted
+    activeTab, setActiveTab,
+    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
+    isAssetsMounted, setIsAssetsMounted
   } = useAppStore();
 
   const [showSplash, setShowSplash] = useState(true);
@@ -84,8 +85,8 @@ function App() {
     return localStorage.getItem('hasSeenTutorial') === null;
   });
 
-  const [activeTab, setActiveTab] = useState<'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile'>('focus');
-  const [pendingTabChange, setPendingTabChange] = useState<any>(null);
+  // 🌟 移除本地 activeTab / pendingTabChange 保留
+  const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
 
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -135,13 +136,8 @@ function App() {
   const engineRef = useRef(new TimerEngine());
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [isCheckedIn, setIsCheckedIn] = useState(() => CheckinManager.isCheckedInToday());
-
-  const [webChatInterval, setWebChatInterval] = useState(() => StorageManager.getWebChatInterval());
-  const [pipChatInterval, setPipChatInterval] = useState(() => StorageManager.getPipChatInterval());
 
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
-  const [isAssetsMounted, setIsAssetsMounted] = useState(false);
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
   const toastTimerRef = useRef<any>(null);
@@ -185,8 +181,6 @@ function App() {
     setToastMsg(msg);
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
-
-  const tutorialSteps: TourStep[] = [ /* 保持不变，此处省略以节省空间，按需保留 */ ];
 
   useEffect(() => {
     if (chatMessages.length > 0) sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
@@ -262,6 +256,18 @@ function App() {
     }
   }, [timeboxElapsed, timeboxTarget, hasPlayedTimeboxSound, timerState, isZh]);
 
+  useEffect(() => {
+    if (timerState === 'Running' && reminderInterval > 0) {
+      if (activeSeconds > 0 && activeSeconds % reminderInterval === 0 && activeSeconds !== lastRemindedAt) {
+        AudioManager.playTimeboxEnd();
+        showToast(t('toast_timebox_end', { min: reminderInterval / 60 }));
+        setLastRemindedAt(activeSeconds);
+      }
+    }
+  }, [activeSeconds, timerState, reminderInterval, lastRemindedAt, isZh]);
+
+  useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
+
   const handleStart = () => { 
     if (!currentTaskId) { showToast(t('toast_select_part')); return; }
     AudioManager.playStart(); engineRef.current.start(); 
@@ -284,7 +290,7 @@ function App() {
     }
   };
 
-  const handleTabChange = (newTab: typeof activeTab) => {
+  const handleTabChange = (newTab: MainTab) => {
     if (activeTab === 'focus' && timerState === 'Running') setPendingTabChange(newTab);
     else { AudioManager.playClick(); setActiveTab(newTab); }
   };
@@ -313,10 +319,13 @@ function App() {
 
   const checkAndPromptCompleteModel = (updatedModels: any[], modelId?: string) => {
     let targetId = modelId;
-    if (!targetId) { const m = updatedModels.find(m => m.tasks.some(t => t.id === currentTaskId)); targetId = m?.id; }
+    if (!targetId) {
+      const m = updatedModels.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
+      targetId = m?.id;
+    }
     if (!targetId) return;
-    const targetModel = updatedModels.find(m => m.id === targetId);
-    if (targetModel && targetModel.tasks.length > 0 && targetModel.tasks.every(t => t.status === 'Completed') && targetModel.status !== 'Completed') {
+    const targetModel = updatedModels.find((m: any) => m.id === targetId);
+    if (targetModel && targetModel.tasks.length > 0 && targetModel.tasks.every((t: any) => t.status === 'Completed') && targetModel.status !== 'Completed') {
       setShowCompleteModelConfirm(true); setCompleteModelId(targetId);
     }
   };
@@ -329,7 +338,7 @@ function App() {
 
   const handleFinishPart = () => {
     AudioManager.playClick();
-    const assembly = tasks.find(t => t.id === currentTaskId)?.stages.find(s => s.nameKey === 'stage_assembly');
+    const assembly = tasks.find((t: any) => t.id === currentTaskId)?.stages.find((s: any) => s.nameKey === 'stage_assembly');
     if (assembly && assembly.status !== 'Completed') { showToast(t('errorAssemblyRequired')); return; }
     setFinishPartPhoto(''); setIsFinishingPart(true);
   };
@@ -356,7 +365,7 @@ function App() {
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
-    const duplicate = models.find(m => (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade.toUpperCase() === newModelGrade.toUpperCase());
+    const duplicate = models.find((m: any) => (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade.toUpperCase() === newModelGrade.toUpperCase());
     if (duplicate) { showToast(t('toast_duplicate_model')); return; }
 
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
@@ -371,6 +380,11 @@ function App() {
     setModels(updated); triggerAutoBackup();
   };
 
+  const handleDeleteModel = (modelId: string) => {
+    AudioManager.playClick(); const updated = ModelManager.deleteModel(modelId);
+    setModels(updated); setViewingModelId(null); refreshData(); showToast(t('toast_deleted')); triggerAutoBackup();
+  };
+
   const handleJumpToFocus = (taskId: string, stageId: string | null = null) => {
     AudioManager.playClick();
     if (viewingModel?.status === 'Completed' || viewingModel?.isRebuilding) {
@@ -380,20 +394,312 @@ function App() {
     setActiveTab('focus'); setViewingModelId(null);
   };
 
-  // 🌟 辅助数据计算
-  const currentModel = models.find(m => m.id === currentModelId);
-  const currentTask = tasks.find(t => t.id === currentTaskId);
-  const currentStage = currentTask?.stages.find(s => s.id === currentStageId);
-  const viewingModel = models.find(m => m.id === viewingModelId);
-  const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter(s => viewingModel.tasks.some(t => t.id === s.taskId)).reduce((sum, s) => sum + s.activeSeconds, 0) : 0;
-  const equippedTitleDef = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
+  const handleSetTimeboxTarget = (min: number) => {
+    AudioManager.playClick(); setTimeboxTarget(min * 60); setHasPlayedTimeboxSound(false);
+  };
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { 
+    setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); 
+  };
+
+  const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
+
+  const handleOpenPiP = async () => {
+    AudioManager.playClick();
+    if (isWeChat) { showToast(t('toast_pip_not_supported')); return; }
+    if (!('documentPictureInPicture' in window)) { showToast(t('toast_pip_not_supported')); return; }
+    try {
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
+      [...document.styleSheets].forEach((styleSheet) => {
+        try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
+        catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
+      });
+      pipWin.document.body.style.backgroundColor = '#1e1e1e'; pipWin.document.body.style.margin = '0'; pipWin.document.body.style.display = 'flex'; pipWin.document.body.style.justifyContent = 'center'; pipWin.document.body.style.alignItems = 'center'; pipWin.document.body.style.height = '100vh'; pipWin.document.body.style.overflow = 'hidden';
+      setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
+    } catch (err) { console.error(err); showToast(t('toast_pip_open_fail')); }
+  };
+
+  const handleStartRebuild = (taskId: string | null) => {
+    AudioManager.playClick(); 
+    setPendingRebuildTask(taskId);
+    const stages = viewingModel?.tasks.find((t: any) => t.name === 'part_legacy')?.stages.filter((s: any) => s.status === 'Completed').map((s: any) => s.nameKey) || ['stage_assembly'];
+    setImportedStages(stages); 
+    setRebuildMode('part'); 
+    setIsEditingImportedStatus(true);
+  };
+
+  const handleConfirmRebuild = () => {
+    if (!viewingModel) return;
+    AudioManager.playStageDone(); 
+    const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages, rebuildMode === 'whole');
+    
+    let targetTaskId = null;
+    const currentModelUpdated = updated.find((m: any) => m.id === viewingModel.id);
+    if (currentModelUpdated) {
+       if (rebuildMode === 'whole') {
+           const wholeTask = currentModelUpdated.tasks.find((t: any) => t.name === 'part_whole');
+           if (wholeTask) targetTaskId = wholeTask.id;
+       } else {
+           const firstPart = currentModelUpdated.tasks.find((t: any) => t.name !== 'part_legacy' && t.status !== 'Completed');
+           if (firstPart) targetTaskId = firstPart.id;
+           else {
+               const legacyTask = currentModelUpdated.tasks.find((t: any) => t.name === 'part_legacy');
+               if (legacyTask) targetTaskId = legacyTask.id;
+           }
+       }
+    }
+    
+    setPendingRebuildTask(targetTaskId || null);
+    setModels(updated); 
+    setIsEditingImportedStatus(false); 
+    setShowRebuildConfirm(true); 
+    triggerAutoBackup();
+  };
+
+  const handleDoRebuild = () => {
+    AudioManager.playClick(); 
+    setShowRebuildConfirm(false);
+    if (pendingRebuildTask) { 
+      handleJumpToFocus(pendingRebuildTask); 
+      setPendingRebuildTask(null); 
+    } else {
+      setActiveTab('focus');
+      setViewingModelId(null);
+    }
+  };
+
+  const handleSaveImportedStages = () => {
+    if (!viewingModelId) return;
+    AudioManager.playStageDone(); const updated = ModelManager.updateImportedModelStatus(viewingModelId, importedStages);
+    setModels(updated); setIsEditingImportedStatus(false); checkAndPromptCompleteModel(updated, viewingModelId); triggerAutoBackup();
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && viewingModelId) {
+      showToast(t('processing'));
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width; let h = img.height;
+          if(w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+          
+          canvas.toBlob(async (blob) => {
+            let finalBlob = blob;
+            let ext = 'webp';
+            if (!blob) {
+              finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+              ext = 'jpg';
+            }
+            if (!finalBlob) return;
+            const filename = `cover_${Date.now()}.${ext}`;
+            const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
+            const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
+            
+            const updated = ModelManager.updateModelCover(viewingModelId, finalUrl);
+            setModels(updated); setIsEditingCover(false);
+            showToast(t('toast_cover_updated'));
+            triggerAutoBackup();
+          }, 'image/webp', 0.6);
+        };
+      };
+    }
+    e.target.value = '';
+  };
+
+  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      showToast(t('processing'));
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async (ev) => {
+        const img = new Image();
+        img.src = ev.target?.result as string;
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width; let h = img.height;
+          if(w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(async (blob) => {
+            let finalBlob = blob;
+            let ext = 'webp';
+            if (!blob) {
+              finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+              ext = 'jpg';
+            }
+            if (!finalBlob) return;
+            const filename = `bg_${type}_${Date.now()}.${ext}`;
+            const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
+            const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
+            
+            if (type === 'main') { setBgMain(finalUrl); } 
+            else { setBgPip(finalUrl); }
+            showToast(t('toast_bg_updated'));
+            triggerAutoBackup();
+          }, 'image/webp', 0.6);
+        };
+      };
+    }
+    e.target.value = '';
+  };
+
+  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
+    const filename = `audio_${type}_${Date.now()}.mp3`;
+    StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
+      const finalPath = localPath || await new Promise<string>((res) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => res(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      const newAudios = { ...customAudios, [type]: finalPath };
+      setCustomAudios(newAudios);
+      setAudioSettings({ ...audioSettings, [type]: 'custom' });
+      showToast(t('toast_audio_updated'));
+      triggerAutoBackup();
+    });
+    e.target.value = '';
+  };
+
+  const handleUnlockBot = (botId: BotType, cost: number) => {
+    if (coinsBalance >= cost) {
+      setCoinsBalance(coinsBalance - cost);
+      setUnlockedBots([...unlockedBots, botId]);
+      AudioManager.playAchievement(); refreshData();
+      showToast(t('toast_unlock_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
+    }
+  };
+
+  const handleEquipBot = (botId: BotType) => {
+    setCurrentBot(botId);
+    AudioManager.playStageDone();
+    showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
+  };
+
+  const buyTitle = (id: string) => { 
+    const result = UserManager.buyTitle(id);
+    if (result.success) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); } 
+    else { AudioManager.playClick(); showToast(t('notEnoughCoins')); } 
+  };
+  
+  const equipTitle = (id: string) => { 
+    AudioManager.playClick(); setEquippedTitle(id); AudioManager.playStageDone(); 
+  };
+
+  const handleLegacyImport = () => {
+    if (legacyList.length === 0) return;
+    AudioManager.playClick(); const result = ModelManager.importLegacyModelsFromList(legacyList);
+    if (result.count > 0) {
+      AudioManager.playFinishPart(); showToast(t('importedSuccess', { count: result.count }));
+      setLegacyList([]); refreshData(); processAchievements(); triggerAutoBackup();
+    }
+  };
+
+  const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      showToast(t('processing'));
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async (ev) => {
+        const newList = [...legacyList]; 
+        newList[index].coverImage = ev.target?.result as string; 
+        setLegacyList(newList); 
+      };
+    }
+    e.target.value = '';
+  };
+
+  const handleResetData = async () => { 
+    AudioManager.playClick(); setIsResetting(true); 
+    try { await StorageManager.resetAll(); } catch (e) { console.error(e); } 
+    window.location.href = window.location.origin + window.location.pathname; 
+  };
+
+  const exportData = () => { 
+    AudioManager.playClick(); 
+    const data = StorageManager.exportAll(); 
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); 
+    const url = URL.createObjectURL(blob); 
+    const a = document.createElement('a'); 
+    a.href = url; 
+    a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; 
+    a.click(); 
+    URL.revokeObjectURL(url); 
+  };
+  
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
+    const file = e.target.files?.[0]; if (!file) return; AudioManager.playClick();
+    const reader = new FileReader(); 
+    reader.onload = async (event) => { 
+      try { 
+        const data = JSON.parse(event.target?.result as string); 
+        const success = await StorageManager.importAll(data); 
+        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); } 
+        else showToast(t('importError')); 
+      } catch (err) { showToast(t('importError')); } 
+    }; 
+    reader.readAsText(file); e.target.value = ''; 
+  };
+
+  const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
+  const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
+
+  const currentModel = models.find((m: any) => m.id === currentModelId);
+  const currentTask = tasks.find((t: any) => t.id === currentTaskId);
+  const currentStage = currentTask?.stages.find((s: any) => s.id === currentStageId);
+  const viewingModel = models.find((m: any) => m.id === viewingModelId);
+  const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t: any) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0) : 0;
+  const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === equippedTitle);
+
+  const commonProps = {
+    t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
+    timerState, activeSeconds, lastSession, timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
+    handleConfirmStageDone, handleCancelDone, handleFinishPart, isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
+    currentModel, currentTask, currentStage, getModelName, formatTime, formatLogDate, handleFocus, showToast, handleSetTimeboxTarget,
+    isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
+    newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
+    isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
+    bgMain, bgPip, bgSize, bgPosition, reminderInterval, setReminderInterval, audioSettings, setAudioSettings,
+    username, setUsername, modelStats: ModelManager.getModelStats(), timeStats: ModelManager.getTimeStats(),
+    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, titles: UserManager.getTitleLibrary(),
+    earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle, earnedAchievements: AchievementManager.getEarnedList(),
+    storageUsage: StorageManager.getStorageUsage(), exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
+    showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, legacyList, removeLegacyItem: (id: string) => setLegacyList(legacyList.filter(i => i.id !== id)), handleLegacyImport,
+    handleBgFileUpload, openPreview: () => {}, updateAudioSetting: (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); }, customAudios, handleAudioUpload, getHistoryLogs: () => SessionManager.getAllSessions().sort((a: any,b: any) => b.startedAt - a.startedAt).map((s: any) => ({...s, details: ModelManager.getTaskDetails(s.taskId)})), journalFilterMonth, setJournalFilterMonth,
+    level, levelProgress, todayTotal: useAppStore.getState().todayTotal, isCheckedIn, checkinStreak, handleCheckin,
+    currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
+    chatMessages, setChatMessages, 
+    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
+    ambientType, setAmbientType,
+    handleOpenPiP,
+    equippedTitleDef,
+    setViewingModelId,
+    setExpandedTaskId,
+    isWholeBuild, setIsWholeBuild,
+    rebuildMode, setRebuildMode,
+    setModels, refreshData,
+    addToLegacyList: (item: any) => { if (!legacyList.some((i: any) => i.name.en === item.name.en)) setLegacyList([...legacyList, item]); else showToast(t('toast_legacy_added')); },
+    handleLegacyCoverUpload,
+    setBgMain, setBgPip, StorageManager
+  };
 
   return (
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
       {showTutorial && !showSplash && (
         <TutorialTour 
-          steps={tutorialSteps} 
+          steps={[]} 
           onClose={() => { setShowTutorial(false); localStorage.setItem('hasSeenTutorial', 'true'); }} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
@@ -431,7 +737,7 @@ function App() {
           {timerState !== 'Idle' && activeTab !== 'focus' && !viewingModel && (
             <div className="mini-timer-bar" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>
               <span className={`mini-timer-dot ${timerState.toLowerCase()}`}>⏱</span>
-              <span className="mini-timer-text">{SessionManager.getTodayTotalSeconds() > 0 ? activeSeconds : '--'}</span>
+              <span className="mini-timer-text">{activeSeconds > 0 ? formatTime(activeSeconds) : '--'}</span>
               <span className="mini-timer-state">{timerState === 'Running' ? t('status_running') : t('status_paused')}</span>
               <span className="mini-timer-arrow">→</span>
             </div>
@@ -455,15 +761,15 @@ function App() {
 
           <div className="scroll-content">
             {viewingModel ? (
-              <ModelDetail {...({ viewingModel, viewingModelTotalSec, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm } as any)} />
+              <ModelDetail {...({ viewingModel, viewingModelTotalSec, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm, handleConfirmRebuild, handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, handleSaveImportedStages, showToast } as any)} />
             ) : (
               <>
-                {activeTab === 'focus' && <FocusView {...({ handleStart, handlePause, handleResume, handleComplete, handleConfirmStageDone, handleCancelDone, handleFinishPart, isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart, lastSession, timeboxTarget, timeboxElapsed, bgImage: bgPip, showToast, handleSetTimeboxTarget, handleCheckin, handleFocus, chatMessages, setChatMessages, ambientType, setAmbientType, handleOpenPiP, isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults, newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild, bgSize, bgPosition, reminderInterval, currentModel, currentTask, currentStage, getModelName, equippedTitleDef } as any)} />}
-                {activeTab === 'journal' && <JournalView {...({ t, i18n, getHistoryLogs: () => SessionManager.getAllSessions().sort((a,b) => b.startedAt - a.startedAt).map(s => ({...s, details: ModelManager.getTaskDetails(s.taskId)})), journalFilterMonth, setJournalFilterMonth, formatTime: (sec: number) => { const m = Math.floor(sec / 60).toString().padStart(2, '0'); const s = (sec % 60).toString().padStart(2, '0'); return `${m}:${s}`; }, formatLogDate: (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; }, handleFocus } as any)} />}
-                {activeTab === 'hangar' && <HangarView {...({ t, i18n, models, getModelName, getModelSeries: (m: any) => isZh ? m.series.zh : m.series.en, setViewingModelId, setExpandedTaskId, setActiveTab, setCurrentModelId } as any)} />}
+                {activeTab === 'focus' && <FocusView {...commonProps} />}
+                {activeTab === 'journal' && <JournalView {...commonProps} />}
+                {activeTab === 'hangar' && <HangarView {...({ t, i18n, models, getModelName, getModelSeries: (m: any) => isZh ? m.series.zh : m.series.en, setViewingModelId, setExpandedTaskId } as any)} />}
                 {activeTab === 'gundam' && <GundamGalleryView {...({ i18n, models } as any)} />} 
-                {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={(botId, cost) => { setCoinsBalance(coinsBalance - cost); setUnlockedBots([...unlockedBots, botId]); AudioManager.playAchievement(); refreshData(); showToast(t('toast_unlock_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName })); }} onEquip={(botId) => { setCurrentBot(botId); AudioManager.playStageDone(); showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName })); }} i18n={i18n} />}
-                {activeTab === 'profile' && <ProfileView {...({ t, i18n, username, handleUsernameChange: (e: any) => setUsername(e.target.value), equippedTitleDef, modelStats: ModelManager.getModelStats(), timeStats: ModelManager.getTimeStats(), showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, formatTime: (sec: number) => { const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0'); return h > 0 ? `${h}:${m}` : `${m}m`; }, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, addToLegacyList: (item: any) => { if (!legacyList.some(i => i.name.en === item.name.en)) setLegacyList([...legacyList, item]); else showToast(t('toast_legacy_added')); }, legacyList, removeLegacyItem: (id: string) => setLegacyList(legacyList.filter(i => i.id !== id)), handleLegacyCoverUpload: () => {}, handleLegacyImport: () => {}, bgMain, bgPip, handleBgFileUpload: () => {}, reminderInterval, setReminderInterval, openPreview: () => {}, audioSettings, updateAudioSetting: () => {}, customAudios, handleAudioUpload: () => {}, titles: UserManager.getTitleLibrary(), earnedTitles, coinsBalance, buyTitle: () => {}, equipTitle: () => {}, equippedTitle, earnedAchievements: AchievementManager.getEarnedList(), exportData: () => {}, importData: () => {}, showResetConfirm, setShowResetConfirm, handleResetData: () => {}, isResetting, storageUsage: StorageManager.getStorageUsage(), handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval, storageEstimate, isAssetsMounted, setIsAssetsMounted, level, levelProgress, showToast, refreshData, setLegacyList } as any)} />}
+                {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
+                {activeTab === 'profile' && <ProfileView {...commonProps} />}
               </>
             )}
           </div>
@@ -478,14 +784,14 @@ function App() {
               <h3 style={{ color: '#f59e0b', fontSize: '18px', marginBottom: '12px' }}>⏱️ {t('status_running')}</h3>
               <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', marginBottom: '16px' }}>{t('confirmLeaveFocus')}</p>
               <div className="modal-actions" style={{ justifyContent: 'center' }}>
-                <button className="btn yes" style={{ flex: 1 }} onClick={() => { setPendingTabChange(null); setActiveTab(pendingTabChange); }}>{t('confirm')}</button>
+                <button className="btn yes" style={{ flex: 1 }} onClick={() => { const target = pendingTabChange; setPendingTabChange(null); setActiveTab(target); }}>{t('confirm')}</button>
                 <button className="btn no" style={{ flex: 1 }} onClick={() => { setPendingTabChange(null); }}>{t('cancel')}</button>
               </div>
             </div>
           </div>
         )}
 
-        {pipWindow && createPortal(<FocusPanel isPip={true} {...({ handleStart, handlePause, handleResume, handleComplete, handleConfirmStageDone, handleCancelDone, handleFinishPart, isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart, lastSession, timeboxTarget, timeboxElapsed, bgImage: bgPip, showToast, handleSetTimeboxTarget, handleCheckin, handleFocus, chatMessages, setChatMessages, ambientType, setAmbientType, handleOpenPiP, currentModel, currentTask, currentStage, getModelName, equippedTitleDef } as any)} />, pipWindow.document.body)}
+        {pipWindow && createPortal(<FocusPanel isPip={true} {...commonProps} bgImage={bgPip} />, pipWindow.document.body)}
       </div>
     </>
   );

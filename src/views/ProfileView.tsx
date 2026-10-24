@@ -6,7 +6,6 @@ import { DailyQuestManager, type DailyQuest } from '../core/DailyQuestManager';
 import { StatsChart } from '../components/StatsChart'; 
 import { ModelManager } from '../core/ModelManager';
 import { UserManager } from '../core/UserManager';
-import { AchievementManager } from '../core/AchievementManager';
 import { StorageManager } from '../core/StorageManager';
 import { useAppStore } from '../store/useAppStore';
 
@@ -14,23 +13,22 @@ export const ProfileView = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 Zustand 全局状态
   const {
     username, setUsername, level, levelProgress, coinsBalance,
-    earnedTitles, equippedTitle, setEquippedTitle, earnedAchievements,
+    earnedTitles, equippedTitle, setEquippedTitle,
     bgMain, setBgMain, bgPip, setBgPip, audioSettings, setAudioSettings,
-    customAudios, setCustomAudios, webChatInterval, setWebChatInterval,
+    customAudios, webChatInterval, setWebChatInterval,
     pipChatInterval, setPipChatInterval, storageEstimate,
     isAssetsMounted, setIsAssetsMounted, refreshData
   } = useAppStore();
 
-  // 局部的 Props（比如 showToast 等）
   const {
     showToast, handleFocus, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
     legacyResults, setLegacyResults, legacyList, setLegacyList, removeLegacyItem,
     handleLegacyCoverUpload, handleLegacyImport, addToLegacyList,
     showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
-    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload
+    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload, handleAudioUpload,
+    earnedAchievements, buyTitle
   } = props;
 
   const allSessions = SessionManager.getAllSessions();
@@ -91,7 +89,6 @@ export const ProfileView = (props: any) => {
 
   const currentWakeupSound = StorageManager.getCustomWakeupSound();
 
-  // 🌟 内部封装的音效修改函数
   const updateAudioSetting = (type: string, style: string) => {
     const newSettings = { ...audioSettings, [type]: style };
     setAudioSettings(newSettings);
@@ -153,7 +150,7 @@ export const ProfileView = (props: any) => {
                 
                 {quest.completed && !quest.claimed ? (
                   <button className="mini-btn" onClick={() => handleClaim(quest.id)} style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
-                    {t('claim')}
+                    {isZh ? '领取' : 'Claim'}
                   </button>
                 ) : quest.claimed ? (
                   <span style={{ fontSize: '12px', color: '#10b981', minWidth: '40px', textAlign: 'center' }}>✓</span>
@@ -360,7 +357,7 @@ export const ProfileView = (props: any) => {
                     {customAudios[type] && <option value="custom">{t('audioCustom')}</option>}
                   </select>
                   <label className="mini-btn" style={{ padding: '2px 6px', cursor: 'pointer', margin: 0 }} title="Upload MP3/WAV">
-                    🎵<input type="file" accept="audio/*" onChange={(e) => props.handleAudioUpload(type, e)} style={{ display: 'none' }} />
+                    🎵<input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(type, e)} style={{ display: 'none' }} />
                   </label>
                 </div>
               </div>
@@ -385,7 +382,7 @@ export const ProfileView = (props: any) => {
                 {isOwned ? (
                   <button className="mini-btn" onClick={() => setEquippedTitle(title.id)} disabled={equippedTitle === title.id}>{equippedTitle === title.id ? t('equipped') : t('equip')}</button>
                 ) : (
-                  <button className="mini-btn buy-btn" onClick={() => props.buyTitle(title.id)} disabled={!canAfford || !meetsCondition}>{title.cost} 🪙</button>
+                  <button className="mini-btn buy-btn" onClick={() => buyTitle(title.id)} disabled={!canAfford || !meetsCondition}>{title.cost} 🪙</button>
                 )}
               </div>
             );

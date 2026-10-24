@@ -4,10 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
 import { useAppStore } from '../store/useAppStore';
-import { ModelManager } from '../core/ModelManager';
-import { SessionManager } from '../core/SessionManager';
-import { DailyQuestManager } from '../core/DailyQuestManager';
-import { TimerEngine } from '../core/TimerEngine';
 
 export const FocusPanel = ({
   isPip, handleStart, handlePause, handleResume, handleComplete,
@@ -20,7 +16,7 @@ export const FocusPanel = ({
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
   newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
-  bgSize, bgPosition, reminderInterval, currentModel, currentTask, currentStage,
+  bgSize, bgPosition, currentModel, currentTask, currentStage,
   getModelName, equippedTitleDef
 }: any) => {
 
@@ -32,8 +28,7 @@ export const FocusPanel = ({
     models, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     timerState, activeSeconds, todayTotal, username, level, levelProgress,
-    isCheckedIn, checkinStreak, currentBot, setCurrentBot,
-    coinsBalance, models: allModels, storageEstimate
+    isCheckedIn, checkinStreak, currentBot
   } = useAppStore();
 
   const [charIndex, setCharIndex] = useState(0);

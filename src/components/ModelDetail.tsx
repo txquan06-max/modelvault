@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import type { ShareCardTemplate } from '../utils/shareCard';
 import { generateShareCard } from '../utils/shareCard';
-import { UserManager } from '../core/UserManager';
 
 const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
@@ -44,7 +43,6 @@ export const ModelDetail = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 直接从 Zustand 获取状态
   const { models, setModels, refreshData, currentBot, username, level, equippedTitle } = useAppStore();
 
   const {

@@ -23,7 +23,7 @@ const LocalCover = ({ image, fallback }: { image: string, fallback: string }) =>
   return <div style={{ width: '100%', height: '100%', backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />;
 };
 
-const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries, getModelTotalTime, isZh }: any) => {
+const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries, getModelTotalTime }: any) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({});
   const [glare, setGlare] = useState<React.CSSProperties>({ opacity: 0 });
@@ -102,7 +102,7 @@ export const HangarView = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 从 Zustand 获取
+  // 🌟 从 Store 取 setActiveTab（不再通过 props）
   const { models, setCurrentModelId, setActiveTab } = useAppStore();
   const { setViewingModelId, setExpandedTaskId } = props;
 
@@ -224,7 +224,6 @@ export const HangarView = (props: any) => {
                         key={model.id}
                         model={model}
                         activeSubTab={activeSubTab}
-                        isZh={isZh}
                         t={t}
                         getModelName={getModelName}
                         getModelSeries={getModelSeries}

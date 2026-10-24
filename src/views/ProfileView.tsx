@@ -14,7 +14,7 @@ export const ProfileView = (props: any) => {
     earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    storageEstimate, isAssetsMounted, setIsAssetsMounted, // 🌟 移除了 isAutoBackupEnabled 和 setIsAutoBackupEnabled
+    storageEstimate, isAssetsMounted, setIsAssetsMounted,
     level, levelProgress, showToast, refreshData
   } = props;
 
@@ -23,9 +23,19 @@ export const ProfileView = (props: any) => {
 
   const [quests, setQuests] = useState<DailyQuest[]>([]);
 
+  // 🌟 快照恢复面板状态
+  const [snapshots, setSnapshots] = useState<{ index: number; timestamp: number | null; size: number }[]>([]);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [restoringIndex, setRestoringIndex] = useState<number | null>(null);
+
   useEffect(() => {
     setQuests(DailyQuestManager.getTodayQuests());
   }, []);
+
+  useEffect(() => {
+    if (!showSnapshots) return;
+    StorageManager.listSnapshots().then((list: any[]) => setSnapshots(list));
+  }, [showSnapshots, StorageManager]);
 
   const handleClaim = (questId: string) => {
     AudioManager.playAchievement();
@@ -34,6 +44,19 @@ export const ProfileView = (props: any) => {
       showToast(isZh ? '🎉 奖励已领取！' : '🎉 Reward claimed!');
       setQuests(DailyQuestManager.getTodayQuests());
       if (refreshData) refreshData();
+    }
+  };
+
+  const handleRestoreSnapshot = async (index: number) => {
+    AudioManager.playClick();
+    setRestoringIndex(index);
+    const success = await StorageManager.restoreSnapshot(index);
+    if (success) {
+      showToast(isZh ? '✅ 快照恢复成功，即将刷新...' : '✅ Snapshot restored. Reloading...');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      showToast(isZh ? '❌ 快照恢复失败' : '❌ Restore failed');
+      setRestoringIndex(null);
     }
   };
 
@@ -390,6 +413,45 @@ export const ProfileView = (props: any) => {
         <div className="backup-actions" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
           <button className="backup-btn" style={{ flex: 1, minWidth: '100px' }} onClick={exportData}>{t('exportData')}</button>
           <label className="backup-btn import-label" style={{ flex: 1, minWidth: '100px', display: 'flex', justifyContent: 'center' }}>{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
+        </div>
+
+        {/* 🌟 快照恢复面板 */}
+        <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginBottom: '16px' }}>
+          <button 
+            className="backup-btn" 
+            style={{ width: '100%', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: '#3b82f6', marginBottom: showSnapshots ? '12px' : 0 }}
+            onClick={() => { AudioManager.playClick(); setShowSnapshots(!showSnapshots); }}
+          >
+            🕰️ {isZh ? (showSnapshots ? '收起历史快照' : '查看历史快照（防误删）') : (showSnapshots ? 'Hide Snapshots' : 'View Snapshots')}
+          </button>
+          
+          {showSnapshots && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px' }}>
+              {snapshots.length === 0 ? (
+                <div style={{ fontSize: '12px', color: '#888', textAlign: 'center' }}>{isZh ? '暂无快照' : 'No snapshots yet'}</div>
+              ) : (
+                snapshots.map(snap => (
+                  <div key={snap.index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '12px', color: '#ccc' }}>
+                      <div style={{ fontWeight: 'bold', color: '#f59e0b' }}>#{snap.index} {isZh ? '号备份' : 'Backup'}</div>
+                      <div style={{ fontSize: '10px' }}>{snap.timestamp ? new Date(snap.timestamp).toLocaleString() : (isZh ? '未知时间' : 'Unknown time')} · {(snap.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                    {restoringIndex === snap.index ? (
+                      <span style={{ fontSize: '12px', color: '#3b82f6' }}>恢复中...</span>
+                    ) : (
+                      <button 
+                        className="mini-btn" 
+                        style={{ background: '#3b82f6', color: '#fff', border: 'none' }} 
+                        onClick={() => handleRestoreSnapshot(snap.index)}
+                      >
+                        {isZh ? '恢复此快照' : 'Restore'}
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginTop: '8px' }}>

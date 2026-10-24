@@ -29,6 +29,24 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   });
 };
 
+// 🌟 新增：限制文本宽度的辅助函数（超长则缩小字号，极限情况截断加省略号）
+const fitText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number, baseFontSize: number, fontFamily: string, fontWeight = 'bold', minFontSize = 24) => {
+  let fontSize = baseFontSize;
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  while (ctx.measureText(text).width > maxWidth && fontSize > minFontSize) {
+    fontSize -= 2;
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  }
+  if (ctx.measureText(text).width > maxWidth) {
+    let truncated = text;
+    while (truncated.length > 0 && ctx.measureText(truncated + '...').width > maxWidth) {
+      truncated = truncated.slice(0, -1);
+    }
+    return truncated + '...';
+  }
+  return text;
+};
+
 export const generateShareCard = async (props: ShareCardProps) => {
   const { model, totalTime, stageTimes, template, isZh, username, level, currentBot, equippedTitle, formatTime, t } = props;
   
@@ -116,8 +134,11 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.beginPath(); ctx.arc(680, 110, 42, 0, Math.PI * 2); ctx.stroke();
     }
 
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 56px sans-serif'; ctx.textAlign = 'center'; 
-    ctx.fillText(modelName, 400, 700);
+    // 🌟 修复文本溢出：使用 fitText 限制宽度 680
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; 
+    const fittedModelName = fitText(ctx, modelName, 680, 56, 'sans-serif', 'bold', 28);
+    ctx.fillText(fittedModelName, 400, 700);
+
     ctx.fillStyle = botColor; ctx.font = 'bold 24px monospace'; 
     ctx.fillText(`[ ${model.grade} | ${seriesName} ]`, 400, 750);
 
@@ -156,8 +177,11 @@ export const generateShareCard = async (props: ShareCardProps) => {
     // 中间过渡线
     ctx.fillStyle = botColor; ctx.fillRect(0, 596, 800, 8);
 
-    ctx.fillStyle = '#212529'; ctx.font = 'bold 60px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(modelName, 400, 720);
+    ctx.fillStyle = '#212529'; ctx.textAlign = 'center';
+    // 🌟 修复文本溢出
+    const fittedModelName = fitText(ctx, modelName, 680, 60, 'sans-serif', 'bold', 30);
+    ctx.fillText(fittedModelName, 400, 720);
+
     ctx.fillStyle = '#6c757d'; ctx.font = '24px sans-serif';
     ctx.fillText(`${model.grade} | ${seriesName}`, 400, 770);
 
@@ -215,10 +239,12 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.fillStyle = '#00f0ff'; ctx.fillText('ERR_0x00FF', 60, 140);
 
     // 错位字效
-    ctx.fillStyle = '#ff003c'; ctx.font = 'bold 70px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(modelName, 405, 705);
-    ctx.fillStyle = '#00f0ff'; ctx.fillText(modelName, 395, 695);
-    ctx.fillStyle = '#ffffff'; ctx.fillText(modelName, 400, 700);
+    ctx.textAlign = 'center';
+    // 🌟 修复文本溢出（错位特效需要留出边缘空间，限制宽度 680）
+    const fittedModelName = fitText(ctx, modelName, 680, 70, 'monospace', 'bold', 30);
+    ctx.fillStyle = '#ff003c'; ctx.fillText(fittedModelName, 405, 705);
+    ctx.fillStyle = '#00f0ff'; ctx.fillText(fittedModelName, 395, 695);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(fittedModelName, 400, 700);
 
     ctx.fillStyle = '#888'; ctx.font = '24px monospace';
     ctx.fillText(`> ${model.grade} / ${seriesName}`, 400, 760);

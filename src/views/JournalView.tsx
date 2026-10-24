@@ -1,7 +1,14 @@
+// src/views/JournalView.tsx
+import { useMemo } from 'react';
 import { AudioManager } from '../core/AudioManager';
 
 export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJournalFilterMonth, formatTime, formatLogDate, handleFocus }: any) => {
   const isZh = i18n.language === 'zh';
+
+  // 🌟 性能优化：保证单次渲染周期内，只查询和过滤一次日志数据
+  const logs = useMemo(() => {
+    return getHistoryLogs();
+  }, [getHistoryLogs, journalFilterMonth]);
 
   return (
     <div className="view-content journal-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
@@ -126,7 +133,7 @@ export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJo
       </div>
 
       <div className="journal-list" style={{ flex: 1, maxHeight: 'none' }}>
-        {getHistoryLogs().length === 0 ? (
+        {logs.length === 0 ? (
           <div className="empty-state">
             {t('emptyJournal').split('\n').map((line: string, i: number) => (
               <span key={i}>
@@ -136,7 +143,7 @@ export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJo
             ))}
           </div>
         ) : (
-          getHistoryLogs().map((session: any) => {
+          logs.map((session: any) => {
             const modelName = session.details?.modelName
               ? i18n.language === 'zh'
                 ? session.details.modelName.zh

@@ -2,6 +2,8 @@ import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { StorageManager } from '../core/StorageManager';
 import { ModelManager } from '../core/ModelManager';
+// 🌟 新增：写心得时更新每日委托
+import { DailyQuestManager } from '../core/DailyQuestManager';
 import { useEffect, useState } from 'react';
 import type { ShareCardTemplate } from '../utils/shareCard';
 
@@ -70,11 +72,27 @@ export const ModelDetail = (props: any) => {
 
   const handleSaveNote = (taskId: string, stageId: string) => {
     AudioManager.playClick();
+    // 🌟 检查保存前是否为空白，只在首次真正写入时计入每日委托
+    let wasEmpty = true;
+    for (const m of props.models) {
+      const task = m.tasks.find((t: any) => t.id === taskId);
+      const stage = task?.stages.find((s: any) => s.id === stageId);
+      if (stage) {
+        wasEmpty = !stage.note || !stage.note.trim();
+        break;
+      }
+    }
+
     const updated = ModelManager.updateStageNote(taskId, stageId, noteText);
     setModels(updated);
     refreshData(); 
     setEditingNoteStageId(null);
     setNoteText('');
+
+    // 🌟 Bug Fix: 首次写入且非空内容，计入每日委托
+    if (wasEmpty && noteText.trim()) {
+      DailyQuestManager.updateProgress('write_note', 1);
+    }
   };
 
   const handleGenerateShareCard = () => {
@@ -202,7 +220,7 @@ export const ModelDetail = (props: any) => {
                         
                         {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                         
-                        {/* 🌟 新增：心得/日记显示与编辑区域 */}
+                        {/* 🌟 心得/日记显示与编辑区域 */}
                         <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
                           {isEditingThisNote ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

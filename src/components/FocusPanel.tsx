@@ -136,6 +136,26 @@ export const FocusPanel = ({
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - timeboxElapsed) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && timeboxElapsed > 0;
 
+  // 🌟 体验优化：番茄钟结束时自动暂停（避免节流后计时继续跑）
+  useEffect(() => {
+    if (isTimeUp && timerState === 'Running') {
+      handlePause();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeUp, timerState]);
+
+  // 🌟 体验优化：Esc 键退出沉浸模式
+  useEffect(() => {
+    if (!isImmersive) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsImmersive(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isImmersive]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -299,7 +319,7 @@ export const FocusPanel = ({
             {timerState === 'Running' && <button className="btn pause" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handlePause}>{t('pause')}</button>}
             {timerState === 'Paused' && (<><button className="btn resume" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleResume}>{t('resume')}</button><button className="btn complete" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleComplete}>{t('complete')}</button></>)}
           </div>
-          <div style={{ color: '#555', fontSize: '12px', marginTop: '40px' }}>↓ {isZh ? '向下滑动退出' : 'Swipe down to exit'} ↓</div>
+          <div style={{ color: '#555', fontSize: '12px', marginTop: '40px' }}>↓ {isZh ? '向下滑动退出 / 按 Esc 退出' : 'Swipe down or press Esc to exit'} ↓</div>
           <div style={{ marginTop: '20px', width: '100%', maxWidth: '500px', height: '200px' }}>{renderChatHistory(false)}</div>
         </div>
       </div>

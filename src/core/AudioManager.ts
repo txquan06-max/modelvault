@@ -22,8 +22,8 @@ const CUE_MAP: Record<SoundType, string> = {
   timebox: 'focus',
   achievement: 'long-press',
   typing: 'press',
-  distraction: 'press', // fallback
-  wakeup: 'complete', // fallback
+  distraction: 'press',
+  wakeup: 'complete',
 };
 
 export class AudioManager {
@@ -36,7 +36,8 @@ export class AudioManager {
   private static currentAmbient: AmbientType = 'none';
 
   static async unlock() {
-    try { await ui.unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
+    // 🌟 修复：用 as any 绕过旧版 uisfx 的类型缺失
+    try { await (ui as any).unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
   }
 
   private static getCtx(): AudioContext {
@@ -80,7 +81,6 @@ export class AudioManager {
     } catch (e) {}
   }
 
-  // 🌟 新增：防作弊警告音（切屏提示）
   private static playDistractionSound() {
     try {
       const ctx = this.getCtx();
@@ -88,7 +88,6 @@ export class AudioManager {
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
       
-      // 低沉的三全音（Tritone），听起来有警告感
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(350, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.3);
@@ -135,10 +134,7 @@ export class AudioManager {
   static playTimeboxEnd() { this.play('timebox'); }
   static playAchievement() { this.play('achievement'); }
   
-  // 🌟 新增：供外部调用的防干扰音
   static playDistraction() { this.play('distraction'); }
-
-  // 🌟 新增：自定义起床铃逻辑
   static playWakeup() { this.play('wakeup'); }
   
   private static playWakeupSound() {
@@ -149,7 +145,6 @@ export class AudioManager {
       audio.play().catch(e => console.warn('Wakeup sound play failed', e));
       return;
     }
-    // 如果没有自定义，走默认的 complete 音效
     const settings = StorageManager.getAudioSettings();
     const style = settings['complete'] || 'default';
     if (style !== 'off') {

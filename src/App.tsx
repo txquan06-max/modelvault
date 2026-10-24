@@ -745,7 +745,7 @@ function App() {
     }
     try {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
-      [...document.styleSheets].forEach((styleSheet) => {
+      Array.from(document.styleSheets).forEach((styleSheet) => {
         try { 
           const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); 
           const style = document.createElement('style'); 

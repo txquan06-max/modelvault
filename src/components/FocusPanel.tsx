@@ -14,13 +14,13 @@ export const FocusPanel = ({
   lastSession, timeboxTarget, timeboxElapsed, bgImage,
   showToast, handleSetTimeboxTarget, handleCheckin, handleFocus,
   chatMessages, setChatMessages, ambientType, setAmbientType, 
-  handleOpenWebPiP, handleToggleMiniMode, // 🌟 接住两个新按钮的回调
+  handleOpenWebPiP, handleToggleMiniMode, 
   isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
   newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
   bgSize, bgPosition, currentModel, currentTask, currentStage,
-  getModelName, equippedTitleDef, onClose // 🌟 onClose 用于关闭小窗/极简模式
+  getModelName, equippedTitleDef, onClose
 }: any) => {
 
   const { t, i18n } = useTranslation();
@@ -61,16 +61,6 @@ export const FocusPanel = ({
   };
 
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
-
-  const touchStartY = useRef<number>(0);
-  const handleTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    if (touchEndY - touchStartY.current > 80) {
-      AudioManager.playClick();
-      setIsImmersive(false);
-    }
-  };
 
   const handleAvatarClick = () => {
     AudioManager.playClick();
@@ -301,11 +291,22 @@ export const FocusPanel = ({
 
   if (isImmersive) {
     const immersiveContent = (
-      <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
+      <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
         <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '24px', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, touchAction: 'manipulation' }}>✕</button>
+        
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '20px' }}>
-          <div style={{ color: botData.color, fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '10px', opacity: 0.8, textAlign: 'center' }}>{currentModel ? getModelName(currentModel) : ''} - {currentTaskName}</div>
+          
+          {/* 沉浸模式增加快捷选择器，防止未选任务时无法开始 */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', zIndex: 10 }}>
+             <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle'} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
+                {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)}</option>)}
+             </select>
+             <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
+                {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t(t_item.name)}</option>)}
+             </select>
+          </div>
+
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(80px, 20vw, 120px)', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>{formatTime(activeSeconds)}</div>
           <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
             {timerState === 'Idle' && <button className="btn start" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
@@ -372,7 +373,6 @@ export const FocusPanel = ({
           <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
         
-        {/* 🌟 分离两个按钮：网页端显示悬浮窗（Web PiP），所有环境都显示专注模式（Tauri 原生缩小） */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
           {!isTauri && (
             <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '网页悬浮窗' : 'Web PiP'}</button>

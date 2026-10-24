@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { TimerEngine } from './core/TimerEngine';
 import { SessionManager } from './core/SessionManager';
@@ -30,6 +31,7 @@ import { AchievementOverlay, type AchievementData } from './components/Achieveme
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
 interface ChatMessage {
   id: string;
@@ -79,15 +81,12 @@ function App() {
   } = useAppStore();
 
   const [showSplash, setShowSplash] = useState(true);
-  const [showTutorial, setShowTutorial] = useState(() => {
-    return localStorage.getItem('hasSeenTutorial') === null;
-  });
-
-  // 🌟 新增：是否处于悬浮小窗模式
+  const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem('hasSeenTutorial') === null);
+  
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isMiniMode, setIsMiniMode] = useState(false);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
-
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -178,34 +177,6 @@ function App() {
     } catch (e) { console.error(e); }
   };
 
-  // 🌟 核心：切换 悬浮小窗模式 与 主界面模式
-  const handleOpenPiP = async () => {
-    AudioManager.playClick();
-    if (!isTauri) { 
-      // Web 端降级为沉浸模式提示
-      showToast(t('toast_pip_not_supported')); 
-      return; 
-    }
-    try {
-      const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
-      const win = getCurrentWindow();
-      if (!isMiniMode) {
-        // 进入小窗模式：缩小尺寸 + 置顶
-        await win.setSize(new LogicalSize(380, 560));
-        await win.setAlwaysOnTop(true);
-        setIsMiniMode(true);
-      } else {
-        // 退出小窗模式：恢复宽屏尺寸 + 取消置顶
-        await win.setSize(new LogicalSize(1100, 800));
-        await win.setAlwaysOnTop(false);
-        setIsMiniMode(false);
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(isZh ? '切换悬浮模式失败' : 'Toggle Mini Mode failed');
-    }
-  };
-
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
     setUpdateProgress(0);
@@ -286,7 +257,7 @@ function App() {
     const updateTimer = () => {
       if (chatTimer) clearInterval(chatTimer);
       let interval = 0;
-      if (isMiniMode) interval = pipChatInterval;
+      if (pipWindow || isMiniMode) interval = pipChatInterval;
       else if (document.visibilityState === 'visible') interval = webChatInterval;
       if (interval > 0) chatTimer = setInterval(tick, interval);
     };
@@ -296,7 +267,7 @@ function App() {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
-  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, isMiniMode, currentStageId]);
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, isMiniMode, currentStageId]);
 
   const triggerAutoBackup = async () => {
     if (!isAutoBackupEnabled) return;
@@ -342,7 +313,18 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
-  const tutorialSteps: TourStep[] = [ /* 保持不变，省略 */ ];
+  const tutorialSteps: TourStep[] = [
+    { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
+    { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
+    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如“头部”。' : 'After adding a model, click Add Part.', page: 'focus' },
+    { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
+    { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
+    { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
+    { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
+    { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
+    { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
+    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' }
+  ];
 
   const handleStart = () => { 
     if (!currentTaskId) { showToast(t('toast_select_part')); return; }
@@ -710,7 +692,7 @@ function App() {
         else showToast(t('importError')); 
       } catch (err) { showToast(t('importError')); } 
     }; 
-    reader.readAsText(file); e.target.value = ''; 
+    reader.readAsText(file); e.target.value = '';
   };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -722,6 +704,71 @@ function App() {
   const viewingModel = models.find((m: any) => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t: any) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0) : 0;
   const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === equippedTitle);
+
+  // 🌟 修复：完全清理未定义变量，把旧版画中画彻底移除
+  const handleToggleMiniMode = async () => {
+    AudioManager.playClick();
+    if (isMiniMode) {
+      setIsMiniMode(false);
+      if (isTauri) {
+        try {
+          const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
+          const win = getCurrentWindow();
+          await win.setSize(new LogicalSize(1100, 800));
+          await win.setAlwaysOnTop(false);
+        } catch (e) {}
+      }
+      showToast(isZh ? '已恢复主界面' : 'Main UI Restored');
+    } else {
+      setIsMiniMode(true);
+      if (isTauri) {
+        try {
+          const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
+          const win = getCurrentWindow();
+          if (await win.isMaximized()) {
+            await win.unmaximize();
+            await new Promise(r => setTimeout(r, 200));
+          }
+          await win.setSize(new LogicalSize(400, 560));
+          await win.setAlwaysOnTop(true);
+        } catch (e) {}
+      }
+      showToast(isZh ? '已进入专注模式' : 'Mini Mode Activated');
+    }
+  };
+
+  const handleOpenWebPiP = async () => {
+    AudioManager.playClick();
+    if (!('documentPictureInPicture' in window)) { 
+      showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); 
+      return; 
+    }
+    try {
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
+      [...document.styleSheets].forEach((styleSheet) => {
+        try { 
+          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); 
+          const style = document.createElement('style'); 
+          style.textContent = cssRules; 
+          pipWin.document.head.appendChild(style); 
+        } catch (e) { 
+          const link = document.createElement('link'); 
+          link.rel = 'stylesheet'; 
+          link.href = (styleSheet as any).href; 
+          pipWin.document.head.appendChild(link); 
+        }
+      });
+      pipWin.document.body.style.backgroundColor = '#1e1e1e';
+      pipWin.document.body.style.margin = '0';
+      pipWin.document.body.style.overflow = 'hidden';
+      
+      setPipWindow(pipWin);
+      pipWin.addEventListener('pagehide', () => setPipWindow(null));
+    } catch (err) {
+      console.error(err);
+      showToast(isZh ? '画中画打开失败' : 'Failed to open PiP');
+    }
+  };
 
   const commonProps = {
     t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -743,7 +790,8 @@ function App() {
     chatMessages, setChatMessages, 
     storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
     ambientType, setAmbientType,
-    handleOpenPiP,
+    handleOpenWebPiP,
+    handleToggleMiniMode,
     equippedTitleDef,
     setViewingModelId,
     setExpandedTaskId,
@@ -755,11 +803,18 @@ function App() {
     setBgMain, setBgPip, StorageManager
   };
 
-  // 🌟 核心：如果处于悬浮模式，直接返回小窗 UI（完全复用 FocusPanel 的 PiP 布局）
+  if (isPipMode) {
+    return (
+      <div className="app-wrapper" style={{ background: 'transparent' }}>
+        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} onClose={() => setPipWindow(null)} />
+      </div>
+    );
+  }
+
   if (isMiniMode) {
     return (
       <div className="app-wrapper mini-mode-wrapper" style={{ background: '#09090b' }}>
-        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} />
+        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} onClose={handleToggleMiniMode} />
       </div>
     );
   }
@@ -888,6 +943,11 @@ function App() {
               )}
             </div>
           </div>
+        )}
+
+        {pipWindow && createPortal(
+          <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} onClose={() => { pipWindow.close(); setPipWindow(null); }} />,
+          pipWindow.document.body
         )}
       </div>
     </>

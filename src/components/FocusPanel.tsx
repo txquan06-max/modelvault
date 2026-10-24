@@ -5,19 +5,22 @@ import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
 import { useAppStore } from '../store/useAppStore';
 
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
 export const FocusPanel = ({
   isPip, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
   lastSession, timeboxTarget, timeboxElapsed, bgImage,
   showToast, handleSetTimeboxTarget, handleCheckin, handleFocus,
-  chatMessages, setChatMessages, ambientType, setAmbientType, handleOpenPiP,
+  chatMessages, setChatMessages, ambientType, setAmbientType, 
+  handleOpenWebPiP, handleToggleMiniMode, // 🌟 接住两个新按钮的回调
   isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
   newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
   bgSize, bgPosition, currentModel, currentTask, currentStage,
-  getModelName, equippedTitleDef
+  getModelName, equippedTitleDef, onClose // 🌟 onClose 用于关闭小窗/极简模式
 }: any) => {
 
   const { t, i18n } = useTranslation();
@@ -220,8 +223,7 @@ export const FocusPanel = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#888', fontWeight: 'bold' }}>🕒 {localTime}</div>
           <div style={{ display: 'flex', gap: '4px' }}>
-            {/* 🌟 悬浮模式下，点击此按钮恢复大屏 */}
-            <button onClick={handleOpenPiP} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)' }} title={isZh ? '恢复主界面' : 'Restore Main UI'}>✕</button>
+            <button onClick={onClose} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)' }} title={isZh ? '退出' : 'Close'}>✕</button>
             <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
           </div>
         </div>
@@ -369,8 +371,13 @@ export const FocusPanel = ({
           <button id="btn-add-model" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
           <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
+        
+        {/* 🌟 分离两个按钮：网页端显示悬浮窗（Web PiP），所有环境都显示专注模式（Tauri 原生缩小） */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
-          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {t('openPip')}</button>
+          {!isTauri && (
+            <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '网页悬浮窗' : 'Web PiP'}</button>
+          )}
+          <button id="btn-mini-mode" onClick={handleToggleMiniMode} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
           <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {t('immersiveMode')}</button>
         </div>
       </div>

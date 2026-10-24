@@ -1,11 +1,10 @@
 // src/core/StorageManager.ts
 import localforage from 'localforage';
+import { MigrationManager, CURRENT_SCHEMA_VERSION } from './MigrationManager';
 
-const CURRENT_SCHEMA_VERSION = 5; 
 const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
-// 🌟 快照最小间隔：10 分钟内不重复快照，避免高频写入消耗快照名额
-const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
+const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000; // 快照最小间隔：10 分钟
 
 export const KEYS = {
   SESSIONS: 'modelvault_sessions',
@@ -32,7 +31,6 @@ export const KEYS = {
   PIP_CHAT_INTERVAL: 'mv_pip_chat_interval',
   CUSTOM_WAKEUP_SOUND: 'mv_custom_wakeup_sound',
   DAILY_QUESTS: 'mv_daily_quests_data',
-  // 🌟 新增：塑灵相关从 localStorage 迁到 IndexedDB
   UNLOCKED_BOTS: 'mv_unlocked_bots_v2',
   CURRENT_BOT: 'mv_current_bot_v2',
 };
@@ -45,20 +43,25 @@ const DEFAULT_AUDIO = JSON.stringify({
 const memoryCache: Record<string, string> = {};
 let isInit = false;
 
+// 🌟 文件系统句柄
 let backupDirHandle: any = null;
 let assetsDirHandle: any = null;
+let assetsDirPath: string | null = null; // Tauri 原生路径
 
 const localUrlCache = new Map<string, { url: string, lastAccess: number }>();
 const MAX_URL_CACHE_SIZE = 50;
 
-// 🌟 快照节流器
 let lastSnapshotAt = 0;
+
+// 🌟 判断是否为 Tauri 环境
+const isTauriEnv = () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
 export const StorageManager = {
   async init() {
     if (isInit) return;
     await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
+    // 1. 迁移 localStorage 遗留数据到 localforage
     const legacyKeys = Object.keys(localStorage).filter(
       (k) => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data'
     );
@@ -73,7 +76,7 @@ export const StorageManager = {
       legacyKeys.forEach((k) => localStorage.removeItem(k));
     }
 
-    // 🌟 一次性迁移：旧版 localStorage 中的塑灵状态 -> IndexedDB
+    // 2. 迁移旧版 localStorage 中的塑灵状态
     const legacyUnlocked = localStorage.getItem('mv_unlocked_bots');
     if (legacyUnlocked && !memoryCache[KEYS.UNLOCKED_BOTS]) {
       memoryCache[KEYS.UNLOCKED_BOTS] = legacyUnlocked;
@@ -87,34 +90,27 @@ export const StorageManager = {
       localStorage.removeItem('mv_current_bot');
     }
 
+    // 3. 从 localforage 加载所有数据到内存
     const keys = await localforage.keys();
     for (const key of keys) {
       const val = await localforage.getItem<string>(key);
       if (val !== null) memoryCache[key] = val;
     }
 
+    // 4. 使用 MigrationManager 进行 schema 迁移
     try {
       const rawData = memoryCache[DATA_KEY];
       if (rawData) {
         const parsed = JSON.parse(rawData);
-        const storedVersion = parsed.schemaVersion || 1;
-        if (storedVersion < CURRENT_SCHEMA_VERSION) {
-          console.log(`🔄 数据迁移: v${storedVersion} -> v${CURRENT_SCHEMA_VERSION}`);
-          await localforage.setItem('modelvault_backup_before_migration', rawData);
-          const migratedModels = parsed.models || [];
-          
-          const finalModels = migratedModels.map((m: any) => ({
-            ...m,
-            tasks: m.tasks.map((t: any) => ({
-              ...t,
-              note: t.note || '',
-              stages: t.stages.map((s: any) => ({ ...s, note: s.note || '' }))
-            }))
-          }));
-
-          const newData = { schemaVersion: CURRENT_SCHEMA_VERSION, models: finalModels };
-          memoryCache[DATA_KEY] = JSON.stringify(newData);
-          await localforage.setItem(DATA_KEY, JSON.stringify(newData));
+        const migrated = await MigrationManager.migrate(parsed, async (backupStr) => {
+          await localforage.setItem('modelvault_backup_before_migration', backupStr);
+        });
+        
+        if (migrated.schemaVersion !== parsed.schemaVersion) {
+          const newDataStr = JSON.stringify(migrated);
+          memoryCache[DATA_KEY] = newDataStr;
+          await localforage.setItem(DATA_KEY, newDataStr);
+          console.log(`✅ 数据已迁移至 v${CURRENT_SCHEMA_VERSION}`);
         }
       }
     } catch (e) {
@@ -146,6 +142,7 @@ export const StorageManager = {
   },
 
   async selectBackupFolder() {
+    if (isTauriEnv()) return false; // Tauri 下直接使用自动备份逻辑，无需选取
     if (!('showDirectoryPicker' in window)) return false;
     try {
       backupDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
@@ -167,7 +164,24 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
+  // 🌟 选择素材文件夹（适配 Tauri 与 Web）
   async selectAssetsFolder() {
+    if (isTauriEnv()) {
+      try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const selected = await open({ directory: true, multiple: false });
+        if (selected && typeof selected === 'string') {
+          assetsDirPath = selected;
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('Tauri folder selection failed', err);
+        return false;
+      }
+    }
+    
+    // Web Fallback
     if (!('showDirectoryPicker' in window)) return false;
     try {
       assetsDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
@@ -175,7 +189,22 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
+  // 🌟 保存文件到本地（适配 Tauri 与 Web）
   async saveFileToLocal(filename: string, blob: Blob) {
+    if (isTauriEnv() && assetsDirPath) {
+      try {
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const { join } = await import('@tauri-apps/api/path');
+        const filePath = await join(assetsDirPath, filename);
+        const buffer = await blob.arrayBuffer();
+        await writeFile(filePath, new Uint8Array(buffer));
+        return `local://${filename}`;
+      } catch (err) {
+        console.error('Tauri write file failed', err);
+        return null;
+      }
+    }
+
     if (!assetsDirHandle) return null;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
@@ -189,21 +218,39 @@ export const StorageManager = {
     } catch (err) { return null; }
   },
 
+  // 🌟 加载本地文件（适配 Tauri 与 Web）
   async loadLocalFileUrl(filename: string) {
-    if (!assetsDirHandle) return null;
-    
     const cached = localUrlCache.get(filename);
     if (cached) {
       cached.lastAccess = Date.now();
       return cached.url;
     }
 
-    try {
-      const cleanFilename = filename.replace('local://', '');
-      const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
-      const file = await fileHandle.getFile();
-      const url = URL.createObjectURL(file);
+    const cleanFilename = filename.replace('local://', '');
+    let url: string | null = null;
 
+    if (isTauriEnv() && assetsDirPath) {
+      try {
+        const { readFile } = await import('@tauri-apps/plugin-fs');
+        const { join } = await import('@tauri-apps/api/path');
+        const filePath = await join(assetsDirPath, cleanFilename);
+        const contents = await readFile(filePath);
+        const blob = new Blob([contents]);
+        url = URL.createObjectURL(blob);
+      } catch (err) {
+        console.warn('Tauri read file failed', err);
+      }
+    } else if (assetsDirHandle) {
+      try {
+        const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
+        const file = await fileHandle.getFile();
+        url = URL.createObjectURL(file);
+      } catch (err) {
+        console.warn('Web read file failed', err);
+      }
+    }
+
+    if (url) {
       if (localUrlCache.size >= MAX_URL_CACHE_SIZE) {
         let oldestKey = '';
         let oldestTime = Infinity;
@@ -218,14 +265,13 @@ export const StorageManager = {
           localUrlCache.delete(oldestKey);
         }
       }
-
       localUrlCache.set(filename, { url, lastAccess: Date.now() });
       return url;
-    } catch (err) { return null; }
+    }
+    return null;
   },
 
   async _set(key: string, val: string) {
-    // 🌟 Bug Fix: 快照加入时间锁（10分钟内不重复），避免高频写入把 5 个名额瞬间用光
     if (key === DATA_KEY && memoryCache[DATA_KEY]) {
       const now = Date.now();
       if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
@@ -238,7 +284,6 @@ export const StorageManager = {
             }
           }
           const currentData = memoryCache[DATA_KEY];
-          // 🌟 注入 _snapshotAt，方便 UI 显示恢复时间
           let dataWithTs = currentData;
           try {
             const parsed = JSON.parse(currentData);
@@ -265,7 +310,6 @@ export const StorageManager = {
     }
   },
 
-  // 🌟 恢复快照
   async restoreSnapshot(snapshotIndex: number) {
     const snapshotKey = `${SNAPSHOT_PREFIX}${snapshotIndex}`;
     const snapshotData = await localforage.getItem<string>(snapshotKey);
@@ -277,7 +321,6 @@ export const StorageManager = {
     return false;
   },
 
-  // 🌟 列出所有快照（供 ProfileView 的恢复面板使用）
   async listSnapshots(): Promise<{ index: number; timestamp: number | null; size: number }[]> {
     const result: { index: number; timestamp: number | null; size: number }[] = [];
     for (let i = 1; i <= 5; i++) {
@@ -324,6 +367,7 @@ export const StorageManager = {
     StorageManager._set(DATA_KEY, JSON.stringify({ ...current, models }));
   },
 
+  // 🌟 所有 Getter / Setter 保持原样（略去重复的大量样板代码，直接使用）
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
   getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
   getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',
@@ -353,7 +397,6 @@ export const StorageManager = {
   getPipChatInterval: () => Number(memoryCache[KEYS.PIP_CHAT_INTERVAL]) || 60000,
   getCustomWakeupSound: () => memoryCache[KEYS.CUSTOM_WAKEUP_SOUND] || '',
   getRawDailyQuests: () => { try { return JSON.parse(memoryCache[KEYS.DAILY_QUESTS] || 'null'); } catch { return null; } },
-  // 🌟 塑灵持久化
   getUnlockedBots: (): string[] => { try { return JSON.parse(memoryCache[KEYS.UNLOCKED_BOTS] || '["tu"]'); } catch { return ['tu']; } },
   getCurrentBot: (): string => memoryCache[KEYS.CURRENT_BOT] || 'tu',
 
@@ -403,7 +446,6 @@ export const StorageManager = {
       if (typeof data.coreData === 'string') await localforage.setItem(DATA_KEY, data.coreData);
       else await localforage.setItem(DATA_KEY, JSON.stringify(data.coreData));
 
-      // 🌟 Bug Fix: 原 forEach(async) 无法 await，改用 for...of 确保导入完整
       for (const key of Object.keys(data)) {
         if (key !== 'version' && key !== 'exportDate' && key !== 'coreData') {
           const val = data[key];

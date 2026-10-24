@@ -3,7 +3,7 @@ import { StorageManager } from './StorageManager';
 import type { Session } from './types';
 
 export class SessionManager {
-  // 🌟 性能优化：内存级缓存，避免每次渲染都 JSON.parse 几万字符
+  // 🌟 内存级缓存，避免每次渲染都重复解析大 JSON
   private static cachedSessions: Session[] | null = null;
   private static cachedRawString: string | null = null;
 
@@ -13,13 +13,15 @@ export class SessionManager {
   }
 
   static saveSession(session: Session) {
-    // 从缓存获取最新副本
+    // 获取最新的会话列表
     const sessions = this.getAllSessions();
     sessions.push(session);
     const newRaw = JSON.stringify(sessions);
+    
+    // 保存到底层
     StorageManager.setSessions(newRaw);
     
-    // 同步更新缓存
+    // 同步更新缓存，避免下一次读取时重新解析
     this.cachedSessions = sessions;
     this.cachedRawString = newRaw;
   }
@@ -27,7 +29,7 @@ export class SessionManager {
   static getAllSessions(): Session[] {
     const raw = StorageManager.getSessions();
     
-    // 如果原始字符串没变，直接返回缓存内容（浅拷贝，防止外部 sort() 污染缓存）
+    // 如果原始字符串没变，直接返回缓存内容的浅拷贝（防止外部 sort() 污染缓存）
     if (this.cachedSessions && this.cachedRawString === raw) {
       return [...this.cachedSessions];
     }

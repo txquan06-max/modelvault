@@ -2,10 +2,13 @@ import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { StorageManager } from '../core/StorageManager';
 import { ModelManager } from '../core/ModelManager';
-// 🌟 新增：写心得时更新每日委托
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAppStore } from '../store/useAppStore';
 import type { ShareCardTemplate } from '../utils/shareCard';
+import { generateShareCard } from '../utils/shareCard';
+import { UserManager } from '../core/UserManager';
 
 const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
@@ -38,27 +41,27 @@ const LocalHero = ({ image, children, onClick }: { image: string, children: Reac
 };
 
 export const ModelDetail = (props: any) => {
+  const { t, i18n } = useTranslation();
+  const isZh = i18n.language === 'zh';
+
+  // 🌟 直接从 Zustand 获取状态
+  const { models, setModels, refreshData, currentBot, username, level, equippedTitle } = useAppStore();
+
   const {
-    t, i18n, viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
+    viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
     isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus,
     importedStages, setImportedStages, handleConfirmRebuild, showRebuildConfirm, setShowRebuildConfirm,
     handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, 
-    rebuildMode, setRebuildMode,
-    // 🌟 新增/由 App 传下来的 
-    setModels, refreshData, generateShareCard
+    rebuildMode, setRebuildMode, showToast
   } = props;
 
-  const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
 
   const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
   const coverPreviewUrl = useLocalImageSrc(viewingModel.coverImage);
 
-  // 🌟 心得/日记编辑相关状态
   const [editingNoteStageId, setEditingNoteStageId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
-  
-  // 🌟 战报模板选择状态
   const [template, setTemplate] = useState<ShareCardTemplate>('cyber');
 
   useEffect(() => {
@@ -72,9 +75,8 @@ export const ModelDetail = (props: any) => {
 
   const handleSaveNote = (taskId: string, stageId: string) => {
     AudioManager.playClick();
-    // 🌟 检查保存前是否为空白，只在首次真正写入时计入每日委托
     let wasEmpty = true;
-    for (const m of props.models) {
+    for (const m of models) {
       const task = m.tasks.find((t: any) => t.id === taskId);
       const stage = task?.stages.find((s: any) => s.id === stageId);
       if (stage) {
@@ -89,7 +91,6 @@ export const ModelDetail = (props: any) => {
     setEditingNoteStageId(null);
     setNoteText('');
 
-    // 🌟 Bug Fix: 首次写入且非空内容，计入每日委托
     if (wasEmpty && noteText.trim()) {
       DailyQuestManager.updateProgress('write_note', 1);
     }
@@ -97,10 +98,28 @@ export const ModelDetail = (props: any) => {
 
   const handleGenerateShareCard = () => {
     AudioManager.playClick();
-    // 提取详细数据传给 App.tsx 的 triggerShareCard
     const detailedStats = ModelManager.getDetailedStatsForShareCard(viewingModel.id);
     if (detailedStats) {
-      generateShareCard(detailedStats.model, detailedStats.totalTime, detailedStats.stageTimes, template);
+      const formatFn = (sec: number) => { const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0'); const s = (sec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
+      generateShareCard({
+        model: detailedStats.model,
+        totalTime: detailedStats.totalTime,
+        stageTimes: detailedStats.stageTimes,
+        template,
+        isZh,
+        username,
+        level,
+        currentBot,
+        equippedTitle,
+        formatTime: formatFn,
+        t
+      }).then((url) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ModelVault_${detailedStats.model.name.en.replace(/\s+/g, '_')}.jpg`;
+        a.click();
+        showToast(t('toast_report_saved'));
+      }).catch(() => showToast(t('toast_report_fail')));
     }
   };
 
@@ -111,36 +130,36 @@ export const ModelDetail = (props: any) => {
           <div className="detail-title">{isZh ? viewingModel.name.zh : viewingModel.name.en}</div>
           <div className="detail-subtitle">
             <span>{viewingModel.grade} | {isZh ? viewingModel.series.zh : viewingModel.series.en}</span>
-            <span>Total: {formatTime(viewingModelTotalSec)}</span>
+            <span>{t('totalTime')}: {formatTime(viewingModelTotalSec)}</span>
           </div>
         </div>
         <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10, background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ fontSize: '14px' }}>📷</span>
-          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>{isZh ? '封面' : 'Cover'}</span>
+          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>{t('btn_cover')}</span>
         </div>
       </LocalHero>
 
       {isEditingCover && (
         <div className="inline-form" style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '上传/修改模型封面' : 'Upload/Modify Cover'}</span>
+          <span style={{ fontSize: '12px', color: '#ccc' }}>{t('btn_upload_cover')}</span>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div style={{ width: '140px', aspectRatio: '4 / 3', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundColor: '#333', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '6px', border: '1px solid #555', flexShrink: 0 }}>
-              {!coverPreviewUrl && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>No Image</div>}
+              {!coverPreviewUrl && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>{t('noImage')}</div>}
             </div>
             <div style={{ fontSize: '11px', color: '#aaa', lineHeight: 1.5 }}>
               {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。' : 'This is how it looks in the Hangar (4:3).'}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {isZh ? '上传新图片' : 'Upload'}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
-            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>{isZh ? '取消' : 'Cancel'}</button>
+            <label className="btn start" style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} /></label>
+            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingCover(false); }}>{t('cancel')}</button>
           </div>
         </div>
       )}
 
       {needsRebuild && !isEditingImportedStatus && (
         <button className="btn start" style={{ width: '100%', padding: '16px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', border: 'none', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }} onClick={() => { AudioManager.playClick(); handleStartRebuild(null); }}>
-          🔧 {isZh ? '开始改造这台历史模型' : 'Start Rebuilding This Model'}
+          🔧 {t('btn_start_rebuild_legacy')}
         </button>
       )}
 
@@ -164,7 +183,7 @@ export const ModelDetail = (props: any) => {
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn start" style={{ flex: 1, padding: '8px' }} onClick={handleConfirmRebuild}>{isZh ? '确认并开始改造' : 'Confirm & Start Rebuild'}</button>
-              <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>{isZh ? '取消' : 'Cancel'}</button>
+              <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>{t('cancel')}</button>
             </div>
           </div>
         </div>
@@ -220,7 +239,6 @@ export const ModelDetail = (props: any) => {
                         
                         {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                         
-                        {/* 🌟 心得/日记显示与编辑区域 */}
                         <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
                           {isEditingThisNote ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -228,7 +246,7 @@ export const ModelDetail = (props: any) => {
                                 autoFocus
                                 value={noteText}
                                 onChange={(e) => setNoteText(e.target.value)}
-                                placeholder={isZh ? '记录一下当时的拼装心得、遇到的问题或想法...' : 'Record your thoughts, issues, or tips...'}
+                                placeholder={t('placeholder_add_note')}
                                 style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid #3b82f6', color: '#fff', borderRadius: '4px', padding: '6px', fontSize: '12px', outline: 'none', resize: 'vertical' }}
                               />
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -252,7 +270,7 @@ export const ModelDetail = (props: any) => {
                   
                   {(!needsRebuild || task.name !== 'part_legacy') && (
                     <button className="mini-btn" style={{ width: '100%', marginTop: '12px', background: '#3b82f6', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold' }} onClick={() => { AudioManager.playClick(); handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
-                      {isZh ? `⏱ 开始专注` : `⏱ Start Focus`}
+                      ⏱ {isZh ? '开始专注' : 'Start Focus'}
                     </button>
                   )}
                 </div>
@@ -262,9 +280,8 @@ export const ModelDetail = (props: any) => {
         })}
       </div>
 
-      {/* 🌟 战报生成器区域：带模板选择 */}
       <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>{isZh ? '🎨 选择战报样式' : '🎨 Select Report Style'}</div>
+        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🎨 {isZh ? '选择战报样式' : 'Select Report Style'}</div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {(['cyber', 'minimal', 'glitch'] as ShareCardTemplate[]).map(tpl => (
             <button
@@ -282,7 +299,7 @@ export const ModelDetail = (props: any) => {
           ))}
         </div>
         <button className="btn start" style={{ width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px', fontWeight: 'bold' }} onClick={handleGenerateShareCard}>
-          📸 {isZh ? '生成专属战报' : 'Generate Build Report'}
+          📸 {t('btn_gen_report')}
         </button>
       </div>
     </div>

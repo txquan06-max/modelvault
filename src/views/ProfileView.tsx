@@ -1,32 +1,44 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { DailyQuestManager, type DailyQuest } from '../core/DailyQuestManager';
 import { StatsChart } from '../components/StatsChart'; 
+import { ModelManager } from '../core/ModelManager';
+import { UserManager } from '../core/UserManager';
+import { AchievementManager } from '../core/AchievementManager';
+import { StorageManager } from '../core/StorageManager';
+import { useAppStore } from '../store/useAppStore';
 
 export const ProfileView = (props: any) => {
+  const { t, i18n } = useTranslation();
+  const isZh = i18n.language === 'zh';
+
+  // 🌟 Zustand 全局状态
   const {
-    t, i18n, username, handleUsernameChange, equippedTitleDef, modelStats, timeStats, showModelDetails, setShowModelDetails,
-    showTimeDetails, setShowTimeDetails, formatTime, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
-    legacyResults, addToLegacyList, legacyList, removeLegacyItem, handleLegacyCoverUpload, handleLegacyImport,
-    bgMain, bgPip, handleBgFileUpload, reminderInterval, setReminderInterval, openPreview, audioSettings, updateAudioSetting,
-    customAudios, handleAudioUpload, titles, earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle,
-    earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
-    storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
-    webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    storageEstimate, isAssetsMounted, setIsAssetsMounted,
-    level, levelProgress, showToast, refreshData
+    username, setUsername, level, levelProgress, coinsBalance,
+    earnedTitles, equippedTitle, setEquippedTitle, earnedAchievements,
+    bgMain, setBgMain, bgPip, setBgPip, audioSettings, setAudioSettings,
+    customAudios, setCustomAudios, webChatInterval, setWebChatInterval,
+    pipChatInterval, setPipChatInterval, storageEstimate,
+    isAssetsMounted, setIsAssetsMounted, refreshData
+  } = useAppStore();
+
+  // 局部的 Props（比如 showToast 等）
+  const {
+    showToast, handleFocus, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
+    legacyResults, setLegacyResults, legacyList, setLegacyList, removeLegacyItem,
+    handleLegacyCoverUpload, handleLegacyImport, addToLegacyList,
+    showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
+    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload
   } = props;
 
-  const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
-
   const [quests, setQuests] = useState<DailyQuest[]>([]);
-
-  // 🌟 快照恢复面板状态
   const [snapshots, setSnapshots] = useState<{ index: number; timestamp: number | null; size: number }[]>([]);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [restoringIndex, setRestoringIndex] = useState<number | null>(null);
+  const [isUploadingWakeup, setIsUploadingWakeup] = useState(false);
 
   useEffect(() => {
     setQuests(DailyQuestManager.getTodayQuests());
@@ -35,15 +47,14 @@ export const ProfileView = (props: any) => {
   useEffect(() => {
     if (!showSnapshots) return;
     StorageManager.listSnapshots().then((list: any[]) => setSnapshots(list));
-  }, [showSnapshots, StorageManager]);
+  }, [showSnapshots]);
 
   const handleClaim = (questId: string) => {
     AudioManager.playAchievement();
-    const success = DailyQuestManager.claimReward(questId);
-    if (success) {
-      showToast(isZh ? '🎉 奖励已领取！' : '🎉 Reward claimed!');
+    if (DailyQuestManager.claimReward(questId)) {
+      showToast(t('toast_quest_claimed'));
       setQuests(DailyQuestManager.getTodayQuests());
-      if (refreshData) refreshData();
+      refreshData();
     }
   };
 
@@ -52,23 +63,13 @@ export const ProfileView = (props: any) => {
     setRestoringIndex(index);
     const success = await StorageManager.restoreSnapshot(index);
     if (success) {
-      showToast(isZh ? '✅ 快照恢复成功，即将刷新...' : '✅ Snapshot restored. Reloading...');
+      showToast(t('toast_reset_success'));
       setTimeout(() => window.location.reload(), 1000);
     } else {
-      showToast(isZh ? '❌ 快照恢复失败' : '❌ Restore failed');
+      showToast(t('toast_reset_fail'));
       setRestoringIndex(null);
     }
   };
-
-  const allCompleted = quests.length > 0 && quests.every(q => q.claimed);
-
-  const typingLabel = (() => {
-    const raw = t('audioTyping');
-    if (raw === 'audioTyping') return isZh ? '打字机音效' : 'Typing Sound';
-    return raw;
-  })();
-
-  const [isUploadingWakeup, setIsUploadingWakeup] = useState(false);
 
   const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,7 +82,7 @@ export const ProfileView = (props: any) => {
       const base64 = ev.target?.result as string;
       StorageManager.setCustomWakeupSound(base64);
       setIsUploadingWakeup(false);
-      showToast(isZh ? '✅ 起床铃已更新' : '✅ Wakeup sound updated');
+      showToast(t('toast_wakeup_updated'));
       AudioManager.playWakeup();
     };
     reader.readAsDataURL(file);
@@ -90,13 +91,32 @@ export const ProfileView = (props: any) => {
 
   const currentWakeupSound = StorageManager.getCustomWakeupSound();
 
+  // 🌟 内部封装的音效修改函数
+  const updateAudioSetting = (type: string, style: string) => {
+    const newSettings = { ...audioSettings, [type]: style };
+    setAudioSettings(newSettings);
+    if (style !== 'off') AudioManager.previewSound(type as any);
+  };
+
+  const typingLabel = (() => {
+    const raw = t('audioTyping');
+    if (raw === 'audioTyping') return isZh ? '打字机音效' : 'Typing Sound';
+    return raw;
+  })();
+
+  const allCompleted = quests.length > 0 && quests.every(q => q.claimed);
+  const modelStats = ModelManager.getModelStats();
+  const timeStats = ModelManager.getTimeStats();
+  const titles = UserManager.getTitleLibrary();
+  const equippedTitleDef = titles.find(t => t.id === equippedTitle);
+
   return (
     <div className="view-content profile-view">
       <div className="profile-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="avatar" style={{ flexShrink: 0 }}>🧑‍🔧</div>
           <div className="profile-info" style={{ flex: 1 }}>
-            <input id="username-input" type="text" value={username} onChange={handleUsernameChange} className="username-input" onFocus={handleFocus} />
+            <input id="username-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="username-input" onFocus={handleFocus} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
               <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
               {equippedTitleDef && <span style={{ fontSize: '12px', color: equippedTitleDef.color, fontWeight: 'bold' }}>[{t(equippedTitleDef.nameKey)}]</span>}
@@ -133,7 +153,7 @@ export const ProfileView = (props: any) => {
                 
                 {quest.completed && !quest.claimed ? (
                   <button className="mini-btn" onClick={() => handleClaim(quest.id)} style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
-                    {isZh ? '领取' : 'Claim'}
+                    {t('claim')}
                   </button>
                 ) : quest.claimed ? (
                   <span style={{ fontSize: '12px', color: '#10b981', minWidth: '40px', textAlign: 'center' }}>✓</span>
@@ -162,48 +182,34 @@ export const ProfileView = (props: any) => {
         </div>
         <div className="stat-card" onClick={() => { AudioManager.playClick(); setShowTimeDetails(!showTimeDetails); }}>
           <div className="stat-label">{t('totalTime')}</div>
-          <div className="stat-value">{formatTime(timeStats.totalSeconds)}</div>
+          <div className="stat-value">{Math.floor(timeStats.totalSeconds / 60)}m</div>
           {showTimeDetails && (
             <div className="stat-details">
               {Object.entries(timeStats.stageTime).map(([stageKey, seconds]) => (seconds as number) > 0 ? (
-                <div key={stageKey} className="detail-row"><span>{t(stageKey)}</span> <span>{formatTime(seconds as number)}</span></div>
+                <div key={stageKey} className="detail-row"><span>{t(stageKey)}</span> <span>{Math.floor((seconds as number) / 60)}m</span></div>
               ) : null)}
             </div>
           )}
         </div>
       </div>
 
-      <div id="tour-install" className="custom-section" style={{ border: '1px solid #10b981', background: 'linear-gradient(145deg, rgba(16, 185, 129, 0.1), rgba(0,0,0,0.2))' }}>
-        <h4>🛡️ {isZh ? '桌面客户端已激活' : 'Desktop Client Activated'}</h4>
-        <p style={{ fontSize: '11px', color: '#ccc', lineHeight: '1.6', marginBottom: '8px' }}>
-          {isZh 
-            ? '你正在使用独立桌面版。所有数据均加密储存在您的本地电脑中，彻底告别网络延迟与断连。' 
-            : 'You are using the Desktop version. All data is stored locally on your PC, no more network latency.'}
-        </p>
-        <div style={{ fontSize: '11px', color: '#10b981', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '6px', lineHeight: '1.6' }}>
-          {isZh ? '💡 更新提示：当有新版本时，群主会发布新的安装包，直接覆盖安装即可，您的本地数据不会丢失。' : '💡 Update tip: Install the new package over the old one, data will be preserved.'}
-        </div>
-      </div>
-
       <div className="custom-section" style={{ border: '1px dashed #10b981' }}>
-        <h4>🛡️ {isZh ? '本地数据扩容' : 'Data Expansion'}</h4>
-        <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>
-          {isZh ? '绑定本地文件夹后，媒体文件将直接存入你的硬盘，容量无上限！' : 'Bind a local folder to store media directly on your disk!'}
-        </p>
+        <h4>🛡️ {t('data_expansion_title')}</h4>
+        <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>{t('data_expansion_desc')}</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '12px' }}>
-              <div>{isZh ? '容量分配' : 'Quota'}: {storageEstimate.quota} GB</div>
-              <div style={{ color: '#10b981' }}>{isZh ? '已用' : 'Used'}: {storageEstimate.usage} GB</div>
+              <div>{t('quota_label')}: {storageEstimate.quota} GB</div>
+              <div style={{ color: '#10b981' }}>{t('used_label')}: {storageEstimate.usage} GB</div>
             </div>
             <button className="mini-btn" onClick={async () => {
               AudioManager.playClick();
               const success = await StorageManager.selectAssetsFolder();
-              if (success) { setIsAssetsMounted(true); showToast(isZh ? '✅ 本地图库扩容已挂载！' : '✅ Local gallery mounted!'); }
-              else showToast(isZh ? '❌ 未选择文件夹或浏览器不支持' : '❌ Unsupported or cancelled');
+              if (success) { setIsAssetsMounted(true); showToast(t('toast_local_mount_success')); }
+              else showToast(t('toast_local_mount_fail'));
             }} style={{ background: isAssetsMounted ? '#10b981' : '#555', flexShrink: 0 }}>
-              {isAssetsMounted ? (isZh ? '已挂载本地图库' : 'Mounted') : (isZh ? '📁 挂载本地图库 (扩容)' : '📁 Mount Local Gallery')}
+              {isAssetsMounted ? t('mounted') : t('mount_gallery')}
             </button>
           </div>
         </div>
@@ -217,7 +223,7 @@ export const ProfileView = (props: any) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="search-autocomplete">
-              <input id="legacy-search-input" autoFocus placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} onBlur={() => setTimeout(() => setLegacyResults([]), 200)} onFocus={handleFocus} />
+              <input autoFocus placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} onBlur={() => setTimeout(() => setLegacyResults([]), 200)} onFocus={handleFocus} />
               {legacyResults.length > 0 && (
                 <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
                   {legacyResults.map((item: any, idx: number) => {
@@ -258,7 +264,7 @@ export const ProfileView = (props: any) => {
             )}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
               <button className="btn start" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={handleLegacyImport} disabled={legacyList.length === 0}>{t('importBtn')} ({legacyList.length})</button>
-              <button className="btn no" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(false); props.setLegacyList([]); setLegacyInput(''); }}>{t('cancel')}</button>
+              <button className="btn no" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={() => { AudioManager.playClick(); setShowLegacyForm(false); setLegacyList([]); setLegacyInput(''); }}>{t('cancel')}</button>
             </div>
           </div>
         )}
@@ -269,7 +275,7 @@ export const ProfileView = (props: any) => {
 
         <div className="custom-row">
           <span>{t('reminderInterval')}:</span>
-          <select value={reminderInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setReminderInterval(val); StorageManager.setReminderInterval(val); }}>
+          <select value={StorageManager.getReminderInterval()} onChange={(e) => { AudioManager.playClick(); StorageManager.setReminderInterval(Number(e.target.value)); }}>
             <option value={0}>{t('audioOff')}</option>
             <option value={15 * 60}>15m</option>
             <option value={30 * 60}>30m</option>
@@ -279,8 +285,8 @@ export const ProfileView = (props: any) => {
         </div>
 
         <div className="custom-row">
-          <span>{isZh ? '网页AI发言频率' : 'Web AI Chat Freq'}:</span>
-          <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); StorageManager.setWebChatInterval(val); }}>
+          <span>{t('web_ai_freq')}:</span>
+          <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); }}>
             <option value={5000}>5s</option>
             <option value={8000}>8s ({isZh ? '默认' : 'Default'})</option>
             <option value={15000}>15s</option>
@@ -290,8 +296,8 @@ export const ProfileView = (props: any) => {
         </div>
 
         <div className="custom-row">
-          <span>{isZh ? '悬浮窗AI发言频率' : 'PiP AI Chat Freq'}:</span>
-          <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); StorageManager.setPipChatInterval(val); }}>
+          <span>{t('pip_ai_freq')}:</span>
+          <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); }}>
             <option value={30000}>30s</option>
             <option value={60000}>60s ({isZh ? '默认' : 'Default'})</option>
             <option value={120000}>120s</option>
@@ -305,7 +311,7 @@ export const ProfileView = (props: any) => {
             <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
               📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'main')} style={{ display: 'none' }} />
             </label>
-            {bgMain && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgMain(''); StorageManager.setBgMain(''); }}>{t('clear')}</button>}
+            {bgMain && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgMain(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
@@ -315,25 +321,21 @@ export const ProfileView = (props: any) => {
             <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
               📁 {t('uploadImage')}<input type="file" accept="image/*" onChange={(e) => handleBgFileUpload(e, 'pip')} style={{ display: 'none' }} />
             </label>
-            {bgPip && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgPip(''); StorageManager.setBgPip(''); }}>{t('clear')}</button>}
+            {bgPip && <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { AudioManager.playClick(); setBgPip(''); }}>{t('clear')}</button>}
           </div>
         </div>
 
-        <div className="custom-row">
-          <button className="mini-btn" onClick={openPreview}>{t('previewBg')}</button>
-        </div>
-
         <div className="custom-row" style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '12px', marginTop: '12px' }}>
-          <span>{isZh ? '自定义专注结束起床铃' : 'Custom Wakeup Sound'}:</span>
+          <span>{t('custom_wakeup_sound')}:</span>
           <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap', alignItems: 'center' }}>
             <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: isUploadingWakeup ? 'not-allowed' : 'pointer', opacity: isUploadingWakeup ? 0.5 : 1, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '120px' }}>
-              🎵 {isUploadingWakeup ? (isZh ? '处理中...' : 'Processing...') : (currentWakeupSound ? (isZh ? '更换起床铃' : 'Replace Sound') : (isZh ? '上传起床铃' : 'Upload Sound'))}
+              🎵 {isUploadingWakeup ? t('processing') : (currentWakeupSound ? t('replace_sound') : t('upload_sound'))}
               <input type="file" accept="audio/*" onChange={handleWakeupUpload} style={{ display: 'none' }} disabled={isUploadingWakeup} />
             </label>
             {currentWakeupSound && (
               <>
-                <button className="mini-btn" style={{ background: '#3b82f6', flexShrink: 0 }} onClick={() => { AudioManager.playWakeup(); }}>{isZh ? '试听' : 'Test'}</button>
-                <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { StorageManager.setCustomWakeupSound(''); showToast(isZh ? '已恢复默认起床铃' : 'Reset to default'); }}>{t('clear')}</button>
+                <button className="mini-btn" style={{ background: '#3b82f6', flexShrink: 0 }} onClick={() => { AudioManager.playWakeup(); }}>{t('test_sound')}</button>
+                <button className="mini-btn" style={{ color: '#ef4444', flexShrink: 0 }} onClick={() => { StorageManager.setCustomWakeupSound(''); showToast(t('toast_wakeup_reset')); }}>{t('clear')}</button>
               </>
             )}
           </div>
@@ -350,7 +352,7 @@ export const ProfileView = (props: any) => {
               <div key={type} className="audio-row">
                 <span>{labelMap[type]}</span>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <select id={`audio-select-${type}`} value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
+                  <select value={audioSettings[type] || 'default'} onChange={e => updateAudioSetting(type, e.target.value)}>
                     <option value="default">{t('audioDefault')}</option>
                     <option value="chiptune">{t('audio8Bit')}</option>
                     <option value="soft">{t('audioSoft')}</option>
@@ -358,7 +360,7 @@ export const ProfileView = (props: any) => {
                     {customAudios[type] && <option value="custom">{t('audioCustom')}</option>}
                   </select>
                   <label className="mini-btn" style={{ padding: '2px 6px', cursor: 'pointer', margin: 0 }} title="Upload MP3/WAV">
-                    🎵<input type="file" accept="audio/*" onChange={(e) => handleAudioUpload(type, e)} style={{ display: 'none' }} />
+                    🎵<input type="file" accept="audio/*" onChange={(e) => props.handleAudioUpload(type, e)} style={{ display: 'none' }} />
                   </label>
                 </div>
               </div>
@@ -381,9 +383,9 @@ export const ProfileView = (props: any) => {
                   <div className="title-cond">{t(title.descKey)}</div>
                 </div>
                 {isOwned ? (
-                  <button className="mini-btn" onClick={() => equipTitle(title.id)} disabled={equippedTitle === title.id}>{equippedTitle === title.id ? t('equipped') : t('equip')}</button>
+                  <button className="mini-btn" onClick={() => setEquippedTitle(title.id)} disabled={equippedTitle === title.id}>{equippedTitle === title.id ? t('equipped') : t('equip')}</button>
                 ) : (
-                  <button className="mini-btn buy-btn" onClick={() => buyTitle(title.id)} disabled={!canAfford || !meetsCondition}>{title.cost} 🪙</button>
+                  <button className="mini-btn buy-btn" onClick={() => props.buyTitle(title.id)} disabled={!canAfford || !meetsCondition}>{title.cost} 🪙</button>
                 )}
               </div>
             );
@@ -409,42 +411,41 @@ export const ProfileView = (props: any) => {
       </div>
 
       <div className="data-backup-section">
-        <h4>{t('dataBackup')} <span style={{ float: 'right', fontSize: '11px', color: '#888' }}>Used: {storageUsage} MB</span></h4>
+        <h4>{t('dataBackup')} <span style={{ float: 'right', fontSize: '11px', color: '#888' }}>Used: {StorageManager.getStorageUsage()} MB</span></h4>
         <div className="backup-actions" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
           <button className="backup-btn" style={{ flex: 1, minWidth: '100px' }} onClick={exportData}>{t('exportData')}</button>
           <label className="backup-btn import-label" style={{ flex: 1, minWidth: '100px', display: 'flex', justifyContent: 'center' }}>{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
         </div>
 
-        {/* 🌟 快照恢复面板 */}
         <div style={{ borderTop: '1px dashed #444', paddingTop: '16px', marginBottom: '16px' }}>
           <button 
             className="backup-btn" 
             style={{ width: '100%', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: '#3b82f6', marginBottom: showSnapshots ? '12px' : 0 }}
             onClick={() => { AudioManager.playClick(); setShowSnapshots(!showSnapshots); }}
           >
-            🕰️ {isZh ? (showSnapshots ? '收起历史快照' : '查看历史快照（防误删）') : (showSnapshots ? 'Hide Snapshots' : 'View Snapshots')}
+            🕰️ {showSnapshots ? t('hide_snapshots') : t('view_snapshots')}
           </button>
           
           {showSnapshots && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px' }}>
               {snapshots.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#888', textAlign: 'center' }}>{isZh ? '暂无快照' : 'No snapshots yet'}</div>
+                <div style={{ fontSize: '12px', color: '#888', textAlign: 'center' }}>{t('no_snapshots')}</div>
               ) : (
                 snapshots.map(snap => (
                   <div key={snap.index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ fontSize: '12px', color: '#ccc' }}>
-                      <div style={{ fontWeight: 'bold', color: '#f59e0b' }}>#{snap.index} {isZh ? '号备份' : 'Backup'}</div>
-                      <div style={{ fontSize: '10px' }}>{snap.timestamp ? new Date(snap.timestamp).toLocaleString() : (isZh ? '未知时间' : 'Unknown time')} · {(snap.size / 1024).toFixed(1)} KB</div>
+                      <div style={{ fontWeight: 'bold', color: '#f59e0b' }}>{t('backup_index', { index: snap.index })}</div>
+                      <div style={{ fontSize: '10px' }}>{snap.timestamp ? new Date(snap.timestamp).toLocaleString() : t('unknown_time')} · {(snap.size / 1024).toFixed(1)} KB</div>
                     </div>
                     {restoringIndex === snap.index ? (
-                      <span style={{ fontSize: '12px', color: '#3b82f6' }}>恢复中...</span>
+                      <span style={{ fontSize: '12px', color: '#3b82f6' }}>{t('restoring')}</span>
                     ) : (
                       <button 
                         className="mini-btn" 
                         style={{ background: '#3b82f6', color: '#fff', border: 'none' }} 
                         onClick={() => handleRestoreSnapshot(snap.index)}
                       >
-                        {isZh ? '恢复此快照' : 'Restore'}
+                        {t('restore_snapshot')}
                       </button>
                     )}
                   </div>
@@ -470,7 +471,7 @@ export const ProfileView = (props: any) => {
         </div>
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.3.0 (Desktop)</p>
+          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.4.0 (Desktop)</p>
           <a href="https://github.com/txquan06-max/modelvault" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>

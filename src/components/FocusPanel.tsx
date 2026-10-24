@@ -23,7 +23,6 @@ export const FocusPanel = ({
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 Zustand 状态
   const {
     models, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -220,7 +219,11 @@ export const FocusPanel = ({
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#888', fontWeight: 'bold' }}>🕒 {localTime}</div>
-          <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {/* 🌟 悬浮模式下，点击此按钮恢复大屏 */}
+            <button onClick={handleOpenPiP} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)' }} title={isZh ? '恢复主界面' : 'Restore Main UI'}>✕</button>
+            <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
+          </div>
         </div>
         <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
           {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}

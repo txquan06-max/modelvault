@@ -30,7 +30,6 @@ import { AchievementOverlay, type AchievementData } from './components/Achieveme
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
 interface ChatMessage {
   id: string;
@@ -83,6 +82,9 @@ function App() {
   const [showTutorial, setShowTutorial] = useState(() => {
     return localStorage.getItem('hasSeenTutorial') === null;
   });
+
+  // 🌟 新增：是否处于悬浮小窗模式
+  const [isMiniMode, setIsMiniMode] = useState(false);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
 
@@ -176,6 +178,34 @@ function App() {
     } catch (e) { console.error(e); }
   };
 
+  // 🌟 核心：切换 悬浮小窗模式 与 主界面模式
+  const handleOpenPiP = async () => {
+    AudioManager.playClick();
+    if (!isTauri) { 
+      // Web 端降级为沉浸模式提示
+      showToast(t('toast_pip_not_supported')); 
+      return; 
+    }
+    try {
+      const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      if (!isMiniMode) {
+        // 进入小窗模式：缩小尺寸 + 置顶
+        await win.setSize(new LogicalSize(380, 560));
+        await win.setAlwaysOnTop(true);
+        setIsMiniMode(true);
+      } else {
+        // 退出小窗模式：恢复宽屏尺寸 + 取消置顶
+        await win.setSize(new LogicalSize(1100, 800));
+        await win.setAlwaysOnTop(false);
+        setIsMiniMode(false);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(isZh ? '切换悬浮模式失败' : 'Toggle Mini Mode failed');
+    }
+  };
+
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
     setUpdateProgress(0);
@@ -256,7 +286,7 @@ function App() {
     const updateTimer = () => {
       if (chatTimer) clearInterval(chatTimer);
       let interval = 0;
-      if (isPipMode) interval = pipChatInterval;
+      if (isMiniMode) interval = pipChatInterval;
       else if (document.visibilityState === 'visible') interval = webChatInterval;
       if (interval > 0) chatTimer = setInterval(tick, interval);
     };
@@ -266,7 +296,7 @@ function App() {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
-  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, isPipMode, currentStageId]);
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, isMiniMode, currentStageId]);
 
   const triggerAutoBackup = async () => {
     if (!isAutoBackupEnabled) return;
@@ -449,36 +479,6 @@ function App() {
   };
 
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
-
-  const handleOpenPiP = async () => {
-    AudioManager.playClick();
-    if (!isTauri) { showToast(t('toast_pip_not_supported')); return; }
-    try {
-      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      // 🌟 修复 1：使用 window.location.origin 确保开发环境跨域正确
-      const webview = new WebviewWindow('pip-window', {
-        url: window.location.origin + '/?pip=true',
-        width: 380,
-        height: 560,
-        alwaysOnTop: true,
-        resizable: true,
-        decorations: false,
-        transparent: true,
-        center: true,
-      });
-      webview.once('tauri://created', () => {
-        console.log('PiP created successfully');
-      });
-      webview.once('tauri://error', function (e) {
-        console.error('PiP error:', e);
-        showToast(isZh ? `悬浮窗打开失败，已开启主窗口置顶模式` : `PiP failed, enabled Always-On-Top mode`);
-        toggleAlwaysOnTop(); // 🌟 兜底：如果独立窗口失败，退化为把主窗口置顶
-      });
-    } catch (err) {
-      console.error('PiP catch error:', err);
-      showToast(isZh ? `悬浮窗打开失败: ${err}` : `PiP failed: ${err}`);
-    }
-  };
 
   const handleStartRebuild = (taskId: string | null) => {
     AudioManager.playClick(); 
@@ -755,9 +755,10 @@ function App() {
     setBgMain, setBgPip, StorageManager
   };
 
-  if (isPipMode) {
+  // 🌟 核心：如果处于悬浮模式，直接返回小窗 UI（完全复用 FocusPanel 的 PiP 布局）
+  if (isMiniMode) {
     return (
-      <div className="app-wrapper" style={{ background: 'transparent' }}>
+      <div className="app-wrapper mini-mode-wrapper" style={{ background: '#09090b' }}>
         <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} />
       </div>
     );

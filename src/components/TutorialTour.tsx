@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
 
 export interface TourStep {
@@ -54,7 +54,6 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
         setReady(true);
       }, 300);
     } else {
-      // 兜底：如果找不到元素，居中显示气泡
       setRect(new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0));
       setReady(true);
     }
@@ -62,7 +61,6 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
   if (!step) return null;
 
-  // 🌟 核心修复：智能防越界计算算法
   const getTooltipStyle = () => {
     if (!rect || rect.width === 0) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
@@ -70,27 +68,23 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
     const padding = 16;
     const tooltipWidth = 300;
-    const tooltipHeight = 200; // 预估高度
+    const tooltipHeight = 200;
 
     let top = rect.bottom + padding;
     let left = rect.left + rect.width / 2 - tooltipWidth / 2;
 
-    // 防底部越界：如果下方放不下，翻转到上方
     if (top + tooltipHeight > windowSize.height) {
       top = rect.top - tooltipHeight - padding;
     }
     
-    // 防顶部越界：如果上方也放不下，强行贴紧顶部
     if (top < padding) {
       top = padding;
     }
 
-    // 防右侧越界
     if (left + tooltipWidth > windowSize.width) {
       left = windowSize.width - tooltipWidth - padding;
     }
 
-    // 防左侧越界
     if (left < padding) {
       left = padding;
     }
@@ -100,7 +94,6 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
-      {/* 高亮遮罩层 */}
       {rect && rect.width > 0 ? (
         <div style={{
           position: 'fixed',
@@ -118,7 +111,6 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9998, opacity: ready ? 1 : 0 }} />
       )}
 
-      {/* 气泡内容 */}
       <div
         style={{
           position: 'fixed', ...getTooltipStyle(),

@@ -429,11 +429,40 @@ body {
 .empty-state { text-align: center; color: #bbb; font-size: 13px; margin-top: 40px; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
 
 /* =========================================
-   Hangar View (格纳库)
+   Hangar View (格纳库 3D 特效)
    ========================================= */
 .hangar-view { width: 100%; }
 .hangar-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; }
-.hangar-card { background: rgba(34, 34, 34, 0.85); border: 1px solid #555; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+.hangar-card { 
+  background: rgba(34, 34, 34, 0.85); 
+  border: 1px solid #555; 
+  border-radius: 8px; 
+  overflow: hidden; 
+  display: flex; 
+  flex-direction: column; 
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+  will-change: transform;
+}
+/* 已完成的模型加入霓虹呼吸灯 */
+.hangar-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 15px rgba(59, 130, 246, 0.2);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.hangar-card:hover::after {
+  opacity: 1;
+  animation: neon-breathing 2s infinite alternate;
+}
+@keyframes neon-breathing {
+  0% { box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.2); }
+  100% { box-shadow: inset 0 0 25px rgba(59, 130, 246, 0.6); }
+}
+
 .hangar-cover { 
   width: 100%; 
   aspect-ratio: 4 / 3; 

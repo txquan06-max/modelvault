@@ -2,50 +2,7 @@ import { useState, useEffect } from 'react';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { DailyQuestManager, type DailyQuest } from '../core/DailyQuestManager';
-
-const toLocalDateStr = (ts: number): string => {
-  const d = new Date(ts);
-  const y = d.getFullYear();
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  const day = d.getDate().toString().padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-const WeeklyChart = ({ sessions, i18n }: { sessions: any[], i18n: any }) => {
-  const isZh = i18n.language === 'zh';
-  const days = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dateStr = toLocalDateStr(d.getTime());
-    const daySessions = sessions.filter((s) => toLocalDateStr(s.startedAt) === dateStr);
-    const totalSec = daySessions.reduce((sum, s) => sum + s.activeSeconds, 0);
-    return { label: `${d.getMonth() + 1}/${d.getDate()}`, totalSec };
-  });
-
-  const maxSec = Math.max(...days.map((d) => d.totalSec), 3600);
-
-  return (
-    <div style={{ width: '100%', height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '10px 0', marginTop: '10px' }}>
-      {days.map((day, i) => {
-        const heightPercent = (day.totalSec / maxSec) * 100;
-        const isToday = i === 6;
-        return (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-            <div style={{ fontSize: '10px', color: isToday ? '#3b82f6' : '#888', marginBottom: '4px' }}>
-              {day.totalSec > 0 ? `${Math.floor(day.totalSec / 60)}m` : ''}
-            </div>
-            <div style={{ width: '20px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-              <div style={{ width: '100%', height: `${Math.max(heightPercent, 2)}%`, background: isToday ? 'linear-gradient(to top, #3b82f6, #8b5cf6)' : 'rgba(59, 130, 246, 0.4)', boxShadow: isToday ? '0 0 10px rgba(59,130,246,0.8)' : 'none', borderRadius: '4px', transition: 'height 1s cubic-bezier(0.4, 0, 0.2, 1)' }} />
-            </div>
-            <div style={{ fontSize: '10px', color: isToday ? '#fff' : '#666', marginTop: '6px', fontWeight: isToday ? 'bold' : 'normal' }}>
-              {isToday ? (isZh ? '今日' : 'Today') : day.label}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+import { StatsChart } from '../components/StatsChart'; 
 
 export const ProfileView = (props: any) => {
   const {
@@ -57,14 +14,13 @@ export const ProfileView = (props: any) => {
     earnedAchievements, exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     storageUsage, handleFocus, setLegacyResults, setBgMain, setBgPip, StorageManager,
     webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
-    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
+    storageEstimate, isAssetsMounted, setIsAssetsMounted, // 🌟 移除了 isAutoBackupEnabled 和 setIsAutoBackupEnabled
     level, levelProgress, showToast, refreshData
   } = props;
 
   const isZh = i18n.language === 'zh';
   const allSessions = SessionManager.getAllSessions();
 
-  // 每日委托状态
   const [quests, setQuests] = useState<DailyQuest[]>([]);
 
   useEffect(() => {
@@ -129,7 +85,6 @@ export const ProfileView = (props: any) => {
         </div>
       </div>
 
-      {/* 🌟 全新：每日委托面板 */}
       <div className="custom-section" style={{ background: 'linear-gradient(145deg, rgba(59,130,246,0.1), rgba(0,0,0,0.2))', border: '1px solid rgba(59,130,246,0.3)' }}>
         <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>📋 {isZh ? '每日委托' : 'Daily Quests'}</span>
@@ -166,9 +121,8 @@ export const ProfileView = (props: any) => {
         </div>
       </div>
 
-      <div className="custom-section" style={{ paddingBottom: '10px' }}>
-        <h4>📊 {isZh ? '近 7 天专注势能' : '7-Day Focus Energy'}</h4>
-        <WeeklyChart sessions={allSessions} i18n={i18n} />
+      <div className="custom-section" style={{ paddingBottom: '16px', overflow: 'hidden' }}>
+        <StatsChart sessions={allSessions} stageTime={timeStats.stageTime} i18n={i18n} />
       </div>
 
       <div className="stats-grid">
@@ -455,7 +409,7 @@ export const ProfileView = (props: any) => {
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
           <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.3.0 (Desktop)</p>
-          <a href="https://github.com/你的Github用户名/modelvault-web/issues" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
+          <a href="https://github.com/txquan06-max/modelvault" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>
     </div>

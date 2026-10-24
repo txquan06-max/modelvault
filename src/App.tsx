@@ -10,7 +10,7 @@ import { StorageManager } from './core/StorageManager';
 import { UserManager } from './core/UserManager';
 import { CheckinManager } from './core/CheckinManager';
 import { GunplaSearch } from './core/GunplaDB';
-import { DailyQuestManager } from './core/DailyQuestManager'; // 🌟 新增
+import { DailyQuestManager } from './core/DailyQuestManager';
 import type { Model, Task } from './core/ModelManager';
 import type { GunplaItem } from './core/GunplaDB';
 import './App.css';
@@ -53,6 +53,14 @@ const LocalImage = ({ src, ...props }: any) => {
 
   if (!url) return <div {...props} style={{ ...props.style, background: '#333' }} />;
   return <img src={url} {...props} />;
+};
+
+// 🌟 工具函数：请求原生通知权限
+const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    await Notification.requestPermission();
+  }
 };
 
 function App() {
@@ -158,7 +166,6 @@ function App() {
   const [isAssetsMounted, setIsAssetsMounted] = useState(false);
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
 
-  // 离线单机模式，屏蔽 PWA 更新状态
   const toastTimerRef = useRef<any>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -168,6 +175,35 @@ function App() {
     } catch (e) {}
     return []; 
   });
+
+  // 🌟 原生系统通知触发函数
+  const sendNativeNotification = (title: string, body: string) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/bots/tia_avatar.png' });
+    }
+  };
+
+  useEffect(() => {
+    requestNotificationPermission();
+
+    // 拦截 Tauri 窗口的全局拖拽，防止文件被浏览器直接打开
+    const preventDefault = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('dragover', preventDefault);
+    window.addEventListener('drop', (e) => {
+      preventDefault(e);
+      if (e.dataTransfer?.files.length) {
+        showToast(isZh ? '⚠️ 请使用页面内的按钮上传图片' : '⚠️ Please use the upload button');
+      }
+    });
+    
+    return () => {
+      window.removeEventListener('dragover', preventDefault);
+      window.removeEventListener('drop', preventDefault);
+    };
+  }, []);
 
   useEffect(() => {
     if (timerState === 'Running') AudioManager.playAmbient(ambientType);
@@ -198,7 +234,6 @@ function App() {
     return () => window.removeEventListener('mv-storage-error', handleStorageError);
   }, []);
 
-  // 🌟 精简后的教程（移除了 PWA 安装）
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
     { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
@@ -372,9 +407,15 @@ function App() {
 
   useEffect(() => {
     if (timerState === 'Running' && timeboxTarget > 0 && timeboxElapsed >= timeboxTarget && !hasPlayedTimeboxSound) {
-      AudioManager.playTimeboxEnd(); setHasPlayedTimeboxSound(true);
+      AudioManager.playTimeboxEnd(); 
+      setHasPlayedTimeboxSound(true);
+      // 🌟 原生系统通知：番茄钟结束
+      sendNativeNotification(
+        isZh ? '⏰ 番茄钟结束' : '⏰ Timebox Ended',
+        isZh ? '辛苦了胶佬，起来活动一下吧！' : 'Good job builder, time to stretch!'
+      );
     }
-  }, [timeboxElapsed, timeboxTarget, hasPlayedTimeboxSound, timerState]);
+  }, [timeboxElapsed, timeboxTarget, hasPlayedTimeboxSound, timerState, isZh]);
 
   useEffect(() => {
     if (timerState === 'Running' && reminderInterval > 0) {
@@ -384,7 +425,7 @@ function App() {
         setLastRemindedAt(activeSeconds);
       }
     }
-  }, [activeSeconds, timerState, reminderInterval, lastRemindedAt]);
+  }, [activeSeconds, timerState, reminderInterval, lastRemindedAt, isZh]);
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
@@ -505,9 +546,14 @@ function App() {
       AudioManager.playWakeup(); 
       SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
       
-      // 🌟 每日委托埋点：专注时间
       DailyQuestManager.updateProgress('focus_time', result.activeSeconds);
       
+      // 🌟 原生系统通知：专注结束
+      sendNativeNotification(
+        isZh ? '🎉 专注完成！' : '🎉 Focus Completed!',
+        isZh ? `本次专注 ${Math.floor(result.activeSeconds / 60)} 分钟，数据已保存。` : `You focused for ${Math.floor(result.activeSeconds / 60)} mins. Data saved.`
+      );
+
       refreshData(); setLastSession({ duration: result.activeSeconds, stageId: currentStageId }); pushChatMessage('complete');
       triggerAutoBackup();
     }
@@ -589,7 +635,6 @@ function App() {
     AudioManager.playFinishPart(); const result = ModelManager.finishTask(currentTaskId, finishPartPhoto);
     if (result.error) { showToast(t(result.error)); return; }
     
-    // 🌟 每日委托埋点：完成部位
     DailyQuestManager.updateProgress('complete_part', 1);
 
     setModels(result.models); refreshData(); processAchievements(); setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false); setIsFinishingPart(false); checkAndPromptCompleteModel(result.models);
@@ -621,7 +666,6 @@ function App() {
 
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
     
-    // 🌟 每日委托埋点：添加模型
     DailyQuestManager.updateProgress('add_model', 1);
 
     setModels(updated); setCurrentModelId(updated[updated.length - 1].id);

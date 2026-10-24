@@ -10,11 +10,9 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
   const [dbData, setDbData] = useState<GunplaItem[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 虚拟列表容器引用和宽度状态
   const parentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // 监听容器宽度，动态计算列数
   useEffect(() => {
     if (!parentRef.current) return;
     const resizeObserver = new ResizeObserver((entries) => {
@@ -26,7 +24,6 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // 异步加载图鉴数据
   useEffect(() => {
     GunplaSearch.getAll().then(data => {
       setDbData(data);
@@ -57,14 +54,13 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
   const totalCollected = galleryData.filter(i => i.isCollected).length;
   const totalDB = dbData.length;
 
-  // --- 虚拟网格计算逻辑 ---
-  const minColumnWidth = 100; // 每个卡片最小宽度
-  const gap = 10; // 间距
+  const minColumnWidth = 100; 
+  const gap = 10; 
   const columnCount = containerWidth > 0 ? Math.max(1, Math.floor((containerWidth + gap) / (minColumnWidth + gap))) : 2;
   const rowCount = Math.ceil(filteredData.length / columnCount);
 
-  // 将一维数据按列数切分成行
-  const rows = [];
+  // 🌟 修复：显式指定 rows 的类型为 any[][]
+  const rows: any[][] = [];
   for (let i = 0; i < rowCount; i++) {
     rows.push(filteredData.slice(i * columnCount, i * columnCount + columnCount));
   }
@@ -72,7 +68,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 120, // 预估每行高度 (卡片高度+间距)
+    estimateSize: () => 120, 
     overscan: 5,
   });
 
@@ -115,7 +111,6 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
         </select>
       </div>
 
-      {/* 虚拟滚动容器 */}
       <div 
         ref={parentRef} 
         style={{ flex: 1, overflowY: 'auto', position: 'relative', paddingRight: '4px' }}
@@ -143,7 +138,8 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                {rowItems.map((item, idx) => {
+                {/* 🌟 修复：为 map 参数添加类型 */}
+                {rowItems.map((item: any, idx: number) => {
                   const name = isZh ? item.name.zh : item.name.en;
                   const series = isZh ? item.series.zh : item.series.en;
                   
@@ -165,7 +161,7 @@ export const GundamGalleryView = ({ i18n, models }: any) => {
                         opacity: item.isCollected ? 1 : 0.4,
                         position: 'relative',
                         overflow: 'hidden',
-                        height: '110px' // 固定高度保证虚拟滚动顺滑
+                        height: '110px' 
                       }}
                     >
                       {item.isCollected && item.userModel?.coverImage && (

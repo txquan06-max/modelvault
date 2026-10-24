@@ -1,7 +1,8 @@
 import localforage from 'localforage';
 
-const CURRENT_SCHEMA_VERSION = 5; // 升级版本号，准备迎接新功能
+const CURRENT_SCHEMA_VERSION = 5; 
 const DATA_KEY = 'modelvault_core_data';
+const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
 
 export const KEYS = {
   SESSIONS: 'modelvault_sessions',
@@ -27,6 +28,7 @@ export const KEYS = {
   WEB_CHAT_INTERVAL: 'mv_web_chat_interval',
   PIP_CHAT_INTERVAL: 'mv_pip_chat_interval',
   CUSTOM_WAKEUP_SOUND: 'mv_custom_wakeup_sound',
+  DAILY_QUESTS: 'mv_daily_quests_data',
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
@@ -40,7 +42,6 @@ let isInit = false;
 let backupDirHandle: any = null;
 let assetsDirHandle: any = null;
 
-// 🌟 新增：本地图片 URL LRU 缓存池，防止内存泄漏
 const localUrlCache = new Map<string, { url: string, lastAccess: number }>();
 const MAX_URL_CACHE_SIZE = 50;
 
@@ -79,7 +80,6 @@ export const StorageManager = {
           await localforage.setItem('modelvault_backup_before_migration', rawData);
           const migratedModels = parsed.models || [];
           
-          // 预留：v5 新增 note 字段
           const finalModels = migratedModels.map((m: any) => ({
             ...m,
             tasks: m.tasks.map((t: any) => ({
@@ -166,7 +166,6 @@ export const StorageManager = {
     } catch (err) { return null; }
   },
 
-  // 🌟 优化：通过 LRU 缓存池复用 Blob URL
   async loadLocalFileUrl(filename: string) {
     if (!assetsDirHandle) return null;
     
@@ -182,7 +181,6 @@ export const StorageManager = {
       const file = await fileHandle.getFile();
       const url = URL.createObjectURL(file);
 
-      // LRU 淘汰
       if (localUrlCache.size >= MAX_URL_CACHE_SIZE) {
         let oldestKey = '';
         let oldestTime = Infinity;
@@ -204,15 +202,45 @@ export const StorageManager = {
   },
 
   async _set(key: string, val: string) {
+    // 🌟 自动快照机制：如果即将修改的是核心数据，先备份当前状态
+    if (key === DATA_KEY && memoryCache[DATA_KEY]) {
+      try {
+        for (let i = 4; i >= 1; i--) {
+          const prevSnapshot = memoryCache[`${SNAPSHOT_PREFIX}${i}`];
+          if (prevSnapshot) {
+            memoryCache[`${SNAPSHOT_PREFIX}${i + 1}`] = prevSnapshot;
+            await localforage.setItem(`${SNAPSHOT_PREFIX}${i + 1}`, prevSnapshot);
+          }
+        }
+        const currentData = memoryCache[DATA_KEY];
+        memoryCache[`${SNAPSHOT_PREFIX}1`] = currentData;
+        await localforage.setItem(`${SNAPSHOT_PREFIX}1`, currentData);
+      } catch (e) {
+        console.warn('生成快照失败', e);
+      }
+    }
+
     memoryCache[key] = val;
     try {
       await localforage.setItem(key, val);
     } catch (err) {
       console.error('Storage save failed:', err);
       window.dispatchEvent(new CustomEvent('mv-storage-error', {
-        detail: '⚠️ 本地存储空间可能已满。请前往「个人中心 → 数据备份 → 挂载本地图库」进行扩容。'
+        detail: '⚠️ 本地存储空间可能已满。请前往「个人中心 → 数据扩容」进行清理。'
       }));
     }
+  },
+
+  // 🌟 恢复快照的方法
+  async restoreSnapshot(snapshotIndex: number) {
+    const snapshotKey = `${SNAPSHOT_PREFIX}${snapshotIndex}`;
+    const snapshotData = await localforage.getItem<string>(snapshotKey);
+    if (snapshotData) {
+      await localforage.setItem(DATA_KEY, snapshotData);
+      memoryCache[DATA_KEY] = snapshotData;
+      return true;
+    }
+    return false;
   },
 
   async resetAll() {
@@ -271,6 +299,7 @@ export const StorageManager = {
   getWebChatInterval: () => Number(memoryCache[KEYS.WEB_CHAT_INTERVAL]) || 8000,
   getPipChatInterval: () => Number(memoryCache[KEYS.PIP_CHAT_INTERVAL]) || 60000,
   getCustomWakeupSound: () => memoryCache[KEYS.CUSTOM_WAKEUP_SOUND] || '',
+  getRawDailyQuests: () => { try { return JSON.parse(memoryCache[KEYS.DAILY_QUESTS] || 'null'); } catch { return null; } },
 
   setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
   setAchievements: (data: string) => StorageManager._set(KEYS.ACHIEVEMENTS, data),
@@ -295,6 +324,7 @@ export const StorageManager = {
   setWebChatInterval: (val: number) => StorageManager._set(KEYS.WEB_CHAT_INTERVAL, val.toString()),
   setPipChatInterval: (val: number) => StorageManager._set(KEYS.PIP_CHAT_INTERVAL, val.toString()),
   setCustomWakeupSound: (val: string) => StorageManager._set(KEYS.CUSTOM_WAKEUP_SOUND, val),
+  _setDailyQuests: (val: string) => StorageManager._set(KEYS.DAILY_QUESTS, val),
 
   exportAll: () => {
     const data: any = { version: CURRENT_SCHEMA_VERSION, exportDate: new Date().toISOString(), coreData: memoryCache[DATA_KEY] || null };

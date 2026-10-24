@@ -29,7 +29,6 @@ import { AchievementOverlay, type AchievementData } from './components/Achieveme
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
-// 🌟 删除了无用的 isWeChat
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
@@ -133,7 +132,6 @@ function App() {
   const [showTimeDetails, setShowTimeDetails] = useState(false);
   
   const engineRef = useRef(new TimerEngine());
-  // 🌟 删除了无用的 pipWindow state
   const [isResetting, setIsResetting] = useState(false);
 
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
@@ -457,8 +455,9 @@ function App() {
     if (!isTauri) { showToast(t('toast_pip_not_supported')); return; }
     try {
       const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      // 🌟 修复 1：使用 window.location.origin 确保开发环境跨域正确
       const webview = new WebviewWindow('pip-window', {
-        url: '/?pip=true',
+        url: window.location.origin + '/?pip=true',
         width: 380,
         height: 560,
         alwaysOnTop: true,
@@ -471,12 +470,13 @@ function App() {
         console.log('PiP created successfully');
       });
       webview.once('tauri://error', function (e) {
-        console.error(e);
-        showToast('悬浮窗打开失败');
+        console.error('PiP error:', e);
+        showToast(isZh ? `悬浮窗打开失败，已开启主窗口置顶模式` : `PiP failed, enabled Always-On-Top mode`);
+        toggleAlwaysOnTop(); // 🌟 兜底：如果独立窗口失败，退化为把主窗口置顶
       });
     } catch (err) {
-      console.error(err);
-      showToast(t('toast_pip_open_fail'));
+      console.error('PiP catch error:', err);
+      showToast(isZh ? `悬浮窗打开失败: ${err}` : `PiP failed: ${err}`);
     }
   };
 
@@ -755,7 +755,6 @@ function App() {
     setBgMain, setBgPip, StorageManager
   };
 
-  // 🌟 如果是 PiP 独立小窗口，直接只渲染 FocusPanel
   if (isPipMode) {
     return (
       <div className="app-wrapper" style={{ background: 'transparent' }}>

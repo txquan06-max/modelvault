@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { StorageManager } from '../core/StorageManager';
 import { SessionManager } from '../core/SessionManager';
+import { useAppStore } from '../store/useAppStore';
 
 const LocalCover = ({ image, fallback }: { image: string, fallback: string }) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -82,7 +84,7 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
       <div className="hangar-cover" style={{ transform: 'translateZ(20px)' }}>
         {model.coverImage ? <LocalCover image={model.coverImage} fallback="📷" /> : <span>📷 {t('noImage')}</span>}
         {model.isRebuilding && <span className="rebuild-badge-overlay">🔧 {t('rebuilding')}</span>}
-        {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{isZh ? '拼装中' : 'In Progress'}</span>}
+        {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{t('statusInProgress')}</span>}
       </div>
       <div className="hangar-info" style={{ transform: 'translateZ(30px)' }}>
         <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6', display: 'flex', justifyContent: 'space-between' }}>
@@ -96,9 +98,15 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
   );
 };
 
-export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setViewingModelId, setExpandedTaskId, setActiveTab, setCurrentModelId }: any) => {
-  const [activeSubTab, setActiveSubTab] = useState<'completed' | 'backlog'>('completed');
+export const HangarView = (props: any) => {
+  const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
+
+  // 🌟 从 Zustand 获取
+  const { models, setCurrentModelId, setActiveTab } = useAppStore();
+  const { setViewingModelId, setExpandedTaskId } = props;
+
+  const [activeSubTab, setActiveSubTab] = useState<'completed' | 'backlog'>('completed');
   
   const parentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -139,12 +147,14 @@ export const HangarView = ({ t, i18n, models, getModelName, getModelSeries, setV
     return `${m}m`;
   };
 
+  const getModelName = (m: any) => isZh ? m.name.zh : m.name.en;
+  const getModelSeries = (m: any) => isZh ? m.series.zh : m.series.en;
+
   const minColumnWidth = 160; 
   const gap = 16;
   const columnCount = containerWidth > 0 ? Math.max(1, Math.floor((containerWidth + gap) / (minColumnWidth + gap))) : 2;
   const rowCount = Math.ceil(displayList.length / columnCount);
 
-  // 🌟 修复：显式指定类型
   const rows: any[][] = [];
   for (let i = 0; i < rowCount; i++) {
     rows.push(displayList.slice(i * columnCount, i * columnCount + columnCount));

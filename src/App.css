@@ -862,4 +862,44 @@ body {
 /* 虚拟列表渲染容器优化 */
 .virtual-grid-row {
   will-change: transform;
+/* =========================================
+   主窗口缩小时的体验降级 (当宽度 < 600px 时)
+   ========================================= */
+@media (max-width: 599px) {
+  /* 主窗口隐藏全站背景图，省电省资源 */
+  .app-bg-img, .bg-overlay { display: none !important; }
+  
+  .mini-window {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 12px !important;
+    background: rgba(20, 25, 35, 0.98) !important;
+  }
+
+  /* 隐藏顶部的 6 个 Tab，因为太挤了，建议直接使用悬浮小窗 */
+  .tabs { display: none !important; }
+  
+  /* 强制 Focus 视图变成单列 */
+  .focus-layout {
+    flex-direction: column !important;
+    gap: 12px !important;
+    height: auto !important;
+  }
+  .focus-left, .focus-right {
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* 缩小后不需要看的组件（头像、聊天记录）直接隐藏，只保留核心计时器 */
+  .profile-card, .mini-timer-bar { display: none !important; }
+  
+  /* 隐藏所有的复杂按钮，只保留核心控制 */
+  .add-controls, .stages-panel, .timebox-selector { display: none !important; }
+
+  .timer-display { font-size: 64px !important; margin: 10px 0 !important; }
+}
 }

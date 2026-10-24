@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { TimerEngine } from './core/TimerEngine';
 import { SessionManager } from './core/SessionManager';
@@ -30,8 +29,9 @@ import { AchievementOverlay, type AchievementData } from './components/Achieveme
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
-const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+// 🌟 删除了无用的 isWeChat
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
 interface ChatMessage {
   id: string;
@@ -133,7 +133,7 @@ function App() {
   const [showTimeDetails, setShowTimeDetails] = useState(false);
   
   const engineRef = useRef(new TimerEngine());
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  // 🌟 删除了无用的 pipWindow state
   const [isResetting, setIsResetting] = useState(false);
 
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
@@ -143,8 +143,6 @@ function App() {
 
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
-
-  // 🌟 新增：Tauri 窗口置顶状态
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -167,12 +165,8 @@ function App() {
     return () => window.removeEventListener('tauri-update-available', handleUpdate);
   }, []);
 
-  // 🌟 Tauri 原生置顶切换
   const toggleAlwaysOnTop = async () => {
-    if (!isTauri) {
-      showToast(isZh ? '仅桌面端支持置顶' : 'Always on top is only supported on Desktop');
-      return;
-    }
+    if (!isTauri) { showToast(isZh ? '仅桌面端支持置顶' : 'Always on top is only supported on Desktop'); return; }
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const win = getCurrentWindow();
@@ -181,9 +175,7 @@ function App() {
       setIsAlwaysOnTop(nextState);
       AudioManager.playClick();
       showToast(nextState ? (isZh ? '📌 已置顶，边看视频边拼胶！' : '📌 Pinned!') : (isZh ? '已取消置顶' : 'Unpinned'));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDownloadUpdate = async () => {
@@ -266,7 +258,7 @@ function App() {
     const updateTimer = () => {
       if (chatTimer) clearInterval(chatTimer);
       let interval = 0;
-      if (pipWindow) interval = pipChatInterval;
+      if (isPipMode) interval = pipChatInterval;
       else if (document.visibilityState === 'visible') interval = webChatInterval;
       if (interval > 0) chatTimer = setInterval(tick, interval);
     };
@@ -276,7 +268,7 @@ function App() {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
-  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, currentStageId]);
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, isPipMode, currentStageId]);
 
   const triggerAutoBackup = async () => {
     if (!isAutoBackupEnabled) return;
@@ -462,17 +454,30 @@ function App() {
 
   const handleOpenPiP = async () => {
     AudioManager.playClick();
-    if (isWeChat) { showToast(t('toast_pip_not_supported')); return; }
-    if (!('documentPictureInPicture' in window)) { showToast(t('toast_pip_not_supported')); return; }
+    if (!isTauri) { showToast(t('toast_pip_not_supported')); return; }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
-      [...document.styleSheets].forEach((styleSheet) => {
-        try { const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); const style = document.createElement('style'); style.textContent = cssRules; pipWin.document.head.appendChild(style); } 
-        catch (e) { const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = (styleSheet as any).href; pipWin.document.head.appendChild(link); }
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const webview = new WebviewWindow('pip-window', {
+        url: '/?pip=true',
+        width: 380,
+        height: 560,
+        alwaysOnTop: true,
+        resizable: true,
+        decorations: false,
+        transparent: true,
+        center: true,
       });
-      pipWin.document.body.style.backgroundColor = '#1e1e1e'; pipWin.document.body.style.margin = '0'; pipWin.document.body.style.display = 'flex'; pipWin.document.body.style.justifyContent = 'center'; pipWin.document.body.style.alignItems = 'center'; pipWin.document.body.style.height = '100vh'; pipWin.document.body.style.overflow = 'hidden';
-      setPipWindow(pipWin); pipWin.addEventListener('pagehide', () => setPipWindow(null));
-    } catch (err) { console.error(err); showToast(t('toast_pip_open_fail')); }
+      webview.once('tauri://created', () => {
+        console.log('PiP created successfully');
+      });
+      webview.once('tauri://error', function (e) {
+        console.error(e);
+        showToast('悬浮窗打开失败');
+      });
+    } catch (err) {
+      console.error(err);
+      showToast(t('toast_pip_open_fail'));
+    }
   };
 
   const handleStartRebuild = (taskId: string | null) => {
@@ -750,6 +755,15 @@ function App() {
     setBgMain, setBgPip, StorageManager
   };
 
+  // 🌟 如果是 PiP 独立小窗口，直接只渲染 FocusPanel
+  if (isPipMode) {
+    return (
+      <div className="app-wrapper" style={{ background: 'transparent' }}>
+        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} />
+      </div>
+    );
+  }
+
   return (
     <>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
@@ -775,7 +789,6 @@ function App() {
         <div className="mini-window">
           
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
-            {/* 🌟 新增：原生置顶按钮 */}
             <button 
               onClick={toggleAlwaysOnTop} 
               style={{ background: isAlwaysOnTop ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: isAlwaysOnTop ? '#fff' : '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
@@ -876,8 +889,6 @@ function App() {
             </div>
           </div>
         )}
-
-        {pipWindow && createPortal(<FocusPanel isPip={true} {...commonProps} bgImage={bgPip} />, pipWindow.document.body)}
       </div>
     </>
   );

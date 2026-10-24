@@ -135,7 +135,8 @@ function App() {
   const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
-  const [timeboxElapsed, setTimeboxElapsed] = useState(() => StorageManager.getTimeboxElapsed());
+  // 🌟 timeboxElapsed 由 activeSeconds 派生，不再独立 state
+  const timeboxElapsed = timeboxTarget > 0 ? activeSeconds : 0;
   const [hasPlayedTimeboxSound, setHasPlayedTimeboxSound] = useState(false);
   const [reminderInterval, setReminderInterval] = useState(() => StorageManager.getReminderInterval());
   const [lastRemindedAt, setLastRemindedAt] = useState(0);
@@ -151,13 +152,13 @@ function App() {
   const [webChatInterval, setWebChatInterval] = useState(() => StorageManager.getWebChatInterval());
   const [pipChatInterval, setPipChatInterval] = useState(() => StorageManager.getPipChatInterval());
 
+  // 🌟 Bug Fix: 塑灵状态从 IndexedDB 读取（不再依赖 localStorage）
   const [unlockedBots, setUnlockedBots] = useState<BotType[]>(() => {
-    const saved = localStorage.getItem('mv_unlocked_bots');
-    return saved ? JSON.parse(saved) : ['tu'];
+    return StorageManager.getUnlockedBots() as BotType[];
   });
   
   const [currentBot, setCurrentBot] = useState<BotType>(() => {
-    const saved = localStorage.getItem('mv_current_bot') as BotType;
+    const saved = StorageManager.getCurrentBot() as BotType;
     return (saved && BOTS[saved]) ? saved : 'tu';
   });
 
@@ -395,12 +396,12 @@ function App() {
     }
   }, [currentTaskId, tasks]);
 
+  // 🌟 Bug Fix: timeboxElapsed 现在由 activeSeconds 派生，不再累加
   useEffect(() => {
     const interval = setInterval(() => {
       const secs = engineRef.current.getActiveSeconds();
       const state = engineRef.current.getState();
       setActiveSeconds(secs); setTimerState(state);
-      if (state === 'Running') setTimeboxElapsed(prev => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -446,7 +447,17 @@ function App() {
           canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
           
           canvas.toBlob(async (blob) => {
-            if (!blob) return resolve('');
+            // 🌟 Bug Fix: WebP 编码失败时 fallback 到 JPEG，避免静默失败
+            if (!blob) {
+              canvas.toBlob(async (jpegBlob) => {
+                if (!jpegBlob) return resolve('');
+                const filename = `${type}_${Date.now()}.jpg`;
+                const localPath = await StorageManager.saveFileToLocal(filename, jpegBlob);
+                if (localPath) resolve(localPath);
+                else resolve(canvas.toDataURL('image/jpeg', 0.7));
+              }, 'image/jpeg', 0.7);
+              return;
+            }
             const filename = `${type}_${Date.now()}.webp`;
             const localPath = await StorageManager.saveFileToLocal(filename, blob);
             if (localPath) resolve(localPath);
@@ -514,20 +525,23 @@ function App() {
       StorageManager.setCoinsBalance(coinsBalance - cost);
       const newUnlocked = [...unlockedBots, botId];
       setUnlockedBots(newUnlocked);
-      localStorage.setItem('mv_unlocked_bots', JSON.stringify(newUnlocked));
+      // 🌟 Bug Fix: 持久化到 IndexedDB
+      StorageManager.setUnlockedBots(newUnlocked);
       AudioManager.playAchievement(); refreshData();
       showToast(isZh ? `🎉 欢迎新塑灵：${BOTS[botId].name} 已接入你的终端。` : `🎉 Welcome new Animold: ${BOTS[botId].enName} has connected to your terminal.`);
     }
   };
 
   const handleEquipBot = (botId: BotType) => {
-    setCurrentBot(botId); localStorage.setItem('mv_current_bot', botId);
+    setCurrentBot(botId);
+    // 🌟 Bug Fix: 持久化到 IndexedDB
+    StorageManager.setCurrentBot(botId);
     AudioManager.playStageDone();
     showToast(isZh ? `✅ 已切换为 ${BOTS[botId].name}` : `✅ Switched to ${BOTS[botId].enName}`);
   };
 
   const handleSetTimeboxTarget = (min: number) => {
-    AudioManager.playClick(); setTimeboxTarget(min * 60); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false);
+    AudioManager.playClick(); setTimeboxTarget(min * 60); setHasPlayedTimeboxSound(false);
   };
 
   const handleStart = () => { 
@@ -637,7 +651,7 @@ function App() {
     
     DailyQuestManager.updateProgress('complete_part', 1);
 
-    setModels(result.models); refreshData(); processAchievements(); setTimeboxTarget(0); setTimeboxElapsed(0); setHasPlayedTimeboxSound(false); setIsFinishingPart(false); checkAndPromptCompleteModel(result.models);
+    setModels(result.models); refreshData(); processAchievements(); setTimeboxTarget(0); setHasPlayedTimeboxSound(false); setIsFinishingPart(false); checkAndPromptCompleteModel(result.models);
     triggerAutoBackup();
   };
 
@@ -957,6 +971,18 @@ function App() {
               <button id="tab-gundam" className={`tab ${activeTab === 'gundam' ? 'active' : ''}`} onClick={() => handleTabChange('gundam')}>🤖 {isZh ? '机体' : 'Mecha'}</button>
               <button id="tab-gallery" className={`tab ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => handleTabChange('gallery')}>👥 {isZh ? '塑灵' : 'Animold'}</button>
               <button id="tab-profile" className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => handleTabChange('profile')}>👤 {t('profile')}</button>
+            </div>
+          )}
+
+          {/* 🌟 体验优化：迷你计时条（非 Focus 页也能看到当前计时状态） */}
+          {timerState !== 'Idle' && activeTab !== 'focus' && !viewingModel && (
+            <div className="mini-timer-bar" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>
+              <span className={`mini-timer-dot ${timerState.toLowerCase()}`}>⏱</span>
+              <span className="mini-timer-text">{formatTime(activeSeconds)}</span>
+              <span className="mini-timer-state">
+                {timerState === 'Running' ? (isZh ? '专注中' : 'Running') : (isZh ? '已暂停' : 'Paused')}
+              </span>
+              <span className="mini-timer-arrow">→</span>
             </div>
           )}
 

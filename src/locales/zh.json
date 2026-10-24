@@ -3,8 +3,33 @@
   "journal": "日志",
   "hangar": "格纳库",
   "profile": "个人",
-  "xp": "经验",
-  "today": "今日",
+  "mecha": "机体",
+  "animold": "塑灵",
+  
+  "hangar_completed": "已完成格纳库",
+  "hangar_backlog": "堆积区 / 待拼",
+  "hangar_empty_backlog": "你的堆积区空空如也，赶紧去买模型吧！",
+  
+  "animold_archive": "塑灵图鉴",
+  "animold_unlock_req": "解锁条件",
+  "animold_equip": "设为出战塑灵",
+  "animold_active": "当前出战中",
+  "animold_contract": "缔结契约并解锁",
+  
+  "gundam_archive": "高达图鉴收集",
+  "gundam_all": "全部",
+  "gundam_collected": "已收集",
+  "gundam_uncollected": "未收集",
+  "gundam_all_series": "所有系列",
+  "gundam_completed": "已完成",
+  "gundam_in_progress": "进行中",
+  
+  "report_cyber": "赛博光晕",
+  "report_minimal": "极简白描",
+  "report_glitch": "故障错位",
+  "report_select_style": "选择战报样式",
+  "report_generate": "生成专属战报",
+  
   "start": "开始",
   "pause": "暂停",
   "resume": "继续",
@@ -98,6 +123,9 @@
   "levelTooLow": "等级不足，无法购买此称号",
   "achievements": "成就",
   "emptyAchievements": "暂无解锁的成就，继续加油吧！",
+
+  "checkin": "打卡",
+  "checkedIn": "已打卡",
 
   "part_head": "头部",
   "part_torso": "躯干",

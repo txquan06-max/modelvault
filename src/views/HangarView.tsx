@@ -102,7 +102,6 @@ export const HangarView = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 从 Store 取 setActiveTab（不再通过 props）
   const { models, setCurrentModelId, setActiveTab } = useAppStore();
   const { setViewingModelId, setExpandedTaskId } = props;
 
@@ -177,14 +176,14 @@ export const HangarView = (props: any) => {
             style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: activeSubTab === 'completed' ? '#3b82f6' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 'bold', transition: 'all 0.3s' }}
             onClick={() => { AudioManager.playClick(); setActiveSubTab('completed'); }}
           >
-            🏆 {isZh ? '已完成格纳库' : 'Completed'}
+            🏆 {t('hangar_completed')}
           </button>
           <button 
             className={`tab ${activeSubTab === 'backlog' ? 'active' : ''}`}
             style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: activeSubTab === 'backlog' ? '#f59e0b' : 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 'bold', transition: 'all 0.3s' }}
             onClick={() => { AudioManager.playClick(); setActiveSubTab('backlog'); }}
           >
-            📦 {isZh ? '堆积区 / 待拼' : 'Backlog'}
+            📦 {t('hangar_backlog')}
           </button>
         </div>
 
@@ -192,7 +191,7 @@ export const HangarView = (props: any) => {
           <div className="empty-state">
             {activeSubTab === 'completed' 
               ? t('emptyHangar') 
-              : (isZh ? '你的堆积区空空如也，赶紧去买模型吧！' : 'Your backlog is empty. Time to buy more kits!')}
+              : t('hangar_empty_backlog')}
           </div>
         ) : (
           <div ref={parentRef} style={{ flex: 1, overflowY: 'auto', position: 'relative', paddingRight: '4px' }}>

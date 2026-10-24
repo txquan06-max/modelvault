@@ -1,22 +1,27 @@
-// vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-// 如果你还用了 vite-plugin-singlefile，也可以保留
-// import { viteSingleFile } from 'vite-plugin-singlefile';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 
+// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    // viteSingleFile()
-  ],
-  // 🌟 核心修复：配置 server.watch.ignored
+  plugins: [react(), viteSingleFile()],
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: true, // 🌟 核心：如果 5173 被占用，直接报错，绝不偷换端口
     watch: {
-      // 明确忽略 src-tauri 目录，避免监视 Rust 编译产物
       ignored: ['**/src-tauri/**'],
     },
   },
-  // ... 其他配置（build, envPrefix 等）
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    cssCodeSplit: false,
+    assetsInlineLimit: 100000000,
+    chunkSizeWarningLimit: 100000000,
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
 });

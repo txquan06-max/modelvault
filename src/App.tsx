@@ -85,6 +85,7 @@ function App() {
   
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [isMiniMode, setIsMiniMode] = useState(false);
+  const [isWindowActive, setIsWindowActive] = useState(true);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
   const [viewingModelId, setViewingModelId] = useState<string | null>(null);
@@ -158,7 +159,6 @@ function App() {
     }
   };
 
-  // 🌟 修复：使用 useCallback 确保 onFinish 引用不变
   const handleFinishSplash = useCallback(() => {
     setShowSplash(false);
   }, []);
@@ -167,6 +167,19 @@ function App() {
     const handleUpdate = (e: any) => setUpdateInfo(e.detail);
     window.addEventListener('tauri-update-available', handleUpdate);
     return () => window.removeEventListener('tauri-update-available', handleUpdate);
+  }, []);
+
+  // 监听 Tauri 窗口焦点，最小化时停止聊天
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: any = null;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      win.onFocusChanged(({ payload: focused }) => {
+        setIsWindowActive(focused);
+      }).then(u => { unlisten = u; });
+    });
+    return () => { if (unlisten) unlisten(); };
   }, []);
 
   const toggleAlwaysOnTop = async () => {
@@ -253,7 +266,9 @@ function App() {
     GunplaSearch.init();
   }, []);
 
+  // 聊天逻辑拦截
   useEffect(() => {
+    if (showSplash) return;
     let chatTimer: any;
     const tick = () => {
       const newText = QuoteEngine.getRandom(i18n.language, currentStageId);
@@ -262,6 +277,8 @@ function App() {
     const updateTimer = () => {
       if (chatTimer) clearInterval(chatTimer);
       let interval = 0;
+      if (!isWindowActive) return; 
+      
       if (pipWindow || isMiniMode) interval = pipChatInterval;
       else if (document.visibilityState === 'visible') interval = webChatInterval;
       if (interval > 0) chatTimer = setInterval(tick, interval);
@@ -272,7 +289,7 @@ function App() {
       if (chatTimer) clearInterval(chatTimer);
       document.removeEventListener('visibilitychange', updateTimer);
     };
-  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, isMiniMode, currentStageId]);
+  }, [currentBot, i18n.language, webChatInterval, pipChatInterval, pipWindow, isMiniMode, currentStageId, showSplash, isWindowActive]);
 
   const triggerAutoBackup = async () => {
     if (!isAutoBackupEnabled) return;
@@ -697,7 +714,7 @@ function App() {
         else showToast(t('importError')); 
       } catch (err) { showToast(t('importError')); } 
     }; 
-    reader.readAsText(file); e.target.value = ''; 
+    reader.readAsText(file); e.target.value = '';
   };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -711,7 +728,6 @@ function App() {
   const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === equippedTitle);
 
   const handleToggleMiniMode = async () => {
-    AudioManager.playClick();
     if (isMiniMode) {
       setIsMiniMode(false);
       if (isTauri) {
@@ -733,7 +749,7 @@ function App() {
             await win.unmaximize();
             await new Promise(r => setTimeout(r, 200));
           }
-          await win.setSize(new LogicalSize(400, 560));
+          await win.setSize(new LogicalSize(400, 700)); // 400 * 1.75 = 700
           await win.setAlwaysOnTop(true);
         } catch (e) {}
       }
@@ -742,13 +758,12 @@ function App() {
   };
 
   const handleOpenWebPiP = async () => {
-    AudioManager.playClick();
     if (!('documentPictureInPicture' in window)) { 
       showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); 
       return; 
     }
     try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 400, height: 700 });
       Array.from(document.styleSheets).forEach((styleSheet) => {
         try { 
           const cssRules = Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join(''); 
@@ -810,7 +825,7 @@ function App() {
   if (isPipMode) {
     return (
       <div className="app-wrapper" style={{ background: 'transparent' }}>
-        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} onClose={() => setPipWindow(null)} />
+        <FocusPanel isPip={true} {...commonProps} bgImage={bgPip} onClose={() => { pipWindow?.close(); setPipWindow(null); }} />
       </div>
     );
   }

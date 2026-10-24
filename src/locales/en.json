@@ -3,8 +3,33 @@
   "journal": "Journal",
   "hangar": "Hangar",
   "profile": "Profile",
-  "xp": "XP",
-  "today": "Today",
+  "mecha": "Mecha",
+  "animold": "Animold",
+  
+  "hangar_completed": "Completed",
+  "hangar_backlog": "Backlog",
+  "hangar_empty_backlog": "Your backlog is empty. Time to buy more kits!",
+  
+  "animold_archive": "Animold Archive",
+  "animold_unlock_req": "Unlock Requirements",
+  "animold_equip": "Set as Active Animold",
+  "animold_active": "Currently Active",
+  "animold_contract": "Contract & Unlock",
+  
+  "gundam_archive": "Gundam Archive",
+  "gundam_all": "All",
+  "gundam_collected": "Collected",
+  "gundam_uncollected": "Uncollected",
+  "gundam_all_series": "All Series",
+  "gundam_completed": "Completed",
+  "gundam_in_progress": "In Progress",
+  
+  "report_cyber": "Cyber",
+  "report_minimal": "Minimal",
+  "report_glitch": "Glitch",
+  "report_select_style": "Select Report Style",
+  "report_generate": "Generate Build Report",
+  
   "start": "START",
   "pause": "PAUSE",
   "resume": "RESUME",
@@ -98,6 +123,9 @@
   "levelTooLow": "Level too low to purchase this title",
   "achievements": "Achievements",
   "emptyAchievements": "No achievements unlocked yet. Keep going!",
+
+  "checkin": "Check-in",
+  "checkedIn": "Checked in",
 
   "part_head": "Head",
   "part_torso": "Torso",

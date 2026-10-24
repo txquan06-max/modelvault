@@ -5,7 +5,7 @@ import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
 import { useAppStore } from '../store/useAppStore';
 
-const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+const isTauriEnv = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
 export const FocusPanel = ({
   isPip, handleStart, handlePause, handleResume, handleComplete,
@@ -54,7 +54,6 @@ export const FocusPanel = ({
   }, []);
 
   const togglePipLayout = () => {
-    AudioManager.playClick();
     const next = pipLayout === 'left' ? 'right' : 'left';
     setPipLayout(next);
     localStorage.setItem('mv_pip_layout', next);
@@ -63,7 +62,6 @@ export const FocusPanel = ({
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
   const handleAvatarClick = () => {
-    AudioManager.playClick();
     setAvatarBounce(true);
     setTimeout(() => setAvatarBounce(false), 300);
     const text = QuoteEngine.getRandom(i18n.language, currentStageId);
@@ -217,12 +215,22 @@ export const FocusPanel = ({
             <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
           </div>
         </div>
-        <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
+        <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
           {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
         </select>
-        <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%', marginBottom: '4px' }}>
+        <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%', marginBottom: '4px' }}>
           {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
         </select>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#10b981', fontWeight: 'bold' }}>⏳ {t('today')}: {formatTime(todayTotal)}</div>
+          {!isCheckedIn ? (
+            <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
+          ) : (
+            <span style={{ color: '#10b981', fontSize: 'clamp(8px, 2vw, 10px)', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
+          )}
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(36px, 12vh, 64px)', margin: 0, lineHeight: 1, textShadow: `0 0 20px ${botData.color}40`, textAlign: 'center' }}>
             {formatTime(activeSeconds)}
@@ -240,7 +248,7 @@ export const FocusPanel = ({
           )}
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '4px' }}>
             {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
-              <button key={type} onClick={() => { AudioManager.playClick(); setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '2px 4px', borderRadius: '10px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }}>
+              <button key={type} onClick={() => { setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '2px 4px', borderRadius: '10px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }}>
                 {type === 'none' ? '🔇' : type === 'rain' ? '🌧️' : type === 'wind' ? '🌬️' : '☕'}
               </button>
             ))}
@@ -293,16 +301,15 @@ export const FocusPanel = ({
     const immersiveContent = (
       <div style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
         <div style={{ position: 'absolute', width: '80vw', height: '80vw', maxWidth: '600px', maxHeight: '600px', borderRadius: '50%', background: `radial-gradient(circle, ${botData.color}15 0%, transparent 70%)`, animation: 'pulse 4s infinite alternate', pointerEvents: 'none' }} />
-        <button onClick={() => { AudioManager.playClick(); setIsImmersive(false); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '24px', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, touchAction: 'manipulation' }}>✕</button>
+        <button onClick={() => { setIsImmersive(false); }} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '24px', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 100000, touchAction: 'manipulation' }}>✕</button>
         
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '20px' }}>
           
-          {/* 沉浸模式增加快捷选择器，防止未选任务时无法开始 */}
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', zIndex: 10 }}>
-             <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle'} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
+             <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle'} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
                 {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)}</option>)}
              </select>
-             <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
+             <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
                 {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t(t_item.name)}</option>)}
              </select>
           </div>
@@ -369,16 +376,16 @@ export const FocusPanel = ({
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px', width: '100%' }}>
         <div className="add-controls" style={{ marginBottom: 0 }}>
-          <button id="btn-add-model" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
-          <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
+          <button id="btn-add-model" className="add-btn-large" onClick={() => { setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
+          <button id="btn-add-task" className="add-btn-large" onClick={() => { setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
         
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
-          {!isTauri && (
+          {!isTauriEnv && (
             <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '网页悬浮窗' : 'Web PiP'}</button>
           )}
           <button id="btn-mini-mode" onClick={handleToggleMiniMode} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
-          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {t('immersiveMode')}</button>
+          <button onClick={() => { setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {isZh ? '沉浸模式' : 'Immersive Mode'}</button>
         </div>
       </div>
 
@@ -392,7 +399,7 @@ export const FocusPanel = ({
                   const displayName = isZh ? item.name.zh : item.name.en;
                   const displaySeries = isZh ? item.series.zh : item.series.en;
                   return (
-                    <div key={idx} className="autocomplete-item" onClick={() => { AudioManager.playClick(); setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
+                    <div key={idx} className="autocomplete-item" onClick={() => { setNewModelNameInput(displayName); setNewModelSeriesInput(displaySeries); setNewModelGrade(item.grade); setSelectedGunpla(item); setSearchResults([]); }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span className="ac-grade">{item.grade}</span><strong style={{ color: '#fff' }}>{displayName}</strong></div>
                       <div className="ac-series">| {displaySeries}</div>
                     </div>
@@ -401,21 +408,21 @@ export const FocusPanel = ({
               </div>
             )}
           </div>
-          <select id="new-model-grade" value={newModelGrade} onChange={e => { AudioManager.playClick(); setNewModelGrade(e.target.value); }}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
+          <select id="new-model-grade" value={newModelGrade} onChange={e => { setNewModelGrade(e.target.value); }}>{['HG', 'RG', 'MG', 'MGEX', 'MGSD', 'FM', 'PG'].map(g => <option key={g} value={g}>{g}</option>)}</select>
           <input id="new-model-series" placeholder={t('series')} value={newModelSeriesInput} onChange={e => setNewModelSeriesInput(e.target.value)} disabled={!!selectedGunpla} onFocus={handleFocus} />
           <label className="checkbox-label">
-            <input type="checkbox" checked={useDefaultTasks} onChange={e => { AudioManager.playClick(); setUseDefaultTasks(e.target.checked); }} />
+            <input type="checkbox" checked={useDefaultTasks} onChange={e => { setUseDefaultTasks(e.target.checked); }} />
             {t('useDefaultTasks')}
           </label>
           {useDefaultTasks && (
             <label className="checkbox-label">
-              <input type="checkbox" checked={isWholeBuild} onChange={e => { AudioManager.playClick(); setIsWholeBuild(e.target.checked); }} />
+              <input type="checkbox" checked={isWholeBuild} onChange={e => { setIsWholeBuild(e.target.checked); }} />
               {t('whole_build')}
             </label>
           )}
           <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '8px' }}>
             <button className="btn start" style={{ flex: 1, padding: '8px' }} onClick={handleAddModel}>{t('save')}</button>
-            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
+            <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { setIsAddingModel(false); setSearchResults([]); }}>{t('cancel')}</button>
           </div>
         </div>
       )}
@@ -424,21 +431,21 @@ export const FocusPanel = ({
         <div className="inline-form" style={{ marginBottom: '16px' }}>
           <input id="new-task-name" autoFocus placeholder={t('taskName')} value={newTaskName} onChange={e => setNewTaskName(e.target.value)} onKeyDown={e => {
             if (e.key === 'Enter' && newTaskName.trim()) {
-              AudioManager.playClick(); handleAddTask(newTaskName.trim()); setNewTaskName(''); setIsAddingTask(false);
+              handleAddTask(newTaskName.trim()); setNewTaskName(''); setIsAddingTask(false);
             }
           }} onFocus={handleFocus} />
-          <button onClick={() => { AudioManager.playClick(); setIsAddingTask(false); }}>{t('cancel')}</button>
+          <button onClick={() => { setIsAddingTask(false); }}>{t('cancel')}</button>
         </div>
       )}
 
       <div className="selector-group" style={{ marginBottom: '16px' }}>
         <div className="selector-row">
-          <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
+          <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
             {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
           </select>
         </div>
         <div className="selector-row">
-          <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
+          <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
             {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
           </select>
         </div>
@@ -473,7 +480,7 @@ export const FocusPanel = ({
 
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '8px 0', flexWrap: 'wrap' }}>
         {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
-          <button key={type} onClick={() => { AudioManager.playClick(); setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '6px 12px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+          <button key={type} onClick={() => { setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '6px 12px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
             {type === 'none' ? t('ambient_none') : type === 'rain' ? t('ambient_rain') : type === 'wind' ? t('ambient_wind') : t('ambient_cafe')}
           </button>
         ))}
@@ -482,7 +489,7 @@ export const FocusPanel = ({
       {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
         <div className="stages-panel" style={{ justifyContent: 'center', margin: '10px 0', flexWrap: 'wrap' }}>
           {currentTask.stages.map((stage: any) => (
-            <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { AudioManager.playClick(); setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
+            <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
               {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
             </button>
           ))}

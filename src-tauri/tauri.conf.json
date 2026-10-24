@@ -15,11 +15,13 @@
         "title": "模途 / ModelJourney",
         "width": 1100,
         "height": 800,
-        "minWidth": 380,
-        "minHeight": 480,
+        "minWidth": 300,
+        "minHeight": 525,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "incognito": true,
+        "devtools": true
       }
     ],
     "security": {

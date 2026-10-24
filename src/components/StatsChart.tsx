@@ -26,6 +26,18 @@ export const StatsChart: React.FC<StatsChartProps> = ({ sessions, stageTime, i18
     return { label: `${d.getMonth() + 1}/${d.getDate()}`, value: totalSec };
   });
 
+  const hasData = days.some((d) => d.value > 0);
+
+  // 🌟 修复：空数据时展示友好的占位符
+  if (!hasData) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '140px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+        <div style={{ fontSize: '24px', opacity: 0.3, marginBottom: '8px' }}>📊</div>
+        <div style={{ fontSize: '12px', color: '#888' }}>{isZh ? '暂无专注记录，开始你的第一次拼胶吧！' : 'No focus records yet. Start your first build!'}</div>
+      </div>
+    );
+  }
+
   const maxSec = Math.max(...days.map((d) => d.value), 3600);
 
   const width = 400;

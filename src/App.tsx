@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { TimerEngine } from './core/TimerEngine';
@@ -157,6 +157,11 @@ function App() {
       new Notification(title, { body, icon: '/bots/tia_avatar.png' });
     }
   };
+
+  // 🌟 修复：使用 useCallback 确保 onFinish 引用不变
+  const handleFinishSplash = useCallback(() => {
+    setShowSplash(false);
+  }, []);
 
   useEffect(() => {
     const handleUpdate = (e: any) => setUpdateInfo(e.detail);
@@ -692,7 +697,7 @@ function App() {
         else showToast(t('importError')); 
       } catch (err) { showToast(t('importError')); } 
     }; 
-    reader.readAsText(file); e.target.value = '';
+    reader.readAsText(file); e.target.value = ''; 
   };
 
   const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
@@ -705,7 +710,6 @@ function App() {
   const viewingModelTotalSec = viewingModel ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t: any) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0) : 0;
   const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === equippedTitle);
 
-  // 🌟 修复：完全清理未定义变量，把旧版画中画彻底移除
   const handleToggleMiniMode = async () => {
     AudioManager.playClick();
     if (isMiniMode) {
@@ -747,7 +751,7 @@ function App() {
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 700, height: 400 });
       Array.from(document.styleSheets).forEach((styleSheet) => {
         try { 
-          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join(''); 
+          const cssRules = Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join(''); 
           const style = document.createElement('style'); 
           style.textContent = cssRules; 
           pipWin.document.head.appendChild(style); 
@@ -821,7 +825,7 @@ function App() {
 
   return (
     <>
-      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
       {showTutorial && !showSplash && (
         <TutorialTour 
           steps={tutorialSteps} 

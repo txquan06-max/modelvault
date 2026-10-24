@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [fadeOut, setFadeOut] = useState(false);
+  
+  // 🌟 修复：使用 useRef 保存回调，防止父组件重渲染导致倒计时无限重置
+  const onFinishRef = useRef(onFinish);
+  useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setFadeOut(true);
-      setTimeout(onFinish, 500); // 等待淡出动画结束
-    }, 2000); // 启动页显示 2 秒
+      setTimeout(() => onFinishRef.current(), 500); // 等待淡出动画结束
+    }, 1500); // 启动页显示 1.5 秒
+    
     return () => clearTimeout(timer);
-  }, [onFinish]);
+  }, []); // 🌟 依赖数组留空，确保只执行一次
 
   return (
     <div style={{

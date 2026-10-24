@@ -1,35 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
+import { useAppStore } from '../store/useAppStore';
+import { ModelManager } from '../core/ModelManager';
+import { SessionManager } from '../core/SessionManager';
+import { DailyQuestManager } from '../core/DailyQuestManager';
+import { TimerEngine } from '../core/TimerEngine';
 
 export const FocusPanel = ({
-  isPip, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-  models, tasks, currentTask, currentStage, timerState, activeSeconds, lastSession, todayTotal,
-  timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
+  isPip, handleStart, handlePause, handleResume, handleComplete,
   handleConfirmStageDone, handleCancelDone, handleFinishPart,
   isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-  currentModel, getModelName, t, i18n, bgImage, bgSize, bgPosition, showToast, handleSetTimeboxTarget,
-  username, level, levelProgress, isCheckedIn, checkinStreak, handleCheckin, handleFocus,
-  currentBot, chatMessages, setChatMessages, // 🌟 需要 setChatMessages 来插入特殊互动台词
-  ambientType, setAmbientType, handleOpenPiP,
-  equippedTitleDef,
+  lastSession, timeboxTarget, timeboxElapsed, bgImage,
+  showToast, handleSetTimeboxTarget, handleCheckin, handleFocus,
+  chatMessages, setChatMessages, ambientType, setAmbientType, handleOpenPiP,
   isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
-  newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild
+  newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
+  bgSize, bgPosition, reminderInterval, currentModel, currentTask, currentStage,
+  getModelName, equippedTitleDef
 }: any) => {
+
+  const { t, i18n } = useTranslation();
+  const isZh = i18n.language === 'zh';
+
+  // 🌟 Zustand 状态
+  const {
+    models, currentModelId, setCurrentModelId,
+    tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
+    timerState, activeSeconds, todayTotal, username, level, levelProgress,
+    isCheckedIn, checkinStreak, currentBot, setCurrentBot,
+    coinsBalance, models: allModels, storageEstimate
+  } = useAppStore();
 
   const [charIndex, setCharIndex] = useState(0);
   const [isImmersive, setIsImmersive] = useState(false);
   const typingRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const lastMsgIdRef = useRef<string | null>(null);
-
-  // 🌟 塑灵头像点击弹跳状态
   const [avatarBounce, setAvatarBounce] = useState(false);
-
-  // 🌟 挂机检测
   const hiddenAtRef = useRef<number | null>(null);
 
   const [pipLayout, setPipLayout] = useState<'left' | 'right'>(() => {
@@ -51,7 +63,6 @@ export const FocusPanel = ({
     localStorage.setItem('mv_pip_layout', next);
   };
 
-  const isZh = i18n.language === 'zh';
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
 
   const touchStartY = useRef<number>(0);
@@ -64,19 +75,15 @@ export const FocusPanel = ({
     }
   };
 
-  // 🌟 新增：塑灵头像点击互动
   const handleAvatarClick = () => {
     AudioManager.playClick();
     setAvatarBounce(true);
-    setTimeout(() => setAvatarBounce(false), 300); // 弹跳动画时长
-    
-    // 随机抓取一句专属台词插入聊天
+    setTimeout(() => setAvatarBounce(false), 300);
     const text = QuoteEngine.getRandom(i18n.language, currentStageId);
     const newMsg = { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() };
     setChatMessages((prev: any[]) => [...prev, newMsg].slice(-5));
   };
 
-  // 🌟 新增：防作弊挂机检测（配合 App.tsx 的监听）
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -84,7 +91,6 @@ export const FocusPanel = ({
       } else if (document.visibilityState === 'visible') {
         if (hiddenAtRef.current && timerState === 'Running') {
           const hiddenDuration = (Date.now() - hiddenAtRef.current) / 1000;
-          // 如果切走超过 15 秒，触发警告
           if (hiddenDuration > 15) {
             AudioManager.playDistraction();
             const alertText = isZh 
@@ -109,7 +115,6 @@ export const FocusPanel = ({
     setCharIndex(0);
     let currentIdx = 0;
     const textLength = lastMsg.text.length;
-
     if (typingRef.current) clearInterval(typingRef.current);
 
     typingRef.current = setInterval(() => {
@@ -121,7 +126,6 @@ export const FocusPanel = ({
         clearInterval(typingRef.current);
       }
     }, 100);
-
     return () => { if (typingRef.current) clearInterval(typingRef.current); };
   }, [chatMessages]);
 
@@ -136,21 +140,16 @@ export const FocusPanel = ({
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - timeboxElapsed) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && timeboxElapsed > 0;
 
-  // 🌟 体验优化：番茄钟结束时自动暂停（避免节流后计时继续跑）
   useEffect(() => {
     if (isTimeUp && timerState === 'Running') {
       handlePause();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTimeUp, timerState]);
 
-  // 🌟 体验优化：Esc 键退出沉浸模式
   useEffect(() => {
     if (!isImmersive) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsImmersive(false);
-      }
+      if (e.key === 'Escape') setIsImmersive(false);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -174,7 +173,7 @@ export const FocusPanel = ({
             setFinishPartPhoto(canvas.toDataURL('image/webp', 0.6));
           };
         };
-      } catch (err) { showToast(isZh ? '图片处理失败' : 'Image processing failed'); }
+      } catch (err) { showToast(t('imageProcessingFailed')); }
     }
     e.target.value = '';
   };
@@ -221,20 +220,17 @@ export const FocusPanel = ({
     </div>
   );
 
-  // ==============================
-  // 🌟 悬浮窗视图
-  // ==============================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#888', fontWeight: 'bold' }}>🕒 {localTime}</div>
-          <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={isZh ? '切换左右布局' : 'Switch Layout'}>⇄</button>
+          <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
         </div>
-        <select id="pip-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
+        <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%' }}>
           {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
         </select>
-        <select id="pip-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%', marginBottom: '4px' }}>
+        <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none', width: '100%', marginBottom: '4px' }}>
           {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
         </select>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
@@ -247,7 +243,7 @@ export const FocusPanel = ({
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
               {[0, 15, 30, 60].map(min => (
                 <button key={min} style={{ background: timeboxTarget === min * 60 ? 'rgba(59, 130, 246, 0.8)' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '2px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }} onClick={() => handleSetTimeboxTarget(min)}>
-                  {min === 0 ? (isZh ? '不限' : '∞') : `${min}m`}
+                  {min === 0 ? t('timeboxNone') : `${min}m`}
                 </button>
               ))}
             </div>
@@ -261,7 +257,7 @@ export const FocusPanel = ({
           </div>
           {isFinishingPart ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
-              <input id="pip-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '10px', padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} />
+              <input type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} style={{ fontSize: '10px', padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', outline: 'none' }} disabled={finishPartPhoto.startsWith('data:')} />
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button className="btn yes" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px' }} onClick={handleConfirmFinishPart}>{t('confirm')}</button>
                 <button className="btn no" style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px' }} onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
@@ -303,9 +299,6 @@ export const FocusPanel = ({
     );
   }
 
-  // ==============================
-  // 🌟 沉浸模式视图
-  // ==============================
   if (isImmersive) {
     const immersiveContent = (
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ position: 'fixed', inset: 0, background: '#09090b', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.3s ease-out' }}>
@@ -319,7 +312,7 @@ export const FocusPanel = ({
             {timerState === 'Running' && <button className="btn pause" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handlePause}>{t('pause')}</button>}
             {timerState === 'Paused' && (<><button className="btn resume" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleResume}>{t('resume')}</button><button className="btn complete" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleComplete}>{t('complete')}</button></>)}
           </div>
-          <div style={{ color: '#555', fontSize: '12px', marginTop: '40px' }}>↓ {isZh ? '向下滑动退出 / 按 Esc 退出' : 'Swipe down or press Esc to exit'} ↓</div>
+          <div style={{ color: '#555', fontSize: '12px', marginTop: '40px' }}>{t('hint_exit_immersive')}</div>
           <div style={{ marginTop: '20px', width: '100%', maxWidth: '500px', height: '200px' }}>{renderChatHistory(false)}</div>
         </div>
       </div>
@@ -327,14 +320,10 @@ export const FocusPanel = ({
     return createPortal(immersiveContent, document.body);
   }
 
-  // ==============================
-  // 🌟 普通网页视图 - 左侧
-  // ==============================
   const leftContent = (
     <>
       <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* 🌟 头像互动区 */}
           <div 
             onClick={handleAvatarClick}
             style={{ 
@@ -344,7 +333,7 @@ export const FocusPanel = ({
               transform: avatarBounce ? 'scale(1.2) translateY(-5px)' : 'scale(1) translateY(0)',
               transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
             }}
-            title={isZh ? '戳一下塑灵' : 'Poke Animold'}
+            title={t('title_poke_animold')}
           >
             <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
@@ -365,9 +354,9 @@ export const FocusPanel = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>⏳ {t('today')}: {formatTime(todayTotal)}</div>
         {!isCheckedIn ? (
-          <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>📅 {isZh ? '打卡' : 'Check-in'}</button>
+          <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
         ) : (
-          <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {isZh ? '已打卡' : 'Checked in'} ({checkinStreak}{isZh ? '天' : 'd'})</span>
+          <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
         )}
       </div>
 
@@ -375,9 +364,6 @@ export const FocusPanel = ({
     </>
   );
 
-  // ==============================
-  // 🌟 普通网页视图 - 右侧
-  // ==============================
   const rightContent = (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px', width: '100%' }}>
@@ -386,8 +372,8 @@ export const FocusPanel = ({
           <button id="btn-add-task" className="add-btn-large" onClick={() => { AudioManager.playClick(); setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
-          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '开启悬浮窗' : 'Open PiP'}</button>
-          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {isZh ? '沉浸模式' : 'Immersive'}</button>
+          <button id="btn-pip" onClick={() => { AudioManager.playClick(); handleOpenPiP(); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {t('openPip')}</button>
+          <button onClick={() => { AudioManager.playClick(); setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {t('immersiveMode')}</button>
         </div>
       </div>
 
@@ -442,12 +428,12 @@ export const FocusPanel = ({
 
       <div className="selector-group" style={{ marginBottom: '16px' }}>
         <div className="selector-row">
-          <select id="web-model-select" value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
+          <select value={currentModelId} onChange={(e) => { AudioManager.playClick(); setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
             {availableModels.map((m: any) => <option key={m.id} value={m.id}>{getModelName(m)} {m.isRebuilding ? '🔧' : ''}</option>)}
           </select>
         </div>
         <div className="selector-row">
-          <select id="web-task-select" value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
+          <select value={currentTaskId} onChange={(e) => { AudioManager.playClick(); setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
             {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
           </select>
         </div>
@@ -483,7 +469,7 @@ export const FocusPanel = ({
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '8px 0', flexWrap: 'wrap' }}>
         {(['none', 'rain', 'wind', 'cafe'] as const).map(type => (
           <button key={type} onClick={() => { AudioManager.playClick(); setAmbientType(type); }} style={{ background: ambientType === type ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.05)', color: ambientType === type ? '#c4b5fd' : '#888', border: `1px solid ${ambientType === type ? '#8b5cf6' : 'rgba(255,255,255,0.1)'}`, padding: '6px 12px', borderRadius: '20px', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-            {type === 'none' ? (isZh ? '🔇 静音' : '🔇 Mute') : type === 'rain' ? (isZh ? '🌧️ 雨声' : '🌧️ Rain') : type === 'wind' ? (isZh ? '🌬️ 风声' : '🌬️ Wind') : (isZh ? '☕ 白噪音' : '☕ Cafe')}
+            {type === 'none' ? t('ambient_none') : type === 'rain' ? t('ambient_rain') : type === 'wind' ? t('ambient_wind') : t('ambient_cafe')}
           </button>
         ))}
       </div>
@@ -502,7 +488,7 @@ export const FocusPanel = ({
         <div className="inline-confirm" style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}>
           <div className="confirm-text">🎉 {t('finishPart')}!</div>
           <div style={{ width: '100%', display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-            <input id="web-photo-url" type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '10px', borderRadius: '6px', outline: 'none', minWidth: '150px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
+            <input type="text" value={finishPartPhoto.startsWith('data:') ? t('localImageSelected') : finishPartPhoto} onChange={e => setFinishPartPhoto(e.target.value)} placeholder={t('addPhotoUrl')} className="photo-input" style={{ flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#fff', padding: '10px', borderRadius: '6px', outline: 'none', minWidth: '150px' }} disabled={finishPartPhoto.startsWith('data:')} onFocus={handleFocus} />
             <label className="btn no" style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: 0, borderRadius: '6px', flexShrink: 0 }}>📁<input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} /></label>
           </div>
           {finishPartPhoto.startsWith('data:') && <img src={finishPartPhoto} alt="preview" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '4px', marginTop: '12px' }} />}

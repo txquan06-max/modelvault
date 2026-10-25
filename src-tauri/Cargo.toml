@@ -18,5 +18,12 @@ tauri-build = { version = "2", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2", features = [] }
+
+# 7C：加 tray-icon feature 以启用系统托盘
+tauri = { version = "2", features = ["tray-icon"] }
+
+# 11：Rust FS 需要 dialog（选文件夹）+ 保留 JS 侧 fs/process 兼容
 tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-process = "2"

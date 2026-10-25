@@ -43,18 +43,28 @@ const DEFAULT_AUDIO = JSON.stringify({
 const memoryCache: Record<string, string> = {};
 let isInit = false;
 
-// 🌟 文件系统句柄
+// Web 端文件句柄
 let backupDirHandle: any = null;
 let assetsDirHandle: any = null;
-let assetsDirPath: string | null = null; // Tauri 原生路径
+
+// Tauri 端：是否已挂载素材文件夹（真实路径在 Rust state 里）
+let assetsMounted = false;
 
 const localUrlCache = new Map<string, { url: string, lastAccess: number }>();
 const MAX_URL_CACHE_SIZE = 50;
 
 let lastSnapshotAt = 0;
 
-// 🌟 判断是否为 Tauri 环境
+// Tauri 环境判断
 const isTauriEnv = () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
+/**
+ * Tauri 侧动态 import invoke（避免 Web 端加载 @tauri-apps/api 包报错）
+ */
+const tauriInvoke = async <T = any>(cmd: string, args?: Record<string, any>): Promise<T> => {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(cmd, args);
+};
 
 export const StorageManager = {
   async init() {
@@ -117,6 +127,19 @@ export const StorageManager = {
       console.error('❌ 数据迁移失败:', e);
     }
 
+    // 5. Tauri 侧恢复素材挂载状态（Rust state 在页面刷新后仍保留）
+    if (isTauriEnv()) {
+      try {
+        const saved = await tauriInvoke<string | null>('get_assets_dir');
+        if (saved) {
+          assetsMounted = true;
+          console.log('✅ 已恢复素材文件夹挂载:', saved);
+        }
+      } catch (e) {
+        console.warn('[Tauri] 恢复素材文件夹挂载失败:', e);
+      }
+    }
+
     isInit = true;
   },
 
@@ -164,19 +187,24 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
-  // 🌟 选择素材文件夹（适配 Tauri 与 Web）
+  // ============================================================
+  // 素材文件夹挂载（Tauri 走 Rust command，Web 走 showDirectoryPicker）
+  // ============================================================
   async selectAssetsFolder() {
     if (isTauriEnv()) {
       try {
+        // 1. 前端用 dialog 打开选文件夹对话（用户交互必须走 plugin-dialog）
         const { open } = await import('@tauri-apps/plugin-dialog');
         const selected = await open({ directory: true, multiple: false });
         if (selected && typeof selected === 'string') {
-          assetsDirPath = selected;
+          // 2. 把路径存到 Rust state
+          await tauriInvoke('set_assets_dir', { path: selected });
+          assetsMounted = true;
           return true;
         }
         return false;
       } catch (err) {
-        console.error('Tauri folder selection failed', err);
+        console.error('[Tauri] selectAssetsFolder failed:', err);
         return false;
       }
     }
@@ -189,22 +217,27 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
-  // 🌟 保存文件到本地（适配 Tauri 与 Web）
-  async saveFileToLocal(filename: string, blob: Blob) {
-    if (isTauriEnv() && assetsDirPath) {
+  // ============================================================
+  // 保存文件到本地（Tauri 走 Rust command，Web 走 FileSystemDirectoryHandle）
+  // ============================================================
+  async saveFileToLocal(filename: string, blob: Blob): Promise<string | null> {
+    // -------- Tauri --------
+    if (isTauriEnv()) {
+      if (!assetsMounted) return null;
       try {
-        const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const { join } = await import('@tauri-apps/api/path');
-        const filePath = await join(assetsDirPath, filename);
-        const buffer = await blob.arrayBuffer();
-        await writeFile(filePath, new Uint8Array(buffer));
-        return `local://${filename}`;
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        const localUri = await tauriInvoke<string>('save_local_file', {
+          filename,
+          bytes: Array.from(buf),
+        });
+        return localUri; // 'local://filename'
       } catch (err) {
-        console.error('Tauri write file failed', err);
+        console.error('[Tauri] save_local_file failed:', err);
         return null;
       }
     }
 
+    // -------- Web --------
     if (!assetsDirHandle) return null;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
@@ -218,8 +251,10 @@ export const StorageManager = {
     } catch (err) { return null; }
   },
 
-  // 🌟 加载本地文件（适配 Tauri 与 Web）
-  async loadLocalFileUrl(filename: string) {
+  // ============================================================
+  // 加载本地文件（Tauri 走 Rust command，Web 走 FileSystemDirectoryHandle）
+  // ============================================================
+  async loadLocalFileUrl(filename: string): Promise<string | null> {
     const cached = localUrlCache.get(filename);
     if (cached) {
       cached.lastAccess = Date.now();
@@ -229,24 +264,25 @@ export const StorageManager = {
     const cleanFilename = filename.replace('local://', '');
     let url: string | null = null;
 
-    if (isTauriEnv() && assetsDirPath) {
+    // -------- Tauri --------
+    if (isTauriEnv()) {
+      if (!assetsMounted) return null;
       try {
-        const { readFile } = await import('@tauri-apps/plugin-fs');
-        const { join } = await import('@tauri-apps/api/path');
-        const filePath = await join(assetsDirPath, cleanFilename);
-        const contents = await readFile(filePath);
-        const blob = new Blob([contents]);
+        const bytes = await tauriInvoke<number[]>('read_local_file', { filename: cleanFilename });
+        const blob = new Blob([new Uint8Array(bytes)]);
         url = URL.createObjectURL(blob);
       } catch (err) {
-        console.warn('Tauri read file failed', err);
+        console.warn('[Tauri] read_local_file failed:', err);
       }
-    } else if (assetsDirHandle) {
+    }
+    // -------- Web --------
+    else if (assetsDirHandle) {
       try {
         const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
         const file = await fileHandle.getFile();
         url = URL.createObjectURL(file);
       } catch (err) {
-        console.warn('Web read file failed', err);
+        console.warn('[Web] read file failed:', err);
       }
     }
 
@@ -269,6 +305,20 @@ export const StorageManager = {
       return url;
     }
     return null;
+  },
+
+  /**
+   * 断开素材文件夹挂载（Tauri 清 Rust state，Web 清 JS 句柄）
+   */
+  async clearAssetsFolder() {
+    assetsMounted = false;
+    assetsDirHandle = null;
+    localUrlCache.forEach(val => URL.revokeObjectURL(val.url));
+    localUrlCache.clear();
+
+    if (isTauriEnv()) {
+      try { await tauriInvoke('clear_assets_dir'); } catch (e) { console.warn(e); }
+    }
   },
 
   async _set(key: string, val: string) {
@@ -347,6 +397,13 @@ export const StorageManager = {
     Object.keys(memoryCache).forEach((key) => delete memoryCache[key]);
     localUrlCache.forEach(val => URL.revokeObjectURL(val.url));
     localUrlCache.clear();
+    assetsMounted = false;
+    assetsDirHandle = null;
+
+    if (isTauriEnv()) {
+      try { await tauriInvoke('clear_assets_dir'); } catch (e) {}
+    }
+
     isInit = false;
     lastSnapshotAt = 0;
   },
@@ -367,7 +424,9 @@ export const StorageManager = {
     StorageManager._set(DATA_KEY, JSON.stringify({ ...current, models }));
   },
 
-  // 🌟 所有 Getter / Setter 保持原样（略去重复的大量样板代码，直接使用）
+  // ============================================================
+  // Getter / Setter（保持原有 API 不变）
+  // ============================================================
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
   getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
   getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',

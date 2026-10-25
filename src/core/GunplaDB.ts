@@ -30,7 +30,8 @@ export class GunplaSearch {
           keys: ['name.en', 'name.jp', 'name.zh', 'series.en', 'series.zh', 'grade'],
           threshold: 0.3,
           ignoreLocation: true,
-          minMatchCharLength: 2,
+          // 🌟 修复：从 2 改为 1，支持单字搜索（如 "扎" / "高" / "独"）
+          minMatchCharLength: 1,
         });
       } catch (err) {
         console.error('Failed to load GunplaDB:', err);
@@ -41,7 +42,8 @@ export class GunplaSearch {
   }
 
   static async search(query: string): Promise<GunplaItem[]> {
-    if (!query || query.trim().length < 2) return [];
+    // 🌟 修复：从 < 2 改为 < 1，允许单字搜索
+    if (!query || query.trim().length < 1) return [];
     
     // 如果尚未加载，等待加载完成
     if (!this.fuse) {
@@ -68,5 +70,10 @@ export class GunplaSearch {
   static async getAll(): Promise<GunplaItem[]> {
     if (!this.fuse) await this.init();
     return this.data;
+  }
+
+  // 🌟 新增：暴露加载状态，便于 UI 展示"图鉴加载中"
+  static isReady(): boolean {
+    return !!this.fuse;
   }
 }

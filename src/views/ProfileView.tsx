@@ -26,6 +26,8 @@ export const ProfileView = (props: any) => {
     showToast, handleFocus, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
     legacyResults, setLegacyResults, legacyList, setLegacyList, removeLegacyItem,
     handleLegacyCoverUpload, handleLegacyImport, addToLegacyList,
+    // 🌟 新增：历史补录搜索状态与触发器
+    isLegacySearching, triggerLegacySearch,
     showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload, handleAudioUpload,
     earnedAchievements, buyTitle
@@ -220,9 +222,29 @@ export const ProfileView = (props: any) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="search-autocomplete">
-              <input autoFocus placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} value={legacyInput} onChange={e => setLegacyInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} onBlur={() => setTimeout(() => setLegacyResults([]), 200)} onFocus={handleFocus} />
-              {legacyResults.length > 0 && (
+              <input 
+                autoFocus 
+                placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} 
+                value={legacyInput} 
+                onChange={e => setLegacyInput(e.target.value)} 
+                onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} 
+                onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
+                // 🌟 修复：blur 清空后重新聚焦时重新触发搜索
+                onFocus={(e: any) => { handleFocus(e); triggerLegacySearch?.(); }} 
+              />
+              {/* 🌟 修复：状态机渲染（搜索中 / 无结果 / 结果列表），并放宽展示条件 */}
+              {legacyInput.trim().length >= 2 && (
                 <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
+                  {isLegacySearching && legacyResults.length === 0 && (
+                    <div className="autocomplete-item" style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', cursor: 'default' }}>
+                      🔄 {isZh ? '搜索中...' : 'Searching...'}
+                    </div>
+                  )}
+                  {!isLegacySearching && legacyResults.length === 0 && (
+                    <div className="autocomplete-item" style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', cursor: 'default' }}>
+                      ❌ {isZh ? '未找到匹配的机体，请换个关键字' : 'No matching kits. Try another keyword.'}
+                    </div>
+                  )}
                   {legacyResults.map((item: any, idx: number) => {
                     const displayName = isZh ? item.name.zh : item.name.en;
                     const displaySeries = isZh ? item.series.zh : item.series.en;

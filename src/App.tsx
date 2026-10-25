@@ -13,6 +13,8 @@ import { GunplaSearch } from './core/GunplaDB';
 import { DailyQuestManager } from './core/DailyQuestManager';
 import { useAppStore, type MainTab } from './store/useAppStore';
 import type { GunplaItem } from './core/GunplaDB';
+// 🌟 批次 10C：从 utils 导入格式化工具，删除本地重复定义
+import { formatTime, handleFocusScroll } from './utils/format';
 import './App.css';
 
 import { FocusView } from './views/FocusView';
@@ -68,7 +70,7 @@ function App() {
   const {
     models, setModels, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-    // 🌟 批次 10A：从 store 接管 4 个全局 UI 状态，删掉原 useState
+    // 批次 10A：viewingModelId / expandedTaskId 从 store 拿
     viewingModelId, setViewingModelId,
     expandedTaskId, setExpandedTaskId,
     username, setUsername, coinsBalance, setCoinsBalance,
@@ -91,9 +93,9 @@ function App() {
   const [isWindowActive, setIsWindowActive] = useState(true);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
-  // 🌟 批次 10A：viewingModelId / expandedTaskId 已迁入 store，本地 useState 删除
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // 批次 10C：journalFilterMonth 已迁入 JournalView 内部，此处删除
 
   const [lastSession, setLastSession] = useState<{ duration: number; stageId: string | null } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -138,7 +140,6 @@ function App() {
   const [isWholeBuild, setIsWholeBuild] = useState(false); 
   const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part'); 
 
-  const [journalFilterMonth, setJournalFilterMonth] = useState('');
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
   
@@ -551,10 +552,6 @@ function App() {
     AudioManager.playClick(); setTimeboxTarget(min * 60); setHasPlayedTimeboxSound(false);
   };
 
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { 
-    setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); 
-  };
-
   const handleCancelDone = () => { AudioManager.playClick(); setLastSession(null); };
 
   const handleStartRebuild = (taskId: string | null) => {
@@ -791,7 +788,8 @@ function App() {
     reader.readAsText(file); e.target.value = '';
   };
 
-  const formatTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0'); const s = (totalSec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
+  // 批次 10C：formatTime / formatLogDate / handleFocus 已从 utils/format 导入
+  // formatLogDate 本地无引用，不导入；handleFocus 在 commonProps 里指向 handleFocusScroll
   const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
 
   const currentModel = models.find((m: any) => m.id === currentModelId);
@@ -863,13 +861,18 @@ function App() {
     }
   };
 
-  // 🌟 批次 10A：commonProps 里 setViewingModelId / setExpandedTaskId 现在指向 store setter，
-  // 下轮（10B）清理 HangarView / JournalView 后再从 commonProps 移除
+  // 🌟 批次 10C：清理 commonProps 中 HangarView / JournalView 专属字段
+  // - 删：journalFilterMonth / setJournalFilterMonth / getHistoryLogs
+  //      （10B 已内聚到 JournalView 内部）
+  // - 删：formatLogDate（仅 JournalView 使用，现在内部从 utils 导入）
+  // - 删：setViewingModelId / setExpandedTaskId
+  //      （HangarView 现在从 store 直接读，无需 props 传递）
+  // - handleFocus 改用 utils 的 handleFocusScroll（FocusPanel / ProfileView 仍需要）
   const commonProps = {
     t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     timerState, activeSeconds, lastSession, timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
     handleConfirmStageDone, handleCancelDone, handleFinishPart, isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-    currentModel, currentTask, currentStage, getModelName, formatTime, formatLogDate, handleFocus, showToast, handleSetTimeboxTarget,
+    currentModel, currentTask, currentStage, getModelName, formatTime, handleFocus: handleFocusScroll, showToast, handleSetTimeboxTarget,
     isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
     newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
     isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
@@ -882,7 +885,7 @@ function App() {
     earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle, earnedAchievements: AchievementManager.getEarnedList(),
     storageUsage: StorageManager.getStorageUsage(), exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, legacyList, removeLegacyItem: (id: string) => setLegacyList(legacyList.filter(i => i.id !== id)), handleLegacyImport,
-    handleBgFileUpload, openPreview: () => {}, updateAudioSetting: (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); }, customAudios, handleAudioUpload, getHistoryLogs: () => SessionManager.getAllSessions().sort((a: any,b: any) => b.startedAt - a.startedAt).map((s: any) => ({...s, details: ModelManager.getTaskDetails(s.taskId)})), journalFilterMonth, setJournalFilterMonth,
+    handleBgFileUpload, openPreview: () => {}, updateAudioSetting: (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); }, customAudios, handleAudioUpload,
     level, levelProgress, todayTotal: useAppStore.getState().todayTotal, isCheckedIn, checkinStreak, handleCheckin,
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     chatMessages, setChatMessages, 
@@ -891,8 +894,6 @@ function App() {
     handleOpenWebPiP,
     handleToggleMiniMode,
     equippedTitleDef,
-    setViewingModelId,
-    setExpandedTaskId,
     isWholeBuild, setIsWholeBuild,
     rebuildMode, setRebuildMode,
     setModels, refreshData,
@@ -991,12 +992,13 @@ function App() {
 
           <div className="scroll-content">
             {viewingModel ? (
-              <ModelDetail {...({ viewingModel, viewingModelTotalSec, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm, handleConfirmRebuild, handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, handleSaveImportedStages, showToast } as any)} />
+              // 🌟 批次 10C：顺手修复 ModelDetail 缺失 formatTime 的隐性 Bug
+              <ModelDetail {...({ viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm, handleConfirmRebuild, handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, handleSaveImportedStages, showToast } as any)} />
             ) : (
               <>
                 {activeTab === 'focus' && <FocusView {...commonProps} />}
-                {activeTab === 'journal' && <JournalView {...commonProps} />}
-                {activeTab === 'hangar' && <HangarView {...({ t, i18n, models, getModelName, getModelSeries: (m: any) => isZh ? m.series.zh : m.series.en, setViewingModelId, setExpandedTaskId } as any)} />}
+                {activeTab === 'journal' && <JournalView />}
+                {activeTab === 'hangar' && <HangarView />}
                 {activeTab === 'gundam' && <GundamGalleryView {...({ i18n, models } as any)} />} 
                 {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
                 {activeTab === 'profile' && <ProfileView {...commonProps} />}

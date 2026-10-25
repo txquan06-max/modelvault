@@ -12,12 +12,15 @@ export interface TourStep {
 
 interface Props {
   steps: TourStep[];
+  /** 用户点击右上角 ✕ 或按 Esc 退出（不给奖励） */
   onClose: () => void;
+  /** 用户走完最后一步点击「完成教程」（给奖励） */
+  onComplete?: () => void;
   activeTab: string;
   setActiveTab: (tab: any) => void;
 }
 
-export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props) => {
+export const TutorialTour = ({ steps, onClose, onComplete, activeTab, setActiveTab }: Props) => {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -35,7 +38,7 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
   useEffect(() => {
     if (!step) return;
     setReady(false);
-    
+
     if (step.page && step.page !== activeTab) {
       setActiveTab(step.page);
       const timer = setTimeout(() => {
@@ -78,7 +81,7 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
     if (top + tooltipHeight > windowSize.height) {
       top = rect.top - tooltipHeight - padding;
     }
-    
+
     if (top < padding) {
       top = padding;
     }
@@ -93,6 +96,8 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
 
     return { top: `${top}px`, left: `${left}px` };
   };
+
+  const isLastStep = currentStep === steps.length - 1;
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
@@ -127,6 +132,7 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
           <span style={{ color: '#3b82f6', fontSize: '12px', fontWeight: 'bold' }}>
             {t('tour_step_indicator', { current: currentStep + 1, total: steps.length })}
           </span>
+          {/* 右上角 ✕：随时退出，不给奖励 */}
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', fontSize: '14px' }}>✕</button>
         </div>
         <h3 style={{ margin: 0, color: '#fff', fontSize: '18px' }}>{step.title}</h3>
@@ -139,11 +145,16 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
             onClick={() => { AudioManager.playClick(); setCurrentStep(s => s - 1); }}
             style={{ padding: '6px 16px', borderRadius: '6px', background: 'transparent', border: '1px solid #555', color: currentStep === 0 ? '#444' : '#fff', cursor: currentStep === 0 ? 'not-allowed' : 'pointer' }}
           >{t('tour_prev')}</button>
-          
-          {currentStep === steps.length - 1 ? (
+
+          {isLastStep ? (
             <button
-              onClick={() => { AudioManager.playAchievement(); onClose(); }}
-              style={{ padding: '6px 16px', borderRadius: '6px', background: '#10b981', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+              onClick={() => {
+                AudioManager.playAchievement();
+                // 走完教程 → 触发奖励
+                if (onComplete) onComplete();
+                else onClose();
+              }}
+              style={{ padding: '6px 16px', borderRadius: '6px', background: 'linear-gradient(135deg, #10b981, #3b82f6)', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)' }}
             >{t('tour_finish')}</button>
           ) : (
             <button

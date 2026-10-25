@@ -302,8 +302,10 @@
   "toast_audio_too_large": "Audio file too large (max 2MB)",
   "audioTyping": "Typing Sound",
   "default": "Default",
+
   "search_empty_custom": "No matching kits found. You can enter a custom name.",
   "gundam_loading": "Loading Mecha Archive...",
+
   "cover_preview_hint": "This is how it looks in the Hangar (4:3).",
   "rebuild_check_stages": "Check completed stages:",
   "rebuild_confirm_start": "Confirm & Start Rebuild",
@@ -313,6 +315,7 @@
   "rebuild_stay_here": "Stay here",
   "add_note_hint": "+ Add build note...",
   "start_focus": "Start Focus",
+
   "share_default_title": "New Builder",
   "share_report_label": "Report",
   "tut_welcome_title": "Welcome to ModelJourney",
@@ -344,6 +347,7 @@
   "update_default_body": "Includes routine updates and bug fixes.",
   "update_now": "Update Now",
   "update_later": "Later",
+
   "tour_step_indicator": "STEP {{current}} / {{total}}",
   "tour_prev": "Previous",
   "tour_next": "Next",
@@ -368,8 +372,10 @@
   "bg_pos_bottom": "Bottom",
   "bg_pos_left": "Left",
   "bg_pos_right": "Right",
+
   "splash_waking": "Waking up Animold terminal...",
   "achievement_unlocked_label": "Achievement Unlocked",
+
   "error_crash_title": "⚠️ Oops! Page Crashed",
   "error_crash_desc": "An unexpected error occurred. Try exporting your data first (if readable), then reset the app.",
   "error_export_failed": "Export failed. Data may be corrupted.",
@@ -385,5 +391,12 @@
   "confirmLeaveFocus": "Focus timer is running. Leaving will interrupt your focus. Are you sure?",
   "toast_cover_updated": "✅ Cover updated",
   "toast_bg_updated": "✅ Background updated",
-  "toast_audio_updated": "✅ Sound updated"
+  "toast_audio_updated": "✅ Sound updated",
+
+  "today": "Today",
+  "toast_tutorial_reward": "🎉 Tutorial complete! Earned {{coins}} 🪙 and {{xp}} XP",
+  "tut_mini_title": "Focus Mini Mode",
+  "tut_mini_content": "Click here to shrink the window to a 525×300 horizontal bar and pin on top — build while watching videos! Close to restore.",
+  "tut_checkin_title": "Daily Check-in",
+  "tut_checkin_content": "Click here to check in. Streaks grant bonus coins & XP, and unlock exclusive titles!"
 }

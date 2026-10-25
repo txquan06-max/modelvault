@@ -27,41 +27,29 @@ const sendNativeNotification = (title: string, body: string) => {
 };
 
 /**
- * FocusPanel 零 props 化（批次 10E）
- * - 只保留 isPip / onClose 两个 props
- * - 所有共享状态从 useAppStore 读
- * - 所有局态（加模型表单 / 加部位 / 照片 / 打字机 / immersive / pipLayout / 搜索）内聚
+ * FocusPanel 零 props 化 + 平台差异化 + 挂机声音修复
  */
 export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
   const {
-    // 模型
     models, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-    // Timer
     timerState, activeSeconds, lastSession,
-    timeboxTarget, hasPlayedTimeboxSound, setHasPlayedTimeboxSound,
+    timeboxTarget, setHasPlayedTimeboxSound,
     startTimer, pauseTimer, resumeTimer, completeTimer,
     confirmStageDone, cancelDone, finishPart, confirmFinishPart,
     setTimeboxTarget,
-    // Chat
     chatMessages, setChatMessages,
-    // Ambient
     ambientType, setAmbientType,
-    // 用户
     username, level, levelProgress, todayTotal, checkinStreak, isCheckedIn,
     refreshData,
-    // Bot
     currentBot,
-    // 背景
     bgPip, bgSize, bgPosition,
-    // Toast
     showToast,
   } = useAppStore();
 
-  // ===== 局态（内聚） =====
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
 
@@ -170,7 +158,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     return () => window.removeEventListener('keydown', handler);
   }, [isImmersive]);
 
-  // 搜索防抖
   useEffect(() => {
     const query = newModelNameInput.trim();
     if (query.length < 1 || selectedGunpla) {
@@ -325,23 +312,11 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
       pipWin.document.body.style.backgroundColor = '#1e1e1e';
       pipWin.document.body.style.margin = '0';
       pipWin.document.body.style.overflow = 'hidden';
-      // 用 URL 参数方式重新挂载 PiP（App.tsx 侧打开窗口后，focus 组件会走 ?pip=true 逻辑）
       pipWin.location.href = `${window.location.origin}${window.location.pathname}?pip=true`;
     } catch (err) {
       console.error(err);
       showToast(t('toast_pip_open_fail'));
     }
-  };
-
-  const handleToggleMiniMode = async () => {
-    if (!isTauriEnv) return;
-    try {
-      const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
-      const win = getCurrentWindow();
-      // 通过 window.location.hash 通知 App.tsx 切换（保持简单：直接调用 store）
-      // 这里保留一个小的对外回调，通过 window.dispatchEvent 触发
-      window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'));
-    } catch (e) { console.error(e); }
   };
 
   const renderChatHistory = (isPipView: boolean) => (
@@ -383,7 +358,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     </div>
   );
 
-  // ==================== PiP 模式 ====================
+  // ==================== PiP 模式（含 Tauri 525×300 横窗口） ====================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -406,7 +381,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#10b981', fontWeight: 'bold' }}>⏳ {t('today')}: {formatTime(todayTotal)}</div>
           {!isCheckedIn ? (
-            <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
+            <button id="tour-checkin" className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
           ) : (
             <span style={{ color: '#10b981', fontSize: 'clamp(8px, 2vw, 10px)', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
           )}
@@ -544,7 +519,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 'bold', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>⏳ {t('today')}: {formatTime(todayTotal)}</div>
         {!isCheckedIn ? (
-          <button className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
+          <button id="tour-checkin" className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
         ) : (
           <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
         )}
@@ -563,10 +538,13 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
+          {/* 🔧 修复：极简模式按钮仅 Tauri 显示（Web 端只有网页悬浮窗） */}
+          {isTauriEnv && (
+            <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
+          )}
           {!isTauriEnv && (
             <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '网页悬浮窗' : 'Web PiP'}</button>
           )}
-          <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
           <button onClick={() => { setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {isZh ? '沉浸模式' : 'Immersive Mode'}</button>
         </div>
       </div>

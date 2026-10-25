@@ -31,19 +31,69 @@ export class AudioManager {
   private static ctx: AudioContext | null = null;
   private static lastClickTime = 0; 
 
+  // 挂机声音叠加修复：幂等锁
+  private static resumeInFlight = false;
+  private static unlockCalled = false;
+
   private static ambientSource: AudioBufferSourceNode | null = null;
   private static ambientGain: GainNode | null = null;
   private static currentAmbient: AmbientType = 'none';
 
+  /**
+   * 🔧 辅助方法：判断 AudioContext 是否 running
+   * 用 `as string` 绕过 TS 的类型收窄（闭包内 ctx.state 可能已经变化，
+   * 但 TS 会沿用外层 if 的收窄结果，导致 2367 报错）
+   */
+  private static isCtxRunning(ctx: AudioContext): boolean {
+    return (ctx.state as string) === 'running';
+  }
+
   static async unlock() {
-    // 🌟 修复：用 as any 绕过旧版 uisfx 的类型缺失
-    try { await (ui as any).unlock(); } catch (e) { console.warn('Audio unlock failed', e); }
+    // 只调一次，避免 uisfx 内部重复创建 AudioContext
+    if (this.unlockCalled) return;
+    try {
+      await (ui as any).unlock();
+      this.unlockCalled = true;
+    } catch (e) {
+      console.warn('Audio unlock failed', e);
+    }
   }
 
   private static getCtx(): AudioContext {
-    if (!this.ctx) this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
     return this.ctx;
+  }
+
+  /**
+   * 🔧 确保 AudioContext 进入 running 状态（幂等，避免并发 resume）
+   * 挂机后浏览器会 suspend AudioContext，此时创建 osc 会排队，
+   * resume 完成后一起播放 → 2 声叠加。这里用单例 promise 串行化。
+   */
+  private static async ensureRunning(ctx: AudioContext): Promise<boolean> {
+    if (this.isCtxRunning(ctx)) return true;
+    if (this.resumeInFlight) {
+      // 等正在进行的 resume 完成（用辅助方法避开类型收窄）
+      return new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+          if (this.isCtxRunning(ctx)) resolve(true);
+          else if (!this.resumeInFlight || Date.now() - start > 1500) resolve(this.isCtxRunning(ctx));
+          else setTimeout(check, 30);
+        };
+        check();
+      });
+    }
+    this.resumeInFlight = true;
+    try {
+      await ctx.resume();
+      return this.isCtxRunning(ctx);
+    } catch {
+      return false;
+    } finally {
+      this.resumeInFlight = false;
+    }
   }
 
   private static syncPack(style: string) {
@@ -66,37 +116,55 @@ export class AudioManager {
     return false;
   }
 
+  /**
+   * 🔧 修复挂机后叠加：ctx 不是 running 时，先 resume 再播（只播一次），
+   *    避免多次点击导致 osc 排队 → resume 后一起播放
+   */
   private static playCrispClick() {
     try {
       const ctx = this.getCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.05);
+      const doPlay = () => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1400, ctx.currentTime);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.05);
+        } catch (e) {}
+      };
+
+      if (this.isCtxRunning(ctx)) {
+        doPlay();
+      } else {
+        // 挂机后首次点击：等 resume 完成后播放一次（不叠加）
+        this.ensureRunning(ctx).then((ok) => { if (ok) doPlay(); });
+      }
     } catch (e) {}
   }
 
   private static playDistractionSound() {
     try {
       const ctx = this.getCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(350, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.3);
-      
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-      
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.45);
+      const doPlay = () => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(350, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.45);
+        } catch (e) {}
+      };
+      if (this.isCtxRunning(ctx)) doPlay();
+      else this.ensureRunning(ctx).then((ok) => { if (ok) doPlay(); });
     } catch (e) {}
   }
 
@@ -155,6 +223,10 @@ export class AudioManager {
 
   static previewSound(type: SoundType) { this.play(type); }
 
+  /**
+   * 🔧 打字机音效：挂机时不排队（避免 resume 后瞬间播一堆）
+   *    只用 ensureRunning 触发 ctx.resume，但不创建 osc
+   */
   static playTypeTick() {
     const settings = StorageManager.getAudioSettings();
     const style = settings['typing'] || 'default';
@@ -163,6 +235,13 @@ export class AudioManager {
 
     try {
       const ctx = this.getCtx();
+
+      // 挂机时打字机不排队，只唤醒 ctx
+      if (!this.isCtxRunning(ctx)) {
+        this.ensureRunning(ctx);
+        return;
+      }
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);

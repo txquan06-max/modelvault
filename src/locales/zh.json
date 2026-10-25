@@ -301,9 +301,11 @@
   "legacy_add_cover": "📷 添加封面图 (可选)",
   "toast_audio_too_large": "音频文件太大（最大2MB）",
   "audioTyping": "打字机音效",
-    "default": "默认",
+  "default": "默认",
+
   "search_empty_custom": "未找到匹配的机体，可手动输入名称",
   "gundam_loading": "正在加载机体图鉴...",
+
   "cover_preview_hint": "这是该图片在格纳库卡片中的真实显示效果 (4:3)。",
   "rebuild_check_stages": "勾选你当时已经完成的流程：",
   "rebuild_confirm_start": "确认并开始改造",
@@ -313,6 +315,7 @@
   "rebuild_stay_here": "留在详情页",
   "add_note_hint": "+ 添加制作心得...",
   "start_focus": "开始专注",
+
   "share_default_title": "新晋胶佬",
   "share_report_label": "战报",
   "tut_welcome_title": "欢迎来到模途",
@@ -344,6 +347,7 @@
   "update_default_body": "包含常规更新与 Bug 修复。",
   "update_now": "立即更新",
   "update_later": "稍后提醒",
+
   "tour_step_indicator": "步骤 {{current}} / {{total}}",
   "tour_prev": "上一步",
   "tour_next": "下一步",
@@ -367,9 +371,11 @@
   "bg_pos_top": "顶部对齐 (Top)",
   "bg_pos_bottom": "底部对齐 (Bottom)",
   "bg_pos_left": "左对齐 (Left)",
-   "bg_pos_right": "右对齐 (Right)",
+  "bg_pos_right": "右对齐 (Right)",
+
   "splash_waking": "正在唤醒塑灵终端...",
   "achievement_unlocked_label": "成就解锁",
+
   "error_crash_title": "⚠️ Oops! 页面崩溃了",
   "error_crash_desc": "发生了意外错误。你可以先尝试导出当前数据（如果还能读取），然后重置应用。",
   "error_export_failed": "导出失败，可能数据已损坏。",
@@ -385,5 +391,12 @@
   "confirmLeaveFocus": "当前正在专注计时中，离开将中断专注，确定要离开吗？",
   "toast_cover_updated": "✅ 封面已更新",
   "toast_bg_updated": "✅ 背景已更新",
-  "toast_audio_updated": "✅ 音效已更新"
+  "toast_audio_updated": "✅ 音效已更新",
+
+  "today": "今日",
+  "toast_tutorial_reward": "🎉 教程完成！获得 {{coins}} 🪙 和 {{xp}} XP",
+  "tut_mini_title": "专注极简模式",
+  "tut_mini_content": "点击这里把窗口缩成 525×300 的横条并置顶，边看视频边拼胶！点击关闭即可恢复。",
+  "tut_checkin_title": "每日打卡",
+  "tut_checkin_content": "点击这里【打卡】，连续打卡会有额外金币和 XP 加成，还能解锁专属称号！"
 }

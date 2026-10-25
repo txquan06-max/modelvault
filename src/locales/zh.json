@@ -289,5 +289,17 @@
   "mount_gallery": "📁 挂载本地图库 (扩容)",
   "mounted": "已挂载本地图库",
   "view_snapshots": "查看历史快照（防误删）",
-  "hide_snapshots": "收起历史快照"
+  "hide_snapshots": "收起历史快照",
+
+  "daily_quests": "每日委托",
+  "quest_all_done": "今日大满贯",
+  "quest_claim": "领取",
+  "search_loading": "搜索中...",
+  "search_empty": "未找到匹配的机体，请换个关键字",
+  "legacy_search_placeholder": "搜索并回车添加...",
+  "legacy_cover_added": "✅ 已添加封面",
+  "legacy_add_cover": "📷 添加封面图 (可选)",
+  "toast_audio_too_large": "音频文件太大（最大2MB）",
+  "audioTyping": "打字机音效",
+  "default": "默认"
 }

@@ -26,7 +26,7 @@ export const ProfileView = (props: any) => {
     showToast, handleFocus, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
     legacyResults, setLegacyResults, legacyList, setLegacyList, removeLegacyItem,
     handleLegacyCoverUpload, handleLegacyImport, addToLegacyList,
-    // 🌟 新增：历史补录搜索状态与触发器
+    // 历史补录搜索状态与触发器
     isLegacySearching, triggerLegacySearch,
     showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
     showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload, handleAudioUpload,
@@ -74,7 +74,7 @@ export const ProfileView = (props: any) => {
   const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { showToast(isZh ? '音频文件太大（最大2MB）' : 'Audio file too large (max 2MB)'); return; }
+    if (file.size > 2 * 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
     
     setIsUploadingWakeup(true);
     const reader = new FileReader();
@@ -129,8 +129,8 @@ export const ProfileView = (props: any) => {
 
       <div className="custom-section" style={{ background: 'linear-gradient(145deg, rgba(59,130,246,0.1), rgba(0,0,0,0.2))', border: '1px solid rgba(59,130,246,0.3)' }}>
         <h4 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>📋 {isZh ? '每日委托' : 'Daily Quests'}</span>
-          {allCompleted && <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.2)', padding: '2px 6px', borderRadius: '4px' }}>✨ {isZh ? '今日大满贯' : 'All Done'}</span>}
+          <span>📋 {t('daily_quests')}</span>
+          {allCompleted && <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16,185,129,0.2)', padding: '2px 6px', borderRadius: '4px' }}>✨ {t('quest_all_done')}</span>}
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {quests.map(quest => (
@@ -152,7 +152,7 @@ export const ProfileView = (props: any) => {
                 
                 {quest.completed && !quest.claimed ? (
                   <button className="mini-btn" onClick={() => handleClaim(quest.id)} style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', animation: 'pulse 2s infinite' }}>
-                    {isZh ? '领取' : 'Claim'}
+                    {t('quest_claim')}
                   </button>
                 ) : quest.claimed ? (
                   <span style={{ fontSize: '12px', color: '#10b981', minWidth: '40px', textAlign: 'center' }}>✓</span>
@@ -224,25 +224,25 @@ export const ProfileView = (props: any) => {
             <div className="search-autocomplete">
               <input 
                 autoFocus 
-                placeholder={isZh ? '搜索并回车添加...' : 'Search and press Enter...'} 
+                placeholder={t('legacy_search_placeholder')} 
                 value={legacyInput} 
                 onChange={e => setLegacyInput(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} 
                 onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
-                // 🌟 修复：blur 清空后重新聚焦时重新触发搜索
+                // blur 清空后重新聚焦时重新触发搜索
                 onFocus={(e: any) => { handleFocus(e); triggerLegacySearch?.(); }} 
               />
-              {/* 🌟 修复：状态机渲染（搜索中 / 无结果 / 结果列表），并放宽展示条件 */}
-              {legacyInput.trim().length >= 2 && (
+              {/* 批次 4：放宽展示条件 >= 2 → >= 1，启用单字搜索 */}
+              {legacyInput.trim().length >= 1 && (
                 <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
                   {isLegacySearching && legacyResults.length === 0 && (
                     <div className="autocomplete-item" style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', cursor: 'default' }}>
-                      🔄 {isZh ? '搜索中...' : 'Searching...'}
+                      🔄 {t('search_loading')}
                     </div>
                   )}
                   {!isLegacySearching && legacyResults.length === 0 && (
                     <div className="autocomplete-item" style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', cursor: 'default' }}>
-                      ❌ {isZh ? '未找到匹配的机体，请换个关键字' : 'No matching kits. Try another keyword.'}
+                      ❌ {t('search_empty')}
                     </div>
                   )}
                   {legacyResults.map((item: any, idx: number) => {
@@ -271,7 +271,7 @@ export const ProfileView = (props: any) => {
                       </div>
                       <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label className="mini-btn" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0, minWidth: '120px' }}>
-                          {item.coverImage ? (isZh ? '✅ 已添加封面' : '✅ Cover Added') : (isZh ? '📷 添加封面图 (可选)' : '📷 Add Cover (Optional)')}
+                          {item.coverImage ? t('legacy_cover_added') : t('legacy_add_cover')}
                           <input type="file" accept="image/*" onChange={(e) => handleLegacyCoverUpload(e, idx)} style={{ display: 'none' }} />
                         </label>
                         {item.coverImage && <img src={item.coverImage} alt="cover" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />}
@@ -307,7 +307,7 @@ export const ProfileView = (props: any) => {
           <span>{t('web_ai_freq')}:</span>
           <select value={webChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setWebChatInterval(val); }}>
             <option value={5000}>5s</option>
-            <option value={8000}>8s ({isZh ? '默认' : 'Default'})</option>
+            <option value={8000}>8s ({t('default')})</option>
             <option value={15000}>15s</option>
             <option value={30000}>30s</option>
             <option value={60000}>60s</option>
@@ -318,7 +318,7 @@ export const ProfileView = (props: any) => {
           <span>{t('pip_ai_freq')}:</span>
           <select value={pipChatInterval} onChange={(e) => { AudioManager.playClick(); const val = Number(e.target.value); setPipChatInterval(val); }}>
             <option value={30000}>30s</option>
-            <option value={60000}>60s ({isZh ? '默认' : 'Default'})</option>
+            <option value={60000}>60s ({t('default')})</option>
             <option value={120000}>120s</option>
             <option value={300000}>300s</option>
           </select>

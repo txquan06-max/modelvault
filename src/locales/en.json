@@ -289,5 +289,17 @@
   "mount_gallery": "📁 Mount Local Gallery",
   "mounted": "Mounted",
   "view_snapshots": "View Snapshots",
-  "hide_snapshots": "Hide Snapshots"
+  "hide_snapshots": "Hide Snapshots",
+
+  "daily_quests": "Daily Quests",
+  "quest_all_done": "All Done",
+  "quest_claim": "Claim",
+  "search_loading": "Searching...",
+  "search_empty": "No matching kits. Try another keyword.",
+  "legacy_search_placeholder": "Search and press Enter...",
+  "legacy_cover_added": "✅ Cover Added",
+  "legacy_add_cover": "📷 Add Cover (Optional)",
+  "toast_audio_too_large": "Audio file too large (max 2MB)",
+  "audioTyping": "Typing Sound",
+  "default": "Default"
 }

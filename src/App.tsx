@@ -68,6 +68,9 @@ function App() {
   const {
     models, setModels, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
+    // 🌟 批次 10A：从 store 接管 4 个全局 UI 状态，删掉原 useState
+    viewingModelId, setViewingModelId,
+    expandedTaskId, setExpandedTaskId,
     username, setUsername, coinsBalance, setCoinsBalance,
     earnedTitles, equippedTitle, setEquippedTitle,
     bgMain, bgPip, bgSize, bgPosition, setBgMain, setBgPip, setBgSize, setBgPosition,
@@ -88,10 +91,9 @@ function App() {
   const [isWindowActive, setIsWindowActive] = useState(true);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
-  const [viewingModelId, setViewingModelId] = useState<string | null>(null);
+  // 🌟 批次 10A：viewingModelId / expandedTaskId 已迁入 store，本地 useState 删除
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const [lastSession, setLastSession] = useState<{ duration: number; stageId: string | null } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -861,6 +863,8 @@ function App() {
     }
   };
 
+  // 🌟 批次 10A：commonProps 里 setViewingModelId / setExpandedTaskId 现在指向 store setter，
+  // 下轮（10B）清理 HangarView / JournalView 后再从 commonProps 移除
   const commonProps = {
     t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     timerState, activeSeconds, lastSession, timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,

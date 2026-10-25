@@ -16,6 +16,12 @@ interface AppState {
   currentTaskId: string;
   currentStageId: string | null;
 
+  // 🌟 批次 10A：全局 UI 状态迁移（原先在 App.tsx 里 useState）
+  // viewingModelId：控制 ModelDetail 详情页是否打开（null = 关闭）
+  // expandedTaskId：控制 ModelDetail 内某个 task 是否展开（null = 全部收起）
+  viewingModelId: string | null;
+  expandedTaskId: string | null;
+
   username: string;
   level: number;
   levelProgress: { current: number; next: number; percent: number };
@@ -51,6 +57,9 @@ interface AppState {
   setCurrentModelId: (id: string) => void;
   setCurrentTaskId: (id: string) => void;
   setCurrentStageId: (id: string | null) => void;
+  // 🌟 批次 10A：详情页全局状态 setter
+  setViewingModelId: (id: string | null) => void;
+  setExpandedTaskId: (id: string | null) => void;
   setUsername: (name: string) => void;
   setBgMain: (url: string) => void;
   setBgPip: (url: string) => void;
@@ -78,6 +87,10 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   tasks: [],
   currentTaskId: '',
   currentStageId: null,
+
+  // 🌟 批次 10A：全局 UI 状态初值
+  viewingModelId: null,
+  expandedTaskId: null,
 
   username: StorageManager.getUsername(),
   level: 1,
@@ -176,6 +189,9 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   setCurrentModelId: (id: string) => set({ currentModelId: id }),
   setCurrentTaskId: (id: string) => set({ currentTaskId: id }),
   setCurrentStageId: (id: string | null) => set({ currentStageId: id }),
+  // 🌟 批次 10A：全局 UI setter
+  setViewingModelId: (id: string | null) => set({ viewingModelId: id }),
+  setExpandedTaskId: (id: string | null) => set({ expandedTaskId: id }),
   setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
   setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
   setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },

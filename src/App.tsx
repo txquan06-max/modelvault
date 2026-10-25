@@ -13,8 +13,7 @@ import { GunplaSearch } from './core/GunplaDB';
 import { DailyQuestManager } from './core/DailyQuestManager';
 import { useAppStore, type MainTab } from './store/useAppStore';
 import type { GunplaItem } from './core/GunplaDB';
-// 🌟 批次 10C：从 utils 导入格式化工具，删除本地重复定义
-import { formatTime, handleFocusScroll } from './utils/format';
+import { formatTime, formatLogDate, handleFocusScroll } from './utils/format';
 import './App.css';
 
 import { FocusView } from './views/FocusView';
@@ -70,9 +69,10 @@ function App() {
   const {
     models, setModels, currentModelId, setCurrentModelId,
     tasks, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
-    // 批次 10A：viewingModelId / expandedTaskId 从 store 拿
     viewingModelId, setViewingModelId,
     expandedTaskId, setExpandedTaskId,
+    // 🌟 批次 10D：Toast 从 store 拿
+    toastMsg, showToast,
     username, setUsername, coinsBalance, setCoinsBalance,
     earnedTitles, equippedTitle, setEquippedTitle,
     bgMain, bgPip, bgSize, bgPosition, setBgMain, setBgPip, setBgSize, setBgPosition,
@@ -94,11 +94,8 @@ function App() {
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  // 批次 10C：journalFilterMonth 已迁入 JournalView 内部，此处删除
 
   const [lastSession, setLastSession] = useState<{ duration: number; stageId: string | null } | null>(null);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
   const [isAddingModel, setIsAddingModel] = useState(false);
@@ -110,17 +107,10 @@ function App() {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [searchResults, setSearchResults] = useState<GunplaItem[]>([]);
-  const [legacyInput, setLegacyInput] = useState('');
-  const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
-  const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
-  const [showLegacyForm, setShowLegacyForm] = useState(false);
 
-  // 搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
+  // 模型搜索状态（FocusPanel 用）
   const [isSearching, setIsSearching] = useState(false);
-  const [isLegacySearching, setIsLegacySearching] = useState(false);
-  // 搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
   const [searchTrigger, setSearchTrigger] = useState(0);
-  const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
   
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
   const timeboxElapsed = timeboxTarget > 0 ? activeSeconds : 0;
@@ -140,16 +130,10 @@ function App() {
   const [isWholeBuild, setIsWholeBuild] = useState(false); 
   const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part'); 
 
-  const [showModelDetails, setShowModelDetails] = useState(false);
-  const [showTimeDetails, setShowTimeDetails] = useState(false);
-  
   const engineRef = useRef(new TimerEngine());
-  const [isResetting, setIsResetting] = useState(false);
 
   const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
   const [ambientType, setAmbientType] = useState<AmbientType>('none');
-
-  const toastTimerRef = useRef<any>(null);
 
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
@@ -249,12 +233,6 @@ function App() {
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
-  const showToast = (msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
-  };
-
   useEffect(() => {
     if (chatMessages.length > 0) sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
   }, [chatMessages]);
@@ -276,7 +254,7 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  // 模型名称搜索防抖（FocusPanel 用）
   useEffect(() => {
     const query = newModelNameInput.trim();
     if (query.length < 1 || selectedGunpla) {
@@ -307,38 +285,7 @@ function App() {
     };
   }, [newModelNameInput, selectedGunpla, searchTrigger]);
 
-  // 监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
-  useEffect(() => {
-    const query = legacyInput.trim();
-    if (query.length < 1) {
-      setLegacyResults([]);
-      setIsLegacySearching(false);
-      return;
-    }
-    let cancelled = false;
-    setIsLegacySearching(true);
-    const timer = setTimeout(() => {
-      GunplaSearch.search(query)
-        .then((results) => {
-          if (!cancelled) {
-            setLegacyResults(results.slice(0, 15));
-            setIsLegacySearching(false);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setLegacyResults([]);
-            setIsLegacySearching(false);
-          }
-        });
-    }, 200);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [legacyInput, legacySearchTrigger]);
-
-  // 聊天逻辑拦截
+  // 聊天逻辑
   useEffect(() => {
     if (showSplash) return;
     let chatTimer: any;
@@ -407,7 +354,6 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
-  // Tutorial steps 全部改为 t() 国际化
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
     { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
@@ -515,7 +461,6 @@ function App() {
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
-    // nameObj / seriesObj 数据字段保留双语（写入数据库，双语同时存在）
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
@@ -648,70 +593,11 @@ function App() {
     e.target.value = '';
   };
 
-  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      showToast(t('processing'));
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async (ev) => {
-        const img = new Image();
-        img.src = ev.target?.result as string;
-        img.onload = async () => {
-          const canvas = document.createElement('canvas');
-          let w = img.width; let h = img.height;
-          if(w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-          canvas.toBlob(async (blob) => {
-            let finalBlob = blob;
-            let ext = 'webp';
-            if (!blob) {
-              finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
-              ext = 'jpg';
-            }
-            if (!finalBlob) return;
-            const filename = `bg_${type}_${Date.now()}.${ext}`;
-            const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
-            const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
-            
-            if (type === 'main') { setBgMain(finalUrl); } 
-            else { setBgPip(finalUrl); }
-            showToast(t('toast_bg_updated'));
-            triggerAutoBackup();
-          }, 'image/webp', 0.6);
-        };
-      };
-    }
-    e.target.value = '';
-  };
-
-  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
-    const filename = `audio_${type}_${Date.now()}.mp3`;
-    StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
-      const finalPath = localPath || await new Promise<string>((res) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => res(ev.target?.result as string);
-        reader.readAsDataURL(file);
-      });
-      const newAudios = { ...customAudios, [type]: finalPath };
-      setCustomAudios(newAudios);
-      setAudioSettings({ ...audioSettings, [type]: 'custom' });
-      showToast(t('toast_audio_updated'));
-      triggerAutoBackup();
-    });
-    e.target.value = '';
-  };
-
   const handleUnlockBot = (botId: BotType, cost: number) => {
     if (coinsBalance >= cost) {
       setCoinsBalance(coinsBalance - cost);
       setUnlockedBots([...unlockedBots, botId]);
       AudioManager.playAchievement(); refreshData();
-      // botId.name / .enName 是数据字段，保留 isZh 选择
       showToast(t('toast_unlock_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
     }
   };
@@ -722,75 +608,12 @@ function App() {
     showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
   };
 
-  const buyTitle = (id: string) => { 
-    const result = UserManager.buyTitle(id);
-    if (result.success) { AudioManager.playAchievement(); showToast(t('titleUnlocked')); refreshData(); } 
-    else { AudioManager.playClick(); showToast(t('notEnoughCoins')); } 
-  };
-  
   const equipTitle = (id: string) => { 
     AudioManager.playClick(); setEquippedTitle(id); AudioManager.playStageDone(); 
   };
 
-  const handleLegacyImport = () => {
-    if (legacyList.length === 0) return;
-    AudioManager.playClick(); const result = ModelManager.importLegacyModelsFromList(legacyList);
-    if (result.count > 0) {
-      AudioManager.playFinishPart(); showToast(t('importedSuccess', { count: result.count }));
-      setLegacyList([]); refreshData(); processAchievements(); triggerAutoBackup();
-    }
-  };
-
-  const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      showToast(t('processing'));
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async (ev) => {
-        const newList = [...legacyList]; 
-        newList[index].coverImage = ev.target?.result as string; 
-        setLegacyList(newList); 
-      };
-    }
-    e.target.value = '';
-  };
-
-  const handleResetData = async () => { 
-    AudioManager.playClick(); setIsResetting(true); 
-    try { await StorageManager.resetAll(); } catch (e) { console.error(e); } 
-    window.location.href = window.location.origin + window.location.pathname; 
-  };
-
-  const exportData = () => { 
-    AudioManager.playClick(); 
-    const data = StorageManager.exportAll(); 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); 
-    const url = URL.createObjectURL(blob); 
-    const a = document.createElement('a'); 
-    a.href = url; 
-    a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`; 
-    a.click(); 
-    URL.revokeObjectURL(url); 
-  };
-  
-  const importData = (e: React.ChangeEvent<HTMLInputElement>) => { 
-    const file = e.target.files?.[0]; if (!file) return; AudioManager.playClick();
-    const reader = new FileReader(); 
-    reader.onload = async (event) => { 
-      try { 
-        const data = JSON.parse(event.target?.result as string); 
-        const success = await StorageManager.importAll(data); 
-        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); } 
-        else showToast(t('importError')); 
-      } catch (err) { showToast(t('importError')); } 
-    }; 
-    reader.readAsText(file); e.target.value = '';
-  };
-
-  // 批次 10C：formatTime / formatLogDate / handleFocus 已从 utils/format 导入
-  // formatLogDate 本地无引用，不导入；handleFocus 在 commonProps 里指向 handleFocusScroll
-  const formatLogDate = (timestamp: number) => { const d = new Date(timestamp); return `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`; };
+  const formatTimeLocal = formatTime; // alias
+  const formatLogDateLocal = formatLogDate;
 
   const currentModel = models.find((m: any) => m.id === currentModelId);
   const currentTask = tasks.find((t: any) => t.id === currentTaskId);
@@ -861,35 +684,24 @@ function App() {
     }
   };
 
-  // 🌟 批次 10C：清理 commonProps 中 HangarView / JournalView 专属字段
-  // - 删：journalFilterMonth / setJournalFilterMonth / getHistoryLogs
-  //      （10B 已内聚到 JournalView 内部）
-  // - 删：formatLogDate（仅 JournalView 使用，现在内部从 utils 导入）
-  // - 删：setViewingModelId / setExpandedTaskId
-  //      （HangarView 现在从 store 直接读，无需 props 传递）
-  // - handleFocus 改用 utils 的 handleFocusScroll（FocusPanel / ProfileView 仍需要）
+  // 🌟 批次 10D：commonProps 清理 ProfileView 专属字段
+  // 保留：FocusPanel 需要的（showToast / handleFocus / timer / 模型选择 / 聊天 等）
   const commonProps = {
     t, i18n, models, tasks, currentModelId, setCurrentModelId, currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     timerState, activeSeconds, lastSession, timeboxTarget, timeboxElapsed, handleStart, handlePause, handleResume, handleComplete,
     handleConfirmStageDone, handleCancelDone, handleFinishPart, isFinishingPart, setIsFinishingPart, finishPartPhoto, setFinishPartPhoto, handleConfirmFinishPart,
-    currentModel, currentTask, currentStage, getModelName, formatTime, handleFocus: handleFocusScroll, showToast, handleSetTimeboxTarget,
+    currentModel, currentTask, currentStage, getModelName, formatTime: formatTimeLocal, handleFocus: handleFocusScroll, showToast, handleSetTimeboxTarget,
     isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
     newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
     isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
-    isSearching, isLegacySearching,
+    isSearching,
     triggerModelSearch: () => setSearchTrigger(s => s + 1),
-    triggerLegacySearch: () => setLegacySearchTrigger(s => s + 1),
     bgMain, bgPip, bgSize, bgPosition, reminderInterval, setReminderInterval, audioSettings, setAudioSettings,
-    username, setUsername, modelStats: ModelManager.getModelStats(), timeStats: ModelManager.getTimeStats(),
-    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, titles: UserManager.getTitleLibrary(),
-    earnedTitles, coinsBalance, buyTitle, equipTitle, equippedTitle, earnedAchievements: AchievementManager.getEarnedList(),
-    storageUsage: StorageManager.getStorageUsage(), exportData, importData, showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
-    showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput, legacyResults, setLegacyResults, legacyList, removeLegacyItem: (id: string) => setLegacyList(legacyList.filter(i => i.id !== id)), handleLegacyImport,
-    handleBgFileUpload, openPreview: () => {}, updateAudioSetting: (type: string, style: string) => { const newSettings = { ...audioSettings, [type]: style }; setAudioSettings(newSettings); if (style !== 'off') AudioManager.previewSound(type as any); }, customAudios, handleAudioUpload,
+    username, setUsername,
     level, levelProgress, todayTotal: useAppStore.getState().todayTotal, isCheckedIn, checkinStreak, handleCheckin,
     currentBot, webChatInterval, setWebChatInterval, pipChatInterval, setPipChatInterval,
     chatMessages, setChatMessages, 
-    storageEstimate, isAutoBackupEnabled, setIsAutoBackupEnabled, isAssetsMounted, setIsAssetsMounted,
+    storageEstimate,
     ambientType, setAmbientType,
     handleOpenWebPiP,
     handleToggleMiniMode,
@@ -897,9 +709,6 @@ function App() {
     isWholeBuild, setIsWholeBuild,
     rebuildMode, setRebuildMode,
     setModels, refreshData,
-    addToLegacyList: (item: any) => { if (!legacyList.some((i: any) => i.name.en === item.name.en)) setLegacyList([...legacyList, item]); else showToast(t('toast_legacy_added')); },
-    handleLegacyCoverUpload,
-    setBgMain, setBgPip, StorageManager
   };
 
   if (isPipMode) {
@@ -938,6 +747,7 @@ function App() {
             <img src={bgMain} alt="background" className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
           )
         )}
+        {/* 🌟 批次 10D：toastMsg 来自 store */}
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
         <div className="mini-window">
@@ -968,7 +778,7 @@ function App() {
           {timerState !== 'Idle' && activeTab !== 'focus' && !viewingModel && (
             <div className="mini-timer-bar" onClick={() => { AudioManager.playClick(); setActiveTab('focus'); }}>
               <span className={`mini-timer-dot ${timerState.toLowerCase()}`}>⏱</span>
-              <span className="mini-timer-text">{activeSeconds > 0 ? formatTime(activeSeconds) : '--'}</span>
+              <span className="mini-timer-text">{activeSeconds > 0 ? formatTimeLocal(activeSeconds) : '--'}</span>
               <span className="mini-timer-state">{timerState === 'Running' ? t('status_running') : t('status_paused')}</span>
               <span className="mini-timer-arrow">→</span>
             </div>
@@ -992,8 +802,7 @@ function App() {
 
           <div className="scroll-content">
             {viewingModel ? (
-              // 🌟 批次 10C：顺手修复 ModelDetail 缺失 formatTime 的隐性 Bug
-              <ModelDetail {...({ viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm, handleConfirmRebuild, handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, handleSaveImportedStages, showToast } as any)} />
+              <ModelDetail {...({ viewingModel, viewingModelTotalSec, formatTime: formatTimeLocal, expandedTaskId, setExpandedTaskId, isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus, importedStages, setImportedStages, showRebuildConfirm, setShowRebuildConfirm, handleConfirmRebuild, handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, handleSaveImportedStages, showToast } as any)} />
             ) : (
               <>
                 {activeTab === 'focus' && <FocusView {...commonProps} />}
@@ -1001,7 +810,8 @@ function App() {
                 {activeTab === 'hangar' && <HangarView />}
                 {activeTab === 'gundam' && <GundamGalleryView {...({ i18n, models } as any)} />} 
                 {activeTab === 'gallery' && <BotGalleryView unlockedBots={unlockedBots} currentBot={currentBot} level={level} coins={coinsBalance} checkinStreak={checkinStreak} onUnlock={handleUnlockBot} onEquip={handleEquipBot} i18n={i18n} />}
-                {activeTab === 'profile' && <ProfileView {...commonProps} />}
+                {/* 🌟 批次 10D：ProfileView 完全零 props */}
+                {activeTab === 'profile' && <ProfileView />}
               </>
             )}
           </div>

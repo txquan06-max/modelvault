@@ -7,6 +7,9 @@ import { UserManager } from '../core/UserManager';
 import { CheckinManager } from '../core/CheckinManager';
 import { QuoteEngine, type BotType } from '../core/QuoteEngine';
 
+// 🌟 批次 10D：模块级 toast 计时器（不在 zustand state 里，避免序列化问题）
+let toastTimer: any = null;
+
 export type MainTab = 'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile';
 
 interface AppState {
@@ -16,11 +19,12 @@ interface AppState {
   currentTaskId: string;
   currentStageId: string | null;
 
-  // 🌟 批次 10A：全局 UI 状态迁移（原先在 App.tsx 里 useState）
-  // viewingModelId：控制 ModelDetail 详情页是否打开（null = 关闭）
-  // expandedTaskId：控制 ModelDetail 内某个 task 是否展开（null = 全部收起）
+  // 全局 UI 状态（批次 10A 迁入）
   viewingModelId: string | null;
   expandedTaskId: string | null;
+
+  // 🌟 批次 10D：全局 Toast（ProfileView 零 props 后需要）
+  toastMsg: string | null;
 
   username: string;
   level: number;
@@ -46,7 +50,6 @@ interface AppState {
   timerState: 'Idle' | 'Running' | 'Paused';
   activeSeconds: number;
 
-  // 🌟 全局 Tab & 聊天频率 & 挂载状态
   activeTab: MainTab;
   webChatInterval: number;
   pipChatInterval: number;
@@ -57,9 +60,11 @@ interface AppState {
   setCurrentModelId: (id: string) => void;
   setCurrentTaskId: (id: string) => void;
   setCurrentStageId: (id: string | null) => void;
-  // 🌟 批次 10A：详情页全局状态 setter
   setViewingModelId: (id: string | null) => void;
   setExpandedTaskId: (id: string | null) => void;
+  // 🌟 批次 10D：Toast 全局化
+  showToast: (msg: string) => void;
+  setToastMsg: (msg: string | null) => void;
   setUsername: (name: string) => void;
   setBgMain: (url: string) => void;
   setBgPip: (url: string) => void;
@@ -88,9 +93,10 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   currentTaskId: '',
   currentStageId: null,
 
-  // 🌟 批次 10A：全局 UI 状态初值
   viewingModelId: null,
   expandedTaskId: null,
+
+  toastMsg: null,
 
   username: StorageManager.getUsername(),
   level: 1,
@@ -189,9 +195,18 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   setCurrentModelId: (id: string) => set({ currentModelId: id }),
   setCurrentTaskId: (id: string) => set({ currentTaskId: id }),
   setCurrentStageId: (id: string | null) => set({ currentStageId: id }),
-  // 🌟 批次 10A：全局 UI setter
   setViewingModelId: (id: string | null) => set({ viewingModelId: id }),
   setExpandedTaskId: (id: string | null) => set({ expandedTaskId: id }),
+  // 🌟 批次 10D：Toast 全局化
+  showToast: (msg: string) => {
+    if (toastTimer) clearTimeout(toastTimer);
+    set({ toastMsg: msg });
+    toastTimer = setTimeout(() => set({ toastMsg: null }), 3000);
+  },
+  setToastMsg: (msg: string | null) => {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    set({ toastMsg: msg });
+  },
   setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
   setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
   setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },

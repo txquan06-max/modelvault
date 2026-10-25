@@ -7,39 +7,59 @@ import { StatsChart } from '../components/StatsChart';
 import { ModelManager } from '../core/ModelManager';
 import { UserManager } from '../core/UserManager';
 import { StorageManager } from '../core/StorageManager';
+import { AchievementManager } from '../core/AchievementManager';
+import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { useAppStore } from '../store/useAppStore';
+import { formatTime, handleFocusScroll } from '../utils/format';
 
-export const ProfileView = (props: any) => {
+/**
+ * ProfileView 完全零 props 化
+ * - 全局状态从 useAppStore 拿（含 toastMsg / showToast）
+ * - 本地 UI 状态全部内聚（legacy / reset / snapshot / upload ...）
+ * - 业务逻辑内联（导出/导入/上传/删除/购称号 ...）
+ * - formatTime / handleFocusScroll 从 utils/format 拿
+ */
+export const ProfileView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
   const {
     username, setUsername, level, levelProgress, coinsBalance,
     earnedTitles, equippedTitle, setEquippedTitle,
-    bgMain, setBgMain, bgPip, setBgPip, audioSettings, setAudioSettings,
-    customAudios, webChatInterval, setWebChatInterval,
+    bgMain, setBgMain, bgPip, setBgPip,
+    audioSettings, setAudioSettings,
+    // 🌟 修复：补漏 setCustomAudios（handleAudioUpload 需要）
+    customAudios, setCustomAudios,
+    webChatInterval, setWebChatInterval,
     pipChatInterval, setPipChatInterval, storageEstimate,
-    isAssetsMounted, setIsAssetsMounted, refreshData
+    isAssetsMounted, setIsAssetsMounted, refreshData,
+    showToast,
   } = useAppStore();
 
-  const {
-    showToast, handleFocus, showLegacyForm, setShowLegacyForm, legacyInput, setLegacyInput,
-    legacyResults, setLegacyResults, legacyList, setLegacyList, removeLegacyItem,
-    handleLegacyCoverUpload, handleLegacyImport, addToLegacyList,
-    // 历史补录搜索状态与触发器
-    isLegacySearching, triggerLegacySearch,
-    showResetConfirm, setShowResetConfirm, handleResetData, isResetting,
-    showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, exportData, importData, handleBgFileUpload, handleAudioUpload,
-    earnedAchievements, buyTitle
-  } = props;
-
-  const allSessions = SessionManager.getAllSessions();
+  // ===== 本地 UI 状态（原本来自 App.tsx props） =====
   const [quests, setQuests] = useState<DailyQuest[]>([]);
   const [snapshots, setSnapshots] = useState<{ index: number; timestamp: number | null; size: number }[]>([]);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [restoringIndex, setRestoringIndex] = useState<number | null>(null);
   const [isUploadingWakeup, setIsUploadingWakeup] = useState(false);
 
+  // 历史补录
+  const [showLegacyForm, setShowLegacyForm] = useState(false);
+  const [legacyInput, setLegacyInput] = useState('');
+  const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
+  const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
+  const [isLegacySearching, setIsLegacySearching] = useState(false);
+  const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
+
+  // 危险区
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // 统计展开
+  const [showModelDetails, setShowModelDetails] = useState(false);
+  const [showTimeDetails, setShowTimeDetails] = useState(false);
+
+  // ===== 生命周期 =====
   useEffect(() => {
     setQuests(DailyQuestManager.getTodayQuests());
   }, []);
@@ -49,6 +69,38 @@ export const ProfileView = (props: any) => {
     StorageManager.listSnapshots().then((list: any[]) => setSnapshots(list));
   }, [showSnapshots]);
 
+  // 历史补录搜索防抖 200ms（复用 GunplaSearch）
+  useEffect(() => {
+    const query = legacyInput.trim();
+    if (query.length < 1) {
+      setLegacyResults([]);
+      setIsLegacySearching(false);
+      return;
+    }
+    let cancelled = false;
+    setIsLegacySearching(true);
+    const timer = setTimeout(() => {
+      GunplaSearch.search(query)
+        .then((results) => {
+          if (!cancelled) {
+            setLegacyResults(results.slice(0, 15));
+            setIsLegacySearching(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLegacyResults([]);
+            setIsLegacySearching(false);
+          }
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [legacyInput, legacySearchTrigger]);
+
+  // ===== 业务逻辑 =====
   const handleClaim = (questId: string) => {
     AudioManager.playAchievement();
     if (DailyQuestManager.claimReward(questId)) {
@@ -74,7 +126,7 @@ export const ProfileView = (props: any) => {
   const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
+    if (file.size > 2 * 1024 * 1024) { showToast(isZh ? '音频文件太大（最大2MB）' : 'Audio file too large (max 2MB)'); return; }
     
     setIsUploadingWakeup(true);
     const reader = new FileReader();
@@ -103,11 +155,161 @@ export const ProfileView = (props: any) => {
     return raw;
   })();
 
+  // 背景图上传（内联自 App.tsx handleBgFileUpload）
+  const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    showToast(t('processing'));
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async (ev) => {
+      const img = new Image();
+      img.src = ev.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width; let h = img.height;
+        if (w > 1920) { h = Math.round((h * 1920) / w); w = 1920; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(async (blob) => {
+          let finalBlob = blob;
+          let ext = 'webp';
+          if (!blob) {
+            finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+            ext = 'jpg';
+          }
+          if (!finalBlob) return;
+          const filename = `bg_${type}_${Date.now()}.${ext}`;
+          const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
+          const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
+          if (type === 'main') { setBgMain(finalUrl); } else { setBgPip(finalUrl); }
+          showToast(t('toast_bg_updated'));
+        }, 'image/webp', 0.6);
+      };
+    };
+    e.target.value = '';
+  };
+
+  // 音效上传（内联自 App.tsx handleAudioUpload）
+  const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
+    const filename = `audio_${type}_${Date.now()}.mp3`;
+    StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
+      const finalPath = localPath || await new Promise<string>((res) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => res(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      const newAudios = { ...customAudios, [type]: finalPath };
+      setCustomAudios(newAudios);
+      setAudioSettings({ ...audioSettings, [type]: 'custom' });
+      showToast(t('toast_audio_updated'));
+    });
+    e.target.value = '';
+  };
+
+  // 导出数据
+  const exportData = () => {
+    AudioManager.playClick();
+    const data = StorageManager.exportAll();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `modelvault_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 导入数据
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    AudioManager.playClick();
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        const success = await StorageManager.importAll(data);
+        if (success) { showToast(t('importSuccess')); setTimeout(() => window.location.reload(), 1000); }
+        else showToast(t('importError'));
+      } catch (err) { showToast(t('importError')); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // 重置数据
+  const handleResetData = async () => {
+    AudioManager.playClick();
+    setIsResetting(true);
+    try { await StorageManager.resetAll(); } catch (e) { console.error(e); }
+    window.location.href = window.location.origin + window.location.pathname;
+  };
+
+  // 历史补录：添加
+  const addToLegacyList = (item: GunplaItem) => {
+    if (!legacyList.some((i: any) => i.name.en === item.name.en)) {
+      setLegacyList([...legacyList, item]);
+    } else {
+      showToast(t('toast_legacy_added'));
+    }
+  };
+
+  const removeLegacyItem = (id: string) => {
+    setLegacyList(prev => prev.filter(i => i.id !== id));
+  };
+
+  const handleLegacyCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    showToast(t('processing'));
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async (ev) => {
+      const newList = [...legacyList];
+      newList[index].coverImage = ev.target?.result as string;
+      setLegacyList(newList);
+    };
+    e.target.value = '';
+  };
+
+  const handleLegacyImport = () => {
+    if (legacyList.length === 0) return;
+    AudioManager.playClick();
+    const result = ModelManager.importLegacyModelsFromList(legacyList);
+    if (result.count > 0) {
+      AudioManager.playFinishPart();
+      showToast(t('importedSuccess', { count: result.count }));
+      setLegacyList([]);
+      refreshData();
+      AchievementManager.checkAll();
+    }
+  };
+
+  // 购买称号（内联自 App.tsx buyTitle）
+  const buyTitle = (id: string) => {
+    const result = UserManager.buyTitle(id);
+    if (result.success) {
+      AudioManager.playAchievement();
+      showToast(t('titleUnlocked'));
+      refreshData();
+      AchievementManager.checkAll();
+    } else {
+      AudioManager.playClick();
+      showToast(t('notEnoughCoins'));
+    }
+  };
+
   const allCompleted = quests.length > 0 && quests.every(q => q.claimed);
   const modelStats = ModelManager.getModelStats();
   const timeStats = ModelManager.getTimeStats();
   const titles = UserManager.getTitleLibrary();
   const equippedTitleDef = titles.find(t => t.id === equippedTitle);
+  const earnedAchievements = AchievementManager.getEarnedList();
+  const allSessions = SessionManager.getAllSessions();
 
   return (
     <div className="view-content profile-view">
@@ -115,7 +317,7 @@ export const ProfileView = (props: any) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="avatar" style={{ flexShrink: 0 }}>🧑‍🔧</div>
           <div className="profile-info" style={{ flex: 1 }}>
-            <input id="username-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="username-input" onFocus={handleFocus} />
+            <input id="username-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="username-input" onFocus={handleFocusScroll} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
               <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>Lv.{level}</span>
               {equippedTitleDef && <span style={{ fontSize: '12px', color: equippedTitleDef.color, fontWeight: 'bold' }}>[{t(equippedTitleDef.nameKey)}]</span>}
@@ -229,10 +431,8 @@ export const ProfileView = (props: any) => {
                 onChange={e => setLegacyInput(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter' && legacyResults.length > 0) addToLegacyList(legacyResults[0]); }} 
                 onBlur={() => setTimeout(() => setLegacyResults([]), 200)} 
-                // blur 清空后重新聚焦时重新触发搜索
-                onFocus={(e: any) => { handleFocus(e); triggerLegacySearch?.(); }} 
+                onFocus={(e: any) => { handleFocusScroll(e); setLegacySearchTrigger(s => s + 1); }} 
               />
-              {/* 批次 4：放宽展示条件 >= 2 → >= 1，启用单字搜索 */}
               {legacyInput.trim().length >= 1 && (
                 <div className="autocomplete-dropdown" style={{ zIndex: 999 }}>
                   {isLegacySearching && legacyResults.length === 0 && (

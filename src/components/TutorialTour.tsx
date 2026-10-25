@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 
 export interface TourStep {
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props) => {
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [ready, setReady] = useState(false);
@@ -123,7 +125,7 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: '#3b82f6', fontSize: '12px', fontWeight: 'bold' }}>
-            STEP {currentStep + 1} / {steps.length}
+            {t('tour_step_indicator', { current: currentStep + 1, total: steps.length })}
           </span>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', fontSize: '14px' }}>✕</button>
         </div>
@@ -136,18 +138,18 @@ export const TutorialTour = ({ steps, onClose, activeTab, setActiveTab }: Props)
             disabled={currentStep === 0}
             onClick={() => { AudioManager.playClick(); setCurrentStep(s => s - 1); }}
             style={{ padding: '6px 16px', borderRadius: '6px', background: 'transparent', border: '1px solid #555', color: currentStep === 0 ? '#444' : '#fff', cursor: currentStep === 0 ? 'not-allowed' : 'pointer' }}
-          >上一步</button>
+          >{t('tour_prev')}</button>
           
           {currentStep === steps.length - 1 ? (
             <button
               onClick={() => { AudioManager.playAchievement(); onClose(); }}
               style={{ padding: '6px 16px', borderRadius: '6px', background: '#10b981', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-            >完成教程</button>
+            >{t('tour_finish')}</button>
           ) : (
             <button
               onClick={() => { AudioManager.playClick(); setCurrentStep(s => s + 1); }}
               style={{ padding: '6px 16px', borderRadius: '6px', background: '#3b82f6', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-            >下一步</button>
+            >{t('tour_next')}</button>
           )}
         </div>
       </div>

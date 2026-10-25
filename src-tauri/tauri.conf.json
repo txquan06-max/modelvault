@@ -30,7 +30,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_YOUR_PUBKEY_BASE64",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE1Qjk5MTZGRDI3MDU3MDkKUldRSlYzRFNiNUc1cFh4SksxMEpsMEVGQzUzSXNaRGt5UWJyazlzd1E5c0h2S1FPdk83UTNnb24K",
       "endpoints": [
         "https://github.com/txquan06-max/modelvault/releases/latest/download/latest.json"
       ],

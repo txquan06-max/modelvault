@@ -110,6 +110,13 @@ function App() {
   const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
   const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
+
+  // 🌟 新增：搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLegacySearching, setIsLegacySearching] = useState(false);
+  // 🌟 新增：搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
+  const [searchTrigger, setSearchTrigger] = useState(0);
+  const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
   
   const [timeboxTarget, setTimeboxTarget] = useState(() => StorageManager.getTimeboxTarget());
   const timeboxElapsed = timeboxTarget > 0 ? activeSeconds : 0;
@@ -266,6 +273,69 @@ function App() {
     GunplaSearch.init();
   }, []);
 
+  // 🌟 新增修复：监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  // 之前版本缺失这段代码，导致 searchResults 永远是空数组，搜索栏无反应
+  useEffect(() => {
+    const query = newModelNameInput.trim();
+    if (query.length < 2 || selectedGunpla) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      GunplaSearch.search(query)
+        .then((results) => {
+          if (!cancelled) {
+            setSearchResults(results.slice(0, 15));
+            setIsSearching(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSearchResults([]);
+            setIsSearching(false);
+          }
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [newModelNameInput, selectedGunpla, searchTrigger]);
+
+  // 🌟 新增修复：监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  useEffect(() => {
+    const query = legacyInput.trim();
+    if (query.length < 2) {
+      setLegacyResults([]);
+      setIsLegacySearching(false);
+      return;
+    }
+    let cancelled = false;
+    setIsLegacySearching(true);
+    const timer = setTimeout(() => {
+      GunplaSearch.search(query)
+        .then((results) => {
+          if (!cancelled) {
+            setLegacyResults(results.slice(0, 15));
+            setIsLegacySearching(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLegacyResults([]);
+            setIsLegacySearching(false);
+          }
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [legacyInput, legacySearchTrigger]);
+
   // 聊天逻辑拦截
   useEffect(() => {
     if (showSplash) return;
@@ -338,7 +408,7 @@ function App() {
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
     { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
-    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如“头部”。' : 'After adding a model, click Add Part.', page: 'focus' },
+    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如"头部"。' : 'After adding a model, click Add Part.', page: 'focus' },
     { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
     { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
     { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
@@ -797,6 +867,10 @@ function App() {
     isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
     newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
     isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
+    // 🌟 新增：搜索状态与触发器
+    isSearching, isLegacySearching,
+    triggerModelSearch: () => setSearchTrigger(s => s + 1),
+    triggerLegacySearch: () => setLegacySearchTrigger(s => s + 1),
     bgMain, bgPip, bgSize, bgPosition, reminderInterval, setReminderInterval, audioSettings, setAudioSettings,
     username, setUsername, modelStats: ModelManager.getModelStats(), timeStats: ModelManager.getTimeStats(),
     showModelDetails, setShowModelDetails, showTimeDetails, setShowTimeDetails, titles: UserManager.getTitleLibrary(),

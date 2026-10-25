@@ -17,6 +17,8 @@ export const FocusPanel = ({
   handleOpenWebPiP, handleToggleMiniMode, 
   isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
+  // 🌟 新增：搜索状态与触发器
+  isSearching, triggerModelSearch,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
   newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
   bgSize, bgPosition, currentModel, currentTask, currentStage,
@@ -392,9 +394,28 @@ export const FocusPanel = ({
       {isAddingModel && (
         <div className="inline-form vertical-form" style={{ position: 'relative', marginBottom: '16px' }}>
           <div className="search-autocomplete">
-            <input id="new-model-name" autoFocus placeholder={t('modelName')} value={newModelNameInput} onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} onBlur={() => setTimeout(() => setSearchResults([]), 200)} onFocus={handleFocus} />
-            {searchResults.length > 0 && !selectedGunpla && (
+            <input 
+              id="new-model-name" 
+              autoFocus 
+              placeholder={t('modelName')} 
+              value={newModelNameInput} 
+              onChange={e => { setNewModelNameInput(e.target.value); setSelectedGunpla(null); }} 
+              onBlur={() => setTimeout(() => setSearchResults([]), 200)} 
+              onFocus={(e: any) => { handleFocus(e); triggerModelSearch(); }} 
+            />
+            {/* 🌟 修复：状态机渲染（搜索中 / 无结果 / 结果列表） */}
+            {!selectedGunpla && newModelNameInput.trim().length >= 2 && (
               <div className="autocomplete-dropdown">
+                {isSearching && searchResults.length === 0 && (
+                  <div className="autocomplete-item" style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', cursor: 'default' }}>
+                    🔄 {isZh ? '搜索中...' : 'Searching...'}
+                  </div>
+                )}
+                {!isSearching && searchResults.length === 0 && (
+                  <div className="autocomplete-item" style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', cursor: 'default' }}>
+                    ❌ {isZh ? '未找到匹配的机体，可手动输入名称' : 'No matching kits found. You can enter a custom name.'}
+                  </div>
+                )}
                 {searchResults.map((item: any, idx: number) => {
                   const displayName = isZh ? item.name.zh : item.name.en;
                   const displaySeries = isZh ? item.series.zh : item.series.en;

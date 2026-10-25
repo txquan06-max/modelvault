@@ -12,7 +12,6 @@ use tauri::{
 // ============================================================
 struct AssetsDir(Mutex<Option<PathBuf>>);
 
-/// 保存用户选择的素材文件夹路径到 Rust 状态（前端选完文件夹后调用）
 #[tauri::command]
 fn set_assets_dir(state: State<AssetsDir>, path: String) -> Result<(), String> {
     let path_buf = PathBuf::from(&path);
@@ -24,7 +23,6 @@ fn set_assets_dir(state: State<AssetsDir>, path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 读取当前保存的素材文件夹路径（前端启动时可用来恢复状态）
 #[tauri::command]
 fn get_assets_dir(state: State<AssetsDir>) -> Option<String> {
     state
@@ -34,7 +32,6 @@ fn get_assets_dir(state: State<AssetsDir>) -> Option<String> {
         .and_then(|guard| guard.as_ref().map(|p| p.to_string_lossy().to_string()))
 }
 
-/// 清除素材文件夹路径（用户主动断开挂载时调用）
 #[tauri::command]
 fn clear_assets_dir(state: State<AssetsDir>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -42,8 +39,6 @@ fn clear_assets_dir(state: State<AssetsDir>) -> Result<(), String> {
     Ok(())
 }
 
-/// 把字节写入素材文件夹（覆盖同名文件）
-/// 返回 `local://filename` 作为前端可直接引用的伪 URL
 #[tauri::command]
 fn save_local_file(
     state: State<AssetsDir>,
@@ -57,7 +52,6 @@ fn save_local_file(
     Ok(format!("local://{}", filename))
 }
 
-/// 从素材文件夹读取文件字节（前端转换成 Blob URL 渲染）
 #[tauri::command]
 fn read_local_file(state: State<AssetsDir>, filename: String) -> Result<Vec<u8>, String> {
     let guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -123,7 +117,15 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 // ============================================================
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // 🔧 自动更新插件（仅桌面端）
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

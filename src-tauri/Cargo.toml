@@ -19,10 +19,13 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 
-# 7C：加 tray-icon feature 以启用系统托盘
+# 7C：系统托盘
 tauri = { version = "2", features = ["tray-icon"] }
 
-# 11：Rust FS 需要 dialog（选文件夹）+ 保留 JS 侧 fs/process 兼容
+# 自动更新：updater 插件
+tauri-plugin-updater = "2"
+
+# 原有插件
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"

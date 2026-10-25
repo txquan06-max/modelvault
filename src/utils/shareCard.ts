@@ -61,7 +61,9 @@ export const generateShareCard = async (props: ShareCardProps) => {
 
   // 准备基础数据
   const title = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
-  const titleName = title ? t(title.nameKey) : (isZh ? '新晋胶佬' : 'New Builder');
+  // 兜底称号改为 i18n（原硬编码 isZh ? '新晋胶佬' : 'New Builder'）
+  const titleName = title ? t(title.nameKey) : t('share_default_title');
+  // 数据字段，保留 isZh 选择语言版本
   const modelName = isZh ? model.name.zh : model.name.en;
   const seriesName = isZh ? model.series.zh : model.series.en;
 
@@ -123,7 +125,8 @@ export const generateShareCard = async (props: ShareCardProps) => {
     
     ctx.fillStyle = '#888';
     ctx.font = '18px monospace';
-    ctx.fillText('BUILD REPORT // 战报', 85, 145);
+    // 修复：'BUILD REPORT // 战报' 拆分为英文美术前缀 + i18n 标签
+    ctx.fillText(`BUILD REPORT // ${t('share_report_label')}`, 85, 145);
 
     if (avatarImg) {
       ctx.save();
@@ -134,7 +137,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.beginPath(); ctx.arc(680, 110, 42, 0, Math.PI * 2); ctx.stroke();
     }
 
-    // 🌟 修复文本溢出：使用 fitText 限制宽度 680
+    // 使用 fitText 限制宽度 680
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; 
     const fittedModelName = fitText(ctx, modelName, 680, 56, 'sans-serif', 'bold', 28);
     ctx.fillText(fittedModelName, 400, 700);
@@ -178,7 +181,6 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.fillStyle = botColor; ctx.fillRect(0, 596, 800, 8);
 
     ctx.fillStyle = '#212529'; ctx.textAlign = 'center';
-    // 🌟 修复文本溢出
     const fittedModelName = fitText(ctx, modelName, 680, 60, 'sans-serif', 'bold', 30);
     ctx.fillText(fittedModelName, 400, 720);
 
@@ -240,7 +242,6 @@ export const generateShareCard = async (props: ShareCardProps) => {
 
     // 错位字效
     ctx.textAlign = 'center';
-    // 🌟 修复文本溢出（错位特效需要留出边缘空间，限制宽度 680）
     const fittedModelName = fitText(ctx, modelName, 680, 70, 'monospace', 'bold', 30);
     ctx.fillStyle = '#ff003c'; ctx.fillText(fittedModelName, 405, 705);
     ctx.fillStyle = '#00f0ff'; ctx.fillText(fittedModelName, 395, 695);

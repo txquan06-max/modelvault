@@ -111,10 +111,10 @@ function App() {
   const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
 
-  // 🌟 搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
+  // 搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
   const [isSearching, setIsSearching] = useState(false);
   const [isLegacySearching, setIsLegacySearching] = useState(false);
-  // 🌟 搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
+  // 搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
   const [searchTrigger, setSearchTrigger] = useState(0);
   const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
   
@@ -190,7 +190,7 @@ function App() {
   }, []);
 
   const toggleAlwaysOnTop = async () => {
-    if (!isTauri) { showToast(isZh ? '仅桌面端支持置顶' : 'Always on top is only supported on Desktop'); return; }
+    if (!isTauri) { showToast(t('toast_pin_desktop_only')); return; }
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const win = getCurrentWindow();
@@ -198,7 +198,7 @@ function App() {
       await win.setAlwaysOnTop(nextState);
       setIsAlwaysOnTop(nextState);
       AudioManager.playClick();
-      showToast(nextState ? (isZh ? '📌 已置顶，边看视频边拼胶！' : '📌 Pinned!') : (isZh ? '已取消置顶' : 'Unpinned'));
+      showToast(nextState ? t('toast_pinned') : t('toast_unpinned'));
     } catch (e) { console.error(e); }
   };
 
@@ -273,8 +273,7 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 🌟 修复：监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
-  // 批次 3：放宽拦截条件 < 2 → < 1，启用单字搜索（如 "扎" / "高" / "独"）
+  // 监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
   useEffect(() => {
     const query = newModelNameInput.trim();
     if (query.length < 1 || selectedGunpla) {
@@ -305,8 +304,7 @@ function App() {
     };
   }, [newModelNameInput, selectedGunpla, searchTrigger]);
 
-  // 🌟 修复：监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
-  // 批次 3：放宽拦截条件 < 2 → < 1，启用单字搜索
+  // 监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
   useEffect(() => {
     const query = legacyInput.trim();
     if (query.length < 1) {
@@ -406,17 +404,18 @@ function App() {
 
   useEffect(() => { if (timerState !== 'Running') setLastRemindedAt(0); }, [timerState]);
 
+  // Tutorial steps 全部改为 t() 国际化
   const tutorialSteps: TourStep[] = [
-    { targetId: 'tour-welcome', title: isZh ? '欢迎来到模途' : 'Welcome to ModelJourney', content: isZh ? '欢迎胶佬！这里是你的专属赛博拼装基地。点击上方任意位置开始。' : 'Welcome! This is your cyber building base.', page: 'focus' },
-    { targetId: 'btn-add-model', title: isZh ? '第一步：建立目标' : 'Step 1: Add Model', content: isZh ? '点击这里【添加模型】。可以搜索你的机体。' : 'Click here to add a model. Search your kit.', page: 'focus' },
-    { targetId: 'btn-add-task', title: isZh ? '第二步：拆分部位' : 'Step 2: Add Part', content: isZh ? '添加模型后，点击【添加部位】，比如"头部"。' : 'After adding a model, click Add Part.', page: 'focus' },
-    { targetId: 'btn-pip', title: isZh ? '悬浮窗模式' : 'PiP Mode', content: isZh ? '点击这里开启悬浮窗，边看视频边拼胶！' : 'Click here to open PiP, watch videos while building!', page: 'focus' },
-    { targetId: 'tour-timer', title: isZh ? '番茄钟与专注' : 'Focus & Timer', content: isZh ? '选择时间，点击【开始】。注意：必须超过 10 秒才能【完成】记录！' : 'Select time, click Start. Must exceed 10s to complete!', page: 'focus' },
-    { targetId: 'tab-gundam', title: isZh ? '机体图鉴' : 'Mecha Archive', content: isZh ? '你收集的机体都在这里，看看还有哪些没拼！' : 'All your collected mechas are here.', page: 'gundam' },
-    { targetId: 'tab-journal', title: isZh ? '制作日程' : 'Journal', content: isZh ? '在【日志】里回顾每一分专注。' : 'Review every focused minute in the Journal.', page: 'journal' },
-    { targetId: 'tab-hangar', title: isZh ? '格纳库' : 'Hangar', content: isZh ? '拼完的模型都会陈列在这里。' : 'Completed models are displayed here.', page: 'hangar' },
-    { targetId: 'tab-gallery', title: isZh ? '塑灵' : 'Animold', content: isZh ? '解锁不同的【塑灵】陪你聊天。' : 'Unlock different Animolds to chat with you.', page: 'gallery' },
-    { targetId: 'tab-profile', title: isZh ? '个人中心' : 'Profile', content: isZh ? '换背景、补录历史模型、导出备份都在这里。' : 'Change backgrounds, import legacy models, and export backups here.', page: 'profile' }
+    { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
+    { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
+    { targetId: 'btn-add-task', title: t('tut_step2_title'), content: t('tut_step2_content'), page: 'focus' },
+    { targetId: 'btn-pip', title: t('tut_pip_title'), content: t('tut_pip_content'), page: 'focus' },
+    { targetId: 'tour-timer', title: t('tut_timer_title'), content: t('tut_timer_content'), page: 'focus' },
+    { targetId: 'tab-gundam', title: t('tut_gundam_title'), content: t('tut_gundam_content'), page: 'gundam' },
+    { targetId: 'tab-journal', title: t('tut_journal_title'), content: t('tut_journal_content'), page: 'journal' },
+    { targetId: 'tab-hangar', title: t('tut_hangar_title'), content: t('tut_hangar_content'), page: 'hangar' },
+    { targetId: 'tab-gallery', title: t('tut_gallery_title'), content: t('tut_gallery_content'), page: 'gallery' },
+    { targetId: 'tab-profile', title: t('tut_profile_title'), content: t('tut_profile_content'), page: 'profile' }
   ];
 
   const handleStart = () => { 
@@ -712,6 +711,7 @@ function App() {
       setCoinsBalance(coinsBalance - cost);
       setUnlockedBots([...unlockedBots, botId]);
       AudioManager.playAchievement(); refreshData();
+      // botId.name / .enName 是数据字段，保留 isZh 选择
       showToast(t('toast_unlock_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
     }
   };
@@ -809,7 +809,7 @@ function App() {
           await win.setAlwaysOnTop(false);
         } catch (e) {}
       }
-      showToast(isZh ? '已恢复主界面' : 'Main UI Restored');
+      showToast(t('toast_main_ui_restored'));
     } else {
       setIsMiniMode(true);
       if (isTauri) {
@@ -820,17 +820,17 @@ function App() {
             await win.unmaximize();
             await new Promise(r => setTimeout(r, 200));
           }
-          await win.setSize(new LogicalSize(400, 700)); // 400 * 1.75 = 700
+          await win.setSize(new LogicalSize(400, 700));
           await win.setAlwaysOnTop(true);
         } catch (e) {}
       }
-      showToast(isZh ? '已进入专注模式' : 'Mini Mode Activated');
+      showToast(t('toast_mini_mode_activated'));
     }
   };
 
   const handleOpenWebPiP = async () => {
     if (!('documentPictureInPicture' in window)) { 
-      showToast(isZh ? '您的浏览器不支持画中画，请使用 Chrome/Edge。' : 'Your browser does not support PiP.'); 
+      showToast(t('toast_pip_not_supported')); 
       return; 
     }
     try {
@@ -856,7 +856,7 @@ function App() {
       pipWin.addEventListener('pagehide', () => setPipWindow(null));
     } catch (err) {
       console.error(err);
-      showToast(isZh ? '画中画打开失败' : 'Failed to open PiP');
+      showToast(t('toast_pip_open_fail'));
     }
   };
 
@@ -868,7 +868,6 @@ function App() {
     isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
     newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
     isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
-    // 搜索状态与触发器
     isSearching, isLegacySearching,
     triggerModelSearch: () => setSearchTrigger(s => s + 1),
     triggerLegacySearch: () => setLegacySearchTrigger(s => s + 1),
@@ -1020,9 +1019,9 @@ function App() {
         {updateInfo && (
           <div className="modal-overlay" style={{ zIndex: 10000, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
             <div className="modal-content" style={{ width: '320px', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)', textAlign: 'center' }}>
-              <h3 style={{ color: '#3b82f6', fontSize: '18px', marginBottom: '12px' }}>🚀 发现新版本 v{updateInfo.version}</h3>
+              <h3 style={{ color: '#3b82f6', fontSize: '18px', marginBottom: '12px' }}>{t('update_new_version_title', { version: updateInfo.version })}</h3>
               <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '16px', lineHeight: 1.5, maxHeight: '80px', overflowY: 'auto', textAlign: 'left', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '4px' }}>
-                {updateInfo.body || '包含常规更新与 Bug 修复。'}
+                {updateInfo.body || t('update_default_body')}
               </p>
               
               {updateProgress !== null ? (
@@ -1031,8 +1030,8 @@ function App() {
                 </div>
               ) : (
                 <div className="modal-actions" style={{ justifyContent: 'center' }}>
-                  <button className="btn start" style={{ flex: 1 }} onClick={handleDownloadUpdate}>{isZh ? '立即更新' : 'Update Now'}</button>
-                  <button className="btn no" style={{ flex: 1 }} onClick={() => setUpdateInfo(null)}>{isZh ? '稍后提醒' : 'Later'}</button>
+                  <button className="btn start" style={{ flex: 1 }} onClick={handleDownloadUpdate}>{t('update_now')}</button>
+                  <button className="btn no" style={{ flex: 1 }} onClick={() => setUpdateInfo(null)}>{t('update_later')}</button>
                 </div>
               )}
             </div>

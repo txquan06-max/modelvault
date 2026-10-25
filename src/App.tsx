@@ -111,10 +111,10 @@ function App() {
   const [legacyList, setLegacyList] = useState<(GunplaItem & { coverImage?: string })[]>([]);
   const [showLegacyForm, setShowLegacyForm] = useState(false);
 
-  // 🌟 新增：搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
+  // 🌟 搜索状态（用于 UI 状态机展示「搜索中 / 无结果」）
   const [isSearching, setIsSearching] = useState(false);
   const [isLegacySearching, setIsLegacySearching] = useState(false);
-  // 🌟 新增：搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
+  // 🌟 搜索触发器（onFocus 时重新发起搜索，解决 blur 清空后重新聚焦搜索不触发的问题）
   const [searchTrigger, setSearchTrigger] = useState(0);
   const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
   
@@ -273,11 +273,11 @@ function App() {
     GunplaSearch.init();
   }, []);
 
-  // 🌟 新增修复：监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
-  // 之前版本缺失这段代码，导致 searchResults 永远是空数组，搜索栏无反应
+  // 🌟 修复：监听模型名称搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  // 批次 3：放宽拦截条件 < 2 → < 1，启用单字搜索（如 "扎" / "高" / "独"）
   useEffect(() => {
     const query = newModelNameInput.trim();
-    if (query.length < 2 || selectedGunpla) {
+    if (query.length < 1 || selectedGunpla) {
       setSearchResults([]);
       setIsSearching(false);
       return;
@@ -305,10 +305,11 @@ function App() {
     };
   }, [newModelNameInput, selectedGunpla, searchTrigger]);
 
-  // 🌟 新增修复：监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  // 🌟 修复：监听历史补录搜索输入变化，防抖 200ms 调用 GunplaSearch.search
+  // 批次 3：放宽拦截条件 < 2 → < 1，启用单字搜索
   useEffect(() => {
     const query = legacyInput.trim();
-    if (query.length < 2) {
+    if (query.length < 1) {
       setLegacyResults([]);
       setIsLegacySearching(false);
       return;
@@ -867,7 +868,7 @@ function App() {
     isAddingModel, setIsAddingModel, newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
     newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks, handleAddModel,
     isAddingTask, setIsAddingTask, newTaskName, setNewTaskName, handleAddTask,
-    // 🌟 新增：搜索状态与触发器
+    // 搜索状态与触发器
     isSearching, isLegacySearching,
     triggerModelSearch: () => setSearchTrigger(s => s + 1),
     triggerLegacySearch: () => setLegacySearchTrigger(s => s + 1),

@@ -17,7 +17,7 @@ export const FocusPanel = ({
   handleOpenWebPiP, handleToggleMiniMode, 
   isAddingModel, setIsAddingModel, isAddingTask, setIsAddingTask,
   newModelNameInput, setNewModelNameInput, selectedGunpla, setSelectedGunpla, searchResults, setSearchResults,
-  // 🌟 新增：搜索状态与触发器
+  // 搜索状态与触发器
   isSearching, triggerModelSearch,
   newModelGrade, setNewModelGrade, newModelSeriesInput, setNewModelSeriesInput, useDefaultTasks, setUseDefaultTasks,
   newTaskName, setNewTaskName, handleAddModel, handleAddTask, isWholeBuild, setIsWholeBuild,
@@ -403,8 +403,8 @@ export const FocusPanel = ({
               onBlur={() => setTimeout(() => setSearchResults([]), 200)} 
               onFocus={(e: any) => { handleFocus(e); triggerModelSearch(); }} 
             />
-            {/* 🌟 修复：状态机渲染（搜索中 / 无结果 / 结果列表） */}
-            {!selectedGunpla && newModelNameInput.trim().length >= 2 && (
+            {/* 🌟 状态机渲染（搜索中 / 无结果 / 结果列表）；批次 3：放宽展示条件 >= 2 → >= 1，启用单字搜索 */}
+            {!selectedGunpla && newModelNameInput.trim().length >= 1 && (
               <div className="autocomplete-dropdown">
                 {isSearching && searchResults.length === 0 && (
                   <div className="autocomplete-item" style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', cursor: 'default' }}>

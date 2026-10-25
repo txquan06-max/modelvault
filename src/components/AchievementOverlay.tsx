@@ -33,7 +33,6 @@ export const AchievementOverlay = ({ achievement, onClose, t, i18n }: { achievem
 
   if (!achievement) return null;
 
-  const isZh = i18n.language === 'zh';
   const color = RARITY_COLORS[achievement.rarity];
 
   return (
@@ -56,7 +55,7 @@ export const AchievementOverlay = ({ achievement, onClose, t, i18n }: { achievem
         
         <div style={{ fontSize: '60px', marginBottom: '20px', filter: `drop-shadow(0 0 20px ${color})` }}>🏆</div>
         <h2 style={{ color: color, fontSize: '14px', letterSpacing: '4px', textTransform: 'uppercase', marginBottom: '8px', fontWeight: 'bold' }}>
-          {isZh ? '成就解锁' : 'Achievement Unlocked'}
+          {t('achievement_unlocked_label')}
         </h2>
         <h1 style={{ color: '#fff', fontSize: '24px', margin: '0 0 12px 0', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
           {t(achievement.nameKey)}

@@ -367,5 +367,7 @@
   "bg_pos_top": "Top",
   "bg_pos_bottom": "Bottom",
   "bg_pos_left": "Left",
-  "bg_pos_right": "Right"
+  "bg_pos_right": "Right",
+  "splash_waking": "Waking up Animold terminal...",
+  "achievement_unlocked_label": "Achievement Unlocked"
 }

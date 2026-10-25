@@ -367,6 +367,7 @@
   "bg_pos_top": "顶部对齐 (Top)",
   "bg_pos_bottom": "底部对齐 (Bottom)",
   "bg_pos_left": "左对齐 (Left)",
-  "bg_pos_right": "右对齐 (Right)"
-
+   "bg_pos_right": "右对齐 (Right)",
+  "splash_waking": "正在唤醒塑灵终端...",
+  "achievement_unlocked_label": "成就解锁"
 }

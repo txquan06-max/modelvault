@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
+  const { t } = useTranslation();
   const [fadeOut, setFadeOut] = useState(false);
   
-  // 🌟 修复：使用 useRef 保存回调，防止父组件重渲染导致倒计时无限重置
+  // 使用 useRef 保存回调，防止父组件重渲染导致倒计时无限重置
   const onFinishRef = useRef(onFinish);
   useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
 
@@ -11,10 +13,10 @@ export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
     const timer = setTimeout(() => {
       setFadeOut(true);
       setTimeout(() => onFinishRef.current(), 500); // 等待淡出动画结束
-    }, 1500); // 启动页显示 1.5 秒
+    }, 1250); // 启动页显示 1.25 秒
     
     return () => clearTimeout(timer);
-  }, []); // 🌟 依赖数组留空，确保只执行一次
+  }, []); // 依赖数组留空，确保只执行一次
 
   return (
     <div style={{
@@ -27,7 +29,7 @@ export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         MODELVAULT
       </h1>
       <p style={{ color: '#3b82f6', fontSize: '12px', marginTop: '10px', letterSpacing: '2px' }}>
-        正在唤醒塑灵终端...
+        {t('splash_waking')}
       </p>
     </div>
   );

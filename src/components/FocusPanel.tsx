@@ -403,17 +403,17 @@ export const FocusPanel = ({
               onBlur={() => setTimeout(() => setSearchResults([]), 200)} 
               onFocus={(e: any) => { handleFocus(e); triggerModelSearch(); }} 
             />
-            {/* 🌟 状态机渲染（搜索中 / 无结果 / 结果列表）；批次 3：放宽展示条件 >= 2 → >= 1，启用单字搜索 */}
+            {/* 状态机渲染（搜索中 / 无结果 / 结果列表）；批次 5：文案改为 t() 国际化 */}
             {!selectedGunpla && newModelNameInput.trim().length >= 1 && (
               <div className="autocomplete-dropdown">
                 {isSearching && searchResults.length === 0 && (
                   <div className="autocomplete-item" style={{ textAlign: 'center', color: '#aaa', fontStyle: 'italic', cursor: 'default' }}>
-                    🔄 {isZh ? '搜索中...' : 'Searching...'}
+                    🔄 {t('search_loading')}
                   </div>
                 )}
                 {!isSearching && searchResults.length === 0 && (
                   <div className="autocomplete-item" style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', cursor: 'default' }}>
-                    ❌ {isZh ? '未找到匹配的机体，可手动输入名称' : 'No matching kits found. You can enter a custom name.'}
+                    ❌ {t('search_empty_custom')}
                   </div>
                 )}
                 {searchResults.map((item: any, idx: number) => {

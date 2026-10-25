@@ -301,5 +301,7 @@
   "legacy_add_cover": "📷 Add Cover (Optional)",
   "toast_audio_too_large": "Audio file too large (max 2MB)",
   "audioTyping": "Typing Sound",
-  "default": "Default"
+  "default": "Default",
+  "search_empty_custom": "No matching kits found. You can enter a custom name.",
+  "gundam_loading": "Loading Mecha Archive..."
 }

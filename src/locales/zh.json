@@ -301,5 +301,7 @@
   "legacy_add_cover": "📷 添加封面图 (可选)",
   "toast_audio_too_large": "音频文件太大（最大2MB）",
   "audioTyping": "打字机音效",
-  "default": "默认"
+    "default": "默认",
+  "search_empty_custom": "未找到匹配的机体，可手动输入名称",
+  "gundam_loading": "正在加载机体图鉴..."
 }

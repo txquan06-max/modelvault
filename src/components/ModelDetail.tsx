@@ -145,7 +145,7 @@ export const ModelDetail = (props: any) => {
               {!coverPreviewUrl && <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>{t('noImage')}</div>}
             </div>
             <div style={{ fontSize: '11px', color: '#aaa', lineHeight: 1.5 }}>
-              {isZh ? '这是该图片在格纳库卡片中的真实显示效果 (4:3)。' : 'This is how it looks in the Hangar (4:3).'}
+              {t('cover_preview_hint')}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -170,7 +170,7 @@ export const ModelDetail = (props: any) => {
             <button className={`btn ${rebuildMode === 'whole' ? 'start' : 'no'}`} style={{ flex: 1, padding: '10px' }} onClick={() => { AudioManager.playClick(); setRebuildMode('whole'); }}>{t('rebuild_by_whole')}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontSize: '12px', color: '#ccc' }}>{isZh ? '勾选你当时已经完成的流程：' : 'Check completed stages:'}</span>
+            <span style={{ fontSize: '12px', color: '#ccc' }}>{t('rebuild_check_stages')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
               {['stage_assembly', 'stage_scribing', 'stage_lining', 'stage_painting', 'stage_topcoat'].map(stageKey => (
                 <label key={stageKey} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', cursor: 'pointer' }}>
@@ -180,7 +180,7 @@ export const ModelDetail = (props: any) => {
               ))}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn start" style={{ flex: 1, padding: '8px' }} onClick={handleConfirmRebuild}>{isZh ? '确认并开始改造' : 'Confirm & Start Rebuild'}</button>
+              <button className="btn start" style={{ flex: 1, padding: '8px' }} onClick={handleConfirmRebuild}>{t('rebuild_confirm_start')}</button>
               <button className="btn no" style={{ flex: 1, padding: '8px' }} onClick={() => { AudioManager.playClick(); setIsEditingImportedStatus(false); }}>{t('cancel')}</button>
             </div>
           </div>
@@ -189,10 +189,10 @@ export const ModelDetail = (props: any) => {
 
       {showRebuildConfirm && (
         <div className="inline-confirm" style={{ border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-          <div className="confirm-text" style={{ fontSize: '14px' }}>{isZh ? '改造状态已激活！' : 'Rebuild activated!'}<br /><span>{isZh ? '是否直接跳转至专注页面开始制作？' : 'Jump to focus page now?'}</span></div>
+          <div className="confirm-text" style={{ fontSize: '14px' }}>{t('rebuild_activated')}<br /><span>{t('rebuild_jump_prompt')}</span></div>
           <div className="confirm-actions">
-            <button className="btn yes" onClick={handleDoRebuild}>{isZh ? '是，前往专注' : 'Yes, go to Focus'}</button>
-            <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>{isZh ? '留在详情页' : 'Stay here'}</button>
+            <button className="btn yes" onClick={handleDoRebuild}>{t('rebuild_yes_go_focus')}</button>
+            <button className="btn no" onClick={() => { AudioManager.playClick(); setShowRebuildConfirm(false); }}>{t('rebuild_stay_here')}</button>
           </div>
         </div>
       )}
@@ -257,7 +257,7 @@ export const ModelDetail = (props: any) => {
                               onClick={() => { setEditingNoteStageId(stage.id); setNoteText(stage.note || ''); }}
                               style={{ fontSize: '12px', color: stage.note ? '#ccc' : '#666', cursor: 'pointer', fontStyle: stage.note ? 'normal' : 'italic', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                             >
-                              <span style={{ whiteSpace: 'pre-wrap' }}>{stage.note || (isZh ? '+ 添加制作心得...' : '+ Add build note...')}</span>
+                              <span style={{ whiteSpace: 'pre-wrap' }}>{stage.note || t('add_note_hint')}</span>
                               <span style={{ fontSize: '10px', opacity: 0.5 }}>📝</span>
                             </div>
                           )}
@@ -268,7 +268,7 @@ export const ModelDetail = (props: any) => {
                   
                   {(!needsRebuild || task.name !== 'part_legacy') && (
                     <button className="mini-btn" style={{ width: '100%', marginTop: '12px', background: '#3b82f6', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold' }} onClick={() => { AudioManager.playClick(); handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
-                      ⏱ {isZh ? '开始专注' : 'Start Focus'}
+                      ⏱ {t('start_focus')}
                     </button>
                   )}
                 </div>
@@ -279,7 +279,7 @@ export const ModelDetail = (props: any) => {
       </div>
 
       <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🎨 {isZh ? '选择战报样式' : 'Select Report Style'}</div>
+        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🎨 {t('report_select_style')}</div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {(['cyber', 'minimal', 'glitch'] as ShareCardTemplate[]).map(tpl => (
             <button
@@ -292,7 +292,7 @@ export const ModelDetail = (props: any) => {
                 border: `1px solid ${template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`
               }}
             >
-              {tpl === 'cyber' ? (isZh ? '赛博光晕' : 'Cyber') : tpl === 'minimal' ? (isZh ? '极简白描' : 'Minimal') : (isZh ? '故障错位' : 'Glitch')}
+              {tpl === 'cyber' ? t('report_cyber') : tpl === 'minimal' ? t('report_minimal') : t('report_glitch')}
             </button>
           ))}
         </div>

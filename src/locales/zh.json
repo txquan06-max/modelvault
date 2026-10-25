@@ -303,5 +303,14 @@
   "audioTyping": "打字机音效",
     "default": "默认",
   "search_empty_custom": "未找到匹配的机体，可手动输入名称",
-  "gundam_loading": "正在加载机体图鉴..."
+  "gundam_loading": "正在加载机体图鉴...",
+  "cover_preview_hint": "这是该图片在格纳库卡片中的真实显示效果 (4:3)。",
+  "rebuild_check_stages": "勾选你当时已经完成的流程：",
+  "rebuild_confirm_start": "确认并开始改造",
+  "rebuild_activated": "改造状态已激活！",
+  "rebuild_jump_prompt": "是否直接跳转至专注页面开始制作？",
+  "rebuild_yes_go_focus": "是，前往专注",
+  "rebuild_stay_here": "留在详情页",
+  "add_note_hint": "+ 添加制作心得...",
+  "start_focus": "开始专注"
 }

@@ -303,5 +303,14 @@
   "audioTyping": "Typing Sound",
   "default": "Default",
   "search_empty_custom": "No matching kits found. You can enter a custom name.",
-  "gundam_loading": "Loading Mecha Archive..."
+  "gundam_loading": "Loading Mecha Archive...",
+  "cover_preview_hint": "This is how it looks in the Hangar (4:3).",
+  "rebuild_check_stages": "Check completed stages:",
+  "rebuild_confirm_start": "Confirm & Start Rebuild",
+  "rebuild_activated": "Rebuild activated!",
+  "rebuild_jump_prompt": "Jump to focus page now?",
+  "rebuild_yes_go_focus": "Yes, go to Focus",
+  "rebuild_stay_here": "Stay here",
+  "add_note_hint": "+ Add build note...",
+  "start_focus": "Start Focus"
 }

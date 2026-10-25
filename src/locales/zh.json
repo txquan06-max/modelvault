@@ -369,5 +369,21 @@
   "bg_pos_left": "左对齐 (Left)",
    "bg_pos_right": "右对齐 (Right)",
   "splash_waking": "正在唤醒塑灵终端...",
-  "achievement_unlocked_label": "成就解锁"
+  "achievement_unlocked_label": "成就解锁",
+  "error_crash_title": "⚠️ Oops! 页面崩溃了",
+  "error_crash_desc": "发生了意外错误。你可以先尝试导出当前数据（如果还能读取），然后重置应用。",
+  "error_export_failed": "导出失败，可能数据已损坏。",
+  "error_reset_warning_1": "警告：重置将清空你所有的模型数据！",
+  "error_reset_warning_2": "你是否已经导出了备份？",
+  "error_confirm_reset": "确认清空",
+  "error_emergency_export": "抢救性导出数据",
+  "error_clear_and_reset": "清空数据并重置",
+  "toast_update_failed": "❌ 更新失败",
+  "tour_title_hint": "新手教程",
+  "btn_toggle_always_on_top": "切换窗口置顶",
+  "toast_select_part": "⚠️ 请先选择一个部位",
+  "confirmLeaveFocus": "当前正在专注计时中，离开将中断专注，确定要离开吗？",
+  "toast_cover_updated": "✅ 封面已更新",
+  "toast_bg_updated": "✅ 背景已更新",
+  "toast_audio_updated": "✅ 音效已更新"
 }

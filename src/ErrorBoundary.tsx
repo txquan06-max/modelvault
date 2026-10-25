@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { StorageManager } from './core/StorageManager';
+import i18n from './i18n';
 
 interface Props {
   children: ReactNode;
@@ -62,7 +63,7 @@ export class ErrorBoundary extends Component<Props, State> {
       URL.revokeObjectURL(url);
       this.setState({ exportError: null });
     } catch (err) {
-      this.setState({ exportError: '导出失败，可能数据已损坏。' });
+      this.setState({ exportError: i18n.t('error_export_failed') });
     }
   };
 
@@ -82,7 +83,7 @@ export class ErrorBoundary extends Component<Props, State> {
             fontFamily: 'sans-serif',
           }}
         >
-          <h2 style={{ color: '#ef4444' }}>⚠️ Oops! 页面崩溃了</h2>
+          <h2 style={{ color: '#ef4444' }}>{i18n.t('error_crash_title')}</h2>
           <p
             style={{
               color: '#aaa',
@@ -92,7 +93,7 @@ export class ErrorBoundary extends Component<Props, State> {
               lineHeight: '1.5',
             }}
           >
-            发生了意外错误。你可以先尝试导出当前数据（如果还能读取），然后重置应用。
+            {i18n.t('error_crash_desc')}
             <br />
             <br />
             <span style={{ fontSize: '12px', color: '#ef4444', wordBreak: 'break-all' }}>
@@ -125,9 +126,9 @@ export class ErrorBoundary extends Component<Props, State> {
                   margin: 0,
                 }}
               >
-                警告：重置将清空你所有的模型数据！
+                {i18n.t('error_reset_warning_1')}
                 <br />
-                你是否已经导出了备份？
+                {i18n.t('error_reset_warning_2')}
               </p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
@@ -142,7 +143,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     fontWeight: 'bold',
                   }}
                 >
-                  取消
+                  {i18n.t('cancel')}
                 </button>
                 <button
                   onClick={this.handleConfirmReset}
@@ -156,7 +157,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     fontWeight: 'bold',
                   }}
                 >
-                  确认清空
+                  {i18n.t('error_confirm_reset')}
                 </button>
               </div>
             </div>
@@ -174,7 +175,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   fontWeight: 'bold',
                 }}
               >
-                抢救性导出数据
+                {i18n.t('error_emergency_export')}
               </button>
               <button
                 onClick={this.handleAskReset}
@@ -188,7 +189,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   fontWeight: 'bold',
                 }}
               >
-                清空数据并重置
+                {i18n.t('error_clear_and_reset')}
               </button>
             </div>
           )}

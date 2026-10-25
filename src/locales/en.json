@@ -369,5 +369,21 @@
   "bg_pos_left": "Left",
   "bg_pos_right": "Right",
   "splash_waking": "Waking up Animold terminal...",
-  "achievement_unlocked_label": "Achievement Unlocked"
+  "achievement_unlocked_label": "Achievement Unlocked",
+  "error_crash_title": "⚠️ Oops! Page Crashed",
+  "error_crash_desc": "An unexpected error occurred. Try exporting your data first (if readable), then reset the app.",
+  "error_export_failed": "Export failed. Data may be corrupted.",
+  "error_reset_warning_1": "Warning: Reset will clear ALL your model data!",
+  "error_reset_warning_2": "Have you exported a backup?",
+  "error_confirm_reset": "Confirm Reset",
+  "error_emergency_export": "Emergency Data Export",
+  "error_clear_and_reset": "Clear Data & Reset",
+  "toast_update_failed": "❌ Update failed",
+  "tour_title_hint": "Beginner Tutorial",
+  "btn_toggle_always_on_top": "Toggle Always on Top",
+  "toast_select_part": "⚠️ Please select a part first",
+  "confirmLeaveFocus": "Focus timer is running. Leaving will interrupt your focus. Are you sure?",
+  "toast_cover_updated": "✅ Cover updated",
+  "toast_bg_updated": "✅ Background updated",
+  "toast_audio_updated": "✅ Sound updated"
 }

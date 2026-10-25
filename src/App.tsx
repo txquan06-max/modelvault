@@ -221,7 +221,7 @@ function App() {
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (err) {
-      showToast('❌ 更新失败');
+      showToast(t('toast_update_failed'));
       setUpdateProgress(null);
     }
   };
@@ -512,6 +512,7 @@ function App() {
   const handleAddModel = () => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
+    // nameObj / seriesObj 数据字段保留双语（写入数据库，双语同时存在）
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
 
@@ -940,11 +941,11 @@ function App() {
             <button 
               onClick={toggleAlwaysOnTop} 
               style={{ background: isAlwaysOnTop ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: isAlwaysOnTop ? '#fff' : '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-              title={isZh ? '切换窗口置顶' : 'Toggle Always on Top'}
+              title={t('btn_toggle_always_on_top')}
             >
               📌
             </button>
-            <button onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="新手教程">?</button>
+            <button onClick={() => { AudioManager.playClick(); setShowTutorial(true); }} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={t('tour_title_hint')}>?</button>
             <button className="lang-btn" onClick={() => { AudioManager.playClick(); const next = isZh ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); }}>{isZh ? 'EN' : '中'}</button>
           </div>
 

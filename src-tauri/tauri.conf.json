@@ -2,10 +2,10 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ModelJourney",
   "version": "0.1.0",
-  "identifier": "com.modeljourney.app", 
+  "identifier": "com.modeljourney.app",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173", 
+    "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
@@ -16,7 +16,7 @@
         "width": 1100,
         "height": 800,
         "minWidth": 300,
-        "minHeight": 525,
+        "minHeight": 300,
         "resizable": true,
         "fullscreen": false,
         "center": true,

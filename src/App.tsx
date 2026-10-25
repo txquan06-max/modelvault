@@ -27,7 +27,14 @@ import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
-// 本地文件 blob URL 组件（用于背景图 local:// 渲染）
+// 教程完成奖励标记
+const TUTORIAL_REWARD_KEY = 'mv_tutorial_rewarded';
+
+// 极简模式目标尺寸
+const MINI_MODE_SIZE = { width: 525, height: 300 };
+const NORMAL_MODE_SIZE = { width: 1100, height: 800 };
+
+// 本地文件 blob URL 组件
 const LocalImage = ({ src, ...props }: any) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -46,7 +53,6 @@ function App() {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // ==================== Store（只拿 App.tsx 真正需要的） ====================
   const {
     models, setModels, currentModelId, setCurrentModelId,
     currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
@@ -64,7 +70,6 @@ function App() {
     ambientType,
   } = useAppStore();
 
-  // ==================== 本地 UI state ====================
   const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem('hasSeenTutorial') === null);
   const [isMiniMode, setIsMiniMode] = useState(false);
@@ -73,7 +78,6 @@ function App() {
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // ModelDetail 相关
   const [isEditingCover, setIsEditingCover] = useState(false);
   const [isEditingImportedStatus, setIsEditingImportedStatus] = useState(false);
   const [importedStages, setImportedStages] = useState<string[]>([]);
@@ -81,16 +85,13 @@ function App() {
   const [pendingRebuildTask, setPendingRebuildTask] = useState<string | null>(null);
   const [rebuildMode, setRebuildMode] = useState<'part' | 'whole'>('part');
 
-  // 成就
   const [activeAchievement, setActiveAchievement] = useState<AchievementData | null>(null);
   const [achievementQueue, setAchievementQueue] = useState<AchievementData[]>([]);
 
-  // 更新
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
-  // refs
   const isMiniModeRef = useRef(isMiniMode);
   useEffect(() => { isMiniModeRef.current = isMiniMode; }, [isMiniMode]);
   const lastRemindedAtRef = useRef(0);
@@ -116,7 +117,25 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // ==================== Timer tick（驱动 store） ====================
+  // ==================== Tauri 托盘事件监听（系统托盘右键 开始/暂停 计时） ====================
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: any = null;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen<string>('tray:action', (e) => {
+        const action = e.payload;
+        const store = useAppStore.getState();
+        if (action === 'start' && store.timerState === 'Idle') {
+          store.startTimer();
+        } else if (action === 'pause' && store.timerState === 'Running') {
+          store.pauseTimer();
+        }
+      }).then((u) => { unlisten = u; });
+    });
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
+  // ==================== Timer tick ====================
   useEffect(() => {
     const interval = setInterval(() => {
       useAppStore.getState().tickTimer();
@@ -240,7 +259,7 @@ function App() {
     if (newlyEarned.length > 0) setAchievementQueue(prev => [...prev, ...newlyEarned as AchievementData[]]);
   };
 
-  // ==================== Mini mode（FocusPanel 通过事件触发） ====================
+  // ==================== 极简模式（525 × 300 横窗口） ====================
   const handleToggleMiniMode = useCallback(async () => {
     if (isMiniModeRef.current) {
       setIsMiniMode(false);
@@ -248,7 +267,7 @@ function App() {
         try {
           const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');
           const win = getCurrentWindow();
-          await win.setSize(new LogicalSize(1100, 800));
+          await win.setSize(new LogicalSize(NORMAL_MODE_SIZE.width, NORMAL_MODE_SIZE.height));
           await win.setAlwaysOnTop(false);
         } catch (e) {}
       }
@@ -263,7 +282,8 @@ function App() {
             await win.unmaximize();
             await new Promise(r => setTimeout(r, 200));
           }
-          await win.setSize(new LogicalSize(400, 700));
+          // 525 x 300 横窗口
+          await win.setSize(new LogicalSize(MINI_MODE_SIZE.width, MINI_MODE_SIZE.height));
           await win.setAlwaysOnTop(true);
         } catch (e) {}
       }
@@ -473,19 +493,47 @@ function App() {
     showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
   };
 
-  // ==================== Tutorial ====================
+  // ==================== 教程（两端隔开 + 首次完成奖励） ====================
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
     { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
     { targetId: 'btn-add-task', title: t('tut_step2_title'), content: t('tut_step2_content'), page: 'focus' },
-    { targetId: 'btn-pip', title: t('tut_pip_title'), content: t('tut_pip_content'), page: 'focus' },
+    // 平台专属第 4 步：Tauri = 专注极简模式；Web = 网页悬浮窗
+    ...(isTauri
+      ? [{ targetId: 'btn-mini-mode', title: t('tut_mini_title'), content: t('tut_mini_content'), page: 'focus' as const }]
+      : [{ targetId: 'btn-web-pip', title: t('tut_pip_title'), content: t('tut_pip_content'), page: 'focus' as const }]
+    ),
     { targetId: 'tour-timer', title: t('tut_timer_title'), content: t('tut_timer_content'), page: 'focus' },
+    // 新增：打卡
+    { targetId: 'tour-checkin', title: t('tut_checkin_title'), content: t('tut_checkin_content'), page: 'focus' },
     { targetId: 'tab-gundam', title: t('tut_gundam_title'), content: t('tut_gundam_content'), page: 'gundam' },
     { targetId: 'tab-journal', title: t('tut_journal_title'), content: t('tut_journal_content'), page: 'journal' },
     { targetId: 'tab-hangar', title: t('tut_hangar_title'), content: t('tut_hangar_content'), page: 'hangar' },
     { targetId: 'tab-gallery', title: t('tut_gallery_title'), content: t('tut_gallery_content'), page: 'gallery' },
     { targetId: 'tab-profile', title: t('tut_profile_title'), content: t('tut_profile_content'), page: 'profile' }
   ];
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    localStorage.setItem('hasSeenTutorial', 'true');
+
+    // 首次完成教程 → 给奖励
+    if (!localStorage.getItem(TUTORIAL_REWARD_KEY)) {
+      localStorage.setItem(TUTORIAL_REWARD_KEY, '1');
+      const coins = 100;
+      const xp = 20;
+      StorageManager.setCoinsBalance(StorageManager.getCoinsBalance() + coins);
+      StorageManager.setLegacyXP(StorageManager.getLegacyXP() + xp);
+      refreshData();
+      AudioManager.playAchievement();
+      showToast(t('toast_tutorial_reward', { coins, xp }));
+    }
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+    localStorage.setItem('hasSeenTutorial', 'true');
+  };
 
   // ==================== PiP 独立窗口 ====================
   if (isPipMode) {
@@ -496,7 +544,7 @@ function App() {
     );
   }
 
-  // ==================== Mini 模式（Tauri 缩窗） ====================
+  // ==================== Mini 模式（Tauri 525×300 横窗口） ====================
   if (isMiniMode) {
     return (
       <div className="app-wrapper mini-mode-wrapper" style={{ background: '#09090b' }}>
@@ -511,7 +559,8 @@ function App() {
       {showTutorial && !showSplash && (
         <TutorialTour
           steps={tutorialSteps}
-          onClose={() => { setShowTutorial(false); localStorage.setItem('hasSeenTutorial', 'true'); }}
+          onClose={handleTutorialClose}
+          onComplete={handleTutorialComplete}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
         />

@@ -140,7 +140,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
     // 使用 fitText 限制宽度 680
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; 
     const fittedModelName = fitText(ctx, modelName, 680, 56, 'sans-serif', 'bold', 28);
-    ctx.fillText(fittedModelName, 400, 700);
+    ctx.fillText(fittedModelName, 525, 300);
 
     ctx.fillStyle = botColor; ctx.font = 'bold 24px monospace'; 
     ctx.fillText(`[ ${model.grade} | ${seriesName} ]`, 400, 750);
@@ -245,7 +245,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
     const fittedModelName = fitText(ctx, modelName, 680, 70, 'monospace', 'bold', 30);
     ctx.fillStyle = '#ff003c'; ctx.fillText(fittedModelName, 405, 705);
     ctx.fillStyle = '#00f0ff'; ctx.fillText(fittedModelName, 395, 695);
-    ctx.fillStyle = '#ffffff'; ctx.fillText(fittedModelName, 400, 700);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(fittedModelName, 525, 300);
 
     ctx.fillStyle = '#888'; ctx.font = '24px monospace';
     ctx.fillText(`> ${model.grade} / ${seriesName}`, 400, 760);

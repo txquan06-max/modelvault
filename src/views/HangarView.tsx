@@ -98,12 +98,12 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
   );
 };
 
-export const HangarView = (props: any) => {
+export const HangarView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  const { models, setCurrentModelId, setActiveTab } = useAppStore();
-  const { setViewingModelId, setExpandedTaskId } = props;
+  // 🌟 批次 10B：完全零 props，全部从 store 读取
+  const { models, setCurrentModelId, setActiveTab, setViewingModelId, setExpandedTaskId } = useAppStore();
 
   const [activeSubTab, setActiveSubTab] = useState<'completed' | 'backlog'>('completed');
   

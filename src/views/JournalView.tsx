@@ -1,19 +1,35 @@
 // src/views/JournalView.tsx
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
+import { SessionManager } from '../core/SessionManager';
+import { ModelManager } from '../core/ModelManager';
+import { formatTime, formatLogDate, handleFocusScroll, getMonthKey, normalizeMonthInput } from '../utils/format';
 
-export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJournalFilterMonth, formatTime, formatLogDate, handleFocus }: any) => {
+export const JournalView = () => {
+  const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 性能优化：保证单次渲染周期内，只查询和过滤一次日志数据
+  // 🌟 批次 10B：完全零 props，月份过滤器改为组件内部 state
+  const [journalFilterMonth, setJournalFilterMonth] = useState('');
+
+  // 🌟 顺手修复：原 App.tsx 传入的 getHistoryLogs() 并没有应用月份过滤
+  // 这里内聚到 JournalView，并真正按 journalFilterMonth 过滤
   const logs = useMemo(() => {
-    return getHistoryLogs();
-  }, [getHistoryLogs, journalFilterMonth]);
+    const allLogs = SessionManager.getAllSessions()
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .map(s => ({ ...s, details: ModelManager.getTaskDetails(s.taskId) }));
+
+    if (!journalFilterMonth) return allLogs;
+
+    const filterKey = normalizeMonthInput(journalFilterMonth); // YYYY-MM -> YYYYMM
+    return allLogs.filter(s => getMonthKey(s.startedAt) === filterKey);
+  }, [journalFilterMonth]);
 
   return (
     <div className="view-content journal-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
 
-      {/* 🌟 顶部筛选栏：扩大触达面积 + 图标联动 + 暗色原生日历 */}
+      {/* 顶部筛选栏：扩大触达面积 + 图标联动 + 暗色原生日历 */}
       <div
         style={{
           display: 'flex',
@@ -51,7 +67,6 @@ export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJo
               (e.currentTarget as HTMLDivElement).style.borderColor = '#555';
             }}
             onClick={(e) => {
-              // 点击图标或空白区 → 聚焦 + 弹出日历
               if ((e.target as HTMLElement).tagName !== 'INPUT') {
                 const input = e.currentTarget.querySelector('input') as HTMLInputElement | null;
                 if (input) {
@@ -79,7 +94,6 @@ export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJo
                 setJournalFilterMonth(e.target.value);
               }}
               onClick={(e) => {
-                // Chrome/Edge 99+ 支持 showPicker()，点击立即弹日历
                 (e.currentTarget as HTMLInputElement).showPicker?.();
               }}
               style={{
@@ -95,7 +109,7 @@ export const JournalView = ({ t, i18n, getHistoryLogs, journalFilterMonth, setJo
                 minWidth: 0,
                 minHeight: '40px',
               }}
-              onFocus={handleFocus}
+              onFocus={handleFocusScroll}
             />
           </div>
 

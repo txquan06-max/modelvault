@@ -33,29 +33,19 @@ const useLocalImageSrc = (image?: string): string | null => {
   return url;
 };
 
-const LocalHero = ({ image, children, onClick }: { image: string, children: React.ReactNode, onClick: () => void }) => {
-  const url = useLocalImageSrc(image);
+// 🌟 顶部相册缩略图组件
+const GalleryPhoto = ({ url, onClick, onRemove }: { url: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
+  const resolvedUrl = useLocalImageSrc(url);
   return (
-    <div className="detail-hero" style={{ backgroundImage: url ? `url(${url})` : 'none', cursor: 'pointer' }} onClick={onClick}>
-      {children}
-    </div>
-  );
-};
-
-const PhotoThumbnail = ({ photoUrl, onClick, onRemove }: { photoUrl: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
-  const url = useLocalImageSrc(photoUrl);
-  const { t } = useTranslation();
-  return (
-    <div style={{ position: 'relative', width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', background: '#222' }} onClick={onClick}>
-      {url ? (
-        <img src={url} alt="progress" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    <div style={{ width: '160px', height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative', flexShrink: 0, background: '#222', scrollSnapAlign: 'start' }}>
+      {resolvedUrl ? (
+        <img src={resolvedUrl} alt="gallery" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={onClick} />
       ) : (
-        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', color: '#666' }}>{t('loading')}</div>
+        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#666', fontSize: '12px' }}>加载中</div>
       )}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(e); }}
-        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#ef4444', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-        title={t('delete')}
+        style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', color: '#ef4444', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
       >
         ✕
       </button>
@@ -63,7 +53,26 @@ const PhotoThumbnail = ({ photoUrl, onClick, onRemove }: { photoUrl: string, onC
   );
 };
 
-// 🌟 图表组件
+// 工序内的小缩略图组件
+const PhotoThumbnail = ({ photoUrl, onClick, onRemove }: { photoUrl: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
+  const url = useLocalImageSrc(photoUrl);
+  return (
+    <div style={{ position: 'relative', width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', background: '#222' }} onClick={onClick}>
+      {url ? (
+        <img src={url} alt="progress" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', color: '#666' }}>...</div>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove(e); }}
+        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#ef4444', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
 const STAGE_COLORS: Record<string, string> = {
   stage_assembly: '#3b82f6',
   stage_scribing: '#8b5cf6',
@@ -147,7 +156,6 @@ export const ModelDetail = (props: any) => {
   } = props;
 
   const allSessions = SessionManager.getAllSessions();
-
   const needsRebuild = viewingModel.isImported && !viewingModel.isRebuilding;
   const coverPreviewUrl = useLocalImageSrc(viewingModel.coverImage);
 
@@ -158,8 +166,11 @@ export const ModelDetail = (props: any) => {
   const [saveProgress, setSaveProgress] = useState('');
 
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
-  const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<{ taskId: string, stageId: string, photoUrl: string } | null>(null);
   const previewResolvedUrl = useLocalImageSrc(previewPhotoUrl || undefined);
+
+  // 删除确认
+  const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<{ taskId: string, stageId: string, photoUrl: string } | null>(null);
+  const [deleteGalleryConfirm, setDeleteGalleryConfirm] = useState<string | null>(null);
 
   const stageTimeStats = useMemo(() => {
     const stageTime: Record<string, number> = {};
@@ -205,6 +216,59 @@ export const ModelDetail = (props: any) => {
     }
   };
 
+  // 🌟 顶部通用相册上传
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    showToast(t('processing'));
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async (ev) => {
+      const img = new Image();
+      img.src = ev.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width; let h = img.height;
+        if (w > 1280) { h = Math.round((h * 1280) / w); w = 1280; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(async (blob) => {
+          let finalBlob = blob;
+          let ext = 'webp';
+          if (!blob) {
+            finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+            ext = 'jpg';
+          }
+          if (!finalBlob) return;
+          
+          const filename = `${FILE_SUBDIRS.PROGRESS}/gallery_${Date.now()}.${ext}`;
+          const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
+          const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
+          
+          const updated = ModelManager.addModelGalleryPhoto(viewingModel.id, finalUrl);
+          setModels(updated);
+          refreshData();
+          showToast(t('toast_photo_added'));
+          useAppStore.getState().triggerAutoBackup();
+        }, 'image/webp', 0.6);
+      };
+    };
+    e.target.value = '';
+  };
+
+  const confirmRemoveGallery = () => {
+    if (!deleteGalleryConfirm) return;
+    AudioManager.playClick();
+    const updated = ModelManager.removeModelGalleryPhoto(viewingModel.id, deleteGalleryConfirm);
+    setModels(updated);
+    refreshData();
+    setDeleteGalleryConfirm(null);
+    showToast(t('toast_deleted'));
+    useAppStore.getState().triggerAutoBackup();
+  };
+
+  // 🌟 工序内专属相册上传
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, taskId: string, stageId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -328,19 +392,43 @@ export const ModelDetail = (props: any) => {
 
   return (
     <div className="detail-view">
-      <LocalHero image={viewingModel.coverImage} onClick={() => setIsEditingCover(true)}>
-        <div className="detail-hero-info">
-          <div className="detail-title">{isZh ? viewingModel.name.zh : viewingModel.name.en}</div>
-          <div className="detail-subtitle">
-            <span>{viewingModel.grade} | {isZh ? viewingModel.series.zh : viewingModel.series.en}</span>
-            <span>{t('totalTime')}: {formatTime(viewingModelTotalSec)}</span>
+      {/* 🌟 顶部：相册轮播区 */}
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', marginBottom: '16px' }}>
+        
+        {/* 1. 封面卡片 */}
+        <div 
+          className="detail-hero" 
+          style={{ minWidth: '85%', width: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'start', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}
+          onClick={() => setIsEditingCover(true)}
+        >
+          <div className="detail-hero-info" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)' }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>{isZh ? viewingModel.name.zh : viewingModel.name.en}</div>
+            <div style={{ fontSize: '12px', color: '#ccc', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{viewingModel.grade} | {isZh ? viewingModel.series.zh : viewingModel.series.en}</span>
+              <span>{t('totalTime')}: {formatTime(viewingModelTotalSec)}</span>
+            </div>
           </div>
+          <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>📷 {t('btn_cover')}</div>
         </div>
-        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10, background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontSize: '14px' }}>📷</span>
-          <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>{t('btn_cover')}</span>
-        </div>
-      </LocalHero>
+
+        {/* 2. 相册照片 */}
+        {viewingModel.galleryPhotos?.map((url: string) => (
+          <GalleryPhoto
+            key={url}
+            url={url}
+            onClick={() => setPreviewPhotoUrl(url)}
+            onRemove={() => setDeleteGalleryConfirm(url)}
+          />
+        ))}
+
+        {/* 3. 上传按钮 */}
+        <label style={{ width: '160px', height: '180px', flexShrink: 0, scrollSnapAlign: 'start', borderRadius: '12px', border: '2px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', gap: '8px' }}>
+          <span style={{ fontSize: '32px' }}>+</span>
+          <span style={{ fontSize: '12px' }}>{t('add_progress_photo')}</span>
+          <input type="file" accept="image/*" onChange={handleGalleryUpload} style={{ display: 'none' }} />
+        </label>
+
+      </div>
 
       <StageDistributionChart stageTime={stageTimeStats} formatTime={formatTime} t={t} />
 
@@ -443,6 +531,7 @@ export const ModelDetail = (props: any) => {
                           </div>
                         </div>
 
+                        {/* 工序专属照片 */}
                         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginTop: '8px' }}>
                           {photos.map((url: string, idx: number) => (
                             <PhotoThumbnail
@@ -452,7 +541,7 @@ export const ModelDetail = (props: any) => {
                               onRemove={() => setDeletePhotoConfirm({ taskId: task.id, stageId: stage.id, photoUrl: url })}
                             />
                           ))}
-                          <label style={{ width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', border: '1px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', fontSize: '20px' }}>
+                          <label style={{ width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', border: '1px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', fontSize: '20px' }} title={t('add_stage_photo')}>
                             +
                             <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, task.id, stage.id)} style={{ display: 'none' }} />
                           </label>
@@ -530,6 +619,7 @@ export const ModelDetail = (props: any) => {
         </button>
       </div>
 
+      {/* 大图预览弹窗 */}
       {previewPhotoUrl && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'zoom-out' }} onClick={() => setPreviewPhotoUrl(null)}>
           {previewResolvedUrl ? (
@@ -541,6 +631,24 @@ export const ModelDetail = (props: any) => {
         document.body
       )}
 
+      {/* 删除相册图确认 */}
+      {deleteGalleryConfirm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '12px', border: '1px solid #444', maxWidth: '320px', width: '100%' }}>
+            <h3 style={{ color: '#ef4444', marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>⚠️ {t('photo_delete_title')}</h3>
+            <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px', lineHeight: 1.5 }}>
+              {t('photo_delete_desc')}
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn yes" style={{ flex: 1, background: '#ef4444' }} onClick={confirmRemoveGallery}>{t('confirm')}</button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setDeleteGalleryConfirm(null); }}>{t('cancel')}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 删除工序图确认 */}
       {deletePhotoConfirm && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '12px', border: '1px solid #444', maxWidth: '320px', width: '100%' }}>

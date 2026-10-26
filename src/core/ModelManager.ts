@@ -8,8 +8,8 @@ export interface BuildStage {
   nameKey: string;
   status: StageStatus;
   xpReward: number;
-  photoUrl?: string; // 🌟 保留：兼容旧版
-  processPhotos?: string[]; // 🌟 新增：多图相册
+  photoUrl?: string;
+  processPhotos?: string[];
   note?: string;
 }
 
@@ -29,6 +29,7 @@ export interface Model {
   grade: string;
   status: 'NotStarted' | 'InProgress' | 'Completed';
   coverImage?: string;
+  galleryPhotos?: string[]; // 🌟 新增：模型级相册
   isRebuilding?: boolean;
   isImported?: boolean; 
   tasks: Task[];
@@ -75,6 +76,7 @@ export class ModelManager {
         ...m,
         name: isLegacyName ? { en: m.name, zh: m.name } : m.name,
         series: typeof m.series === 'string' ? { en: m.series, zh: m.series } : m.series,
+        galleryPhotos: Array.isArray(m.galleryPhotos) ? m.galleryPhotos : [], // 🌟 兼容补全
       };
     });
 
@@ -107,6 +109,28 @@ export class ModelManager {
     return models;
   }
 
+  // 🌟 新增：模型通用相册增删
+  static addModelGalleryPhoto(modelId: string, photoUrl: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model) {
+      if (!model.galleryPhotos) model.galleryPhotos = [];
+      model.galleryPhotos.push(photoUrl);
+      this.saveModels(models);
+    }
+    return models;
+  }
+
+  static removeModelGalleryPhoto(modelId: string, photoUrl: string): Model[] {
+    const models = this.getAllModels();
+    const model = models.find(m => m.id === modelId);
+    if (model && model.galleryPhotos) {
+      model.galleryPhotos = model.galleryPhotos.filter(url => url !== photoUrl);
+      this.saveModels(models);
+    }
+    return models;
+  }
+
   static getTotalXP(): number {
     let xp = StorageManager.getLegacyXP();
     this.getAllModels().forEach(m => m.tasks.forEach(t => {
@@ -130,7 +154,7 @@ export class ModelManager {
 
     const newModel: Model = {
       id: modelId, name: nameObj, series: seriesObj, grade, status: 'NotStarted',
-      tasks
+      tasks, galleryPhotos: []
     };
     models.push(newModel);
     this.saveModels(models);
@@ -151,7 +175,8 @@ export class ModelManager {
         status: 'Completed',
         coverImage: item.coverImage,
         isImported: true,
-        tasks: [generateImportedTask(modelId)]
+        tasks: [generateImportedTask(modelId)],
+        galleryPhotos: []
       });
       count++;
     });
@@ -294,7 +319,6 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 新增：追加过程照到指定工序
   static addStagePhoto(taskId: string, stageId: string, photoUrl: string): Model[] {
     const models = this.getAllModels();
     for (const m of models) {
@@ -312,7 +336,6 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 新增：移除指定的过程照
   static removeStagePhoto(taskId: string, stageId: string, photoUrl: string): Model[] {
     const models = this.getAllModels();
     for (const m of models) {
@@ -329,7 +352,6 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 修改：completeStage 自动把 photoUrl 存入 processPhotos
   static completeStage(taskId: string, stageId: string | null, photoUrl?: string, note?: string): Model[] {
     const models = this.getAllModels();
     let isStageCompletedNow = false;
@@ -341,7 +363,7 @@ export class ModelManager {
           if (stage && stage.status !== 'Completed') { 
             stage.status = 'Completed'; 
             if (photoUrl) {
-              stage.photoUrl = photoUrl; // 保留旧字段
+              stage.photoUrl = photoUrl; 
               if (!stage.processPhotos) stage.processPhotos = [];
               stage.processPhotos.push(photoUrl);
             }

@@ -432,5 +432,7 @@
   "tut_photo_title": "Progress Album",
   "tut_photo_content": "In the build log, click '+' under a stage to upload multiple photos. Click thumbnails for full-screen view!",
   "tut_gallery_mount_title": "Expand Gallery",
-  "tut_gallery_mount_content": "Click here to mount a local folder! Covers, progress photos, and reports will be saved to your disk, safe and space-saving."
+  "tut_gallery_mount_content": "Click here to mount a local folder! Covers, progress photos, and reports will be saved to your disk, safe and space-saving.",
+  "add_progress_photo": "Add Photo",
+  "add_stage_photo": "Add Stage Photo"
 }

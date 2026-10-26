@@ -19,10 +19,33 @@ interface FocusPanelProps {
   onClose?: () => void;
 }
 
+/**
+ * 🌟 选项 A - 3：双端兼容的通知函数
+ * - Tauri 端：走 @tauri-apps/plugin-notification（原生系统通知）
+ * - Web 端：走浏览器 Notification API
+ */
 const sendNativeNotification = (title: string, body: string) => {
   if (typeof window === 'undefined') return;
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body, icon: '/bots/tia_avatar.png' });
+
+  if (isTauriEnv) {
+    import('@tauri-apps/plugin-notification').then(async ({ isPermissionGranted, requestPermission, sendNotification }) => {
+      try {
+        let granted = await isPermissionGranted();
+        if (!granted) {
+          const permission = await requestPermission();
+          granted = permission === 'granted';
+        }
+        if (granted) {
+          sendNotification({ title, body });
+        }
+      } catch (e) {
+        console.warn('[Tauri] sendNotification failed:', e);
+      }
+    });
+  } else {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/bots/tia_avatar.png' });
+    }
   }
 };
 

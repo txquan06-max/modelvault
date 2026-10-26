@@ -135,6 +135,30 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
+  // ==================== 🌟 选项 A - 2：全局快捷键 Ctrl+Shift+S 监听 ====================
+  // 语义：Idle → 开始（需有部位）；Running → 暂停；Paused → 继续
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: any = null;
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen('shortcut:toggle-timer', () => {
+        const store = useAppStore.getState();
+        if (store.timerState === 'Idle') {
+          if (store.currentTaskId) {
+            store.startTimer();
+          } else {
+            store.showToast(i18n.t('toast_select_part'));
+          }
+        } else if (store.timerState === 'Running') {
+          store.pauseTimer();
+        } else if (store.timerState === 'Paused') {
+          store.resumeTimer();
+        }
+      }).then((u) => { unlisten = u; });
+    });
+    return () => { if (unlisten) unlisten(); };
+  }, [i18n]);
+
   // ==================== Timer tick ====================
   useEffect(() => {
     const interval = setInterval(() => {
@@ -200,17 +224,36 @@ function App() {
     };
   }, [i18n.language, webChatInterval, pipChatInterval, isMiniMode, showSplash, isWindowActive]);
 
-  // ==================== Timebox 结束通知 ====================
+  // ==================== 🌟 选项 A - 3：Timebox 结束通知（双端兼容） ====================
   useEffect(() => {
     const state = useAppStore.getState();
     if (timerState === 'Running' && state.timeboxTarget > 0 && activeSeconds >= state.timeboxTarget && !state.hasPlayedTimeboxSound) {
       AudioManager.playTimeboxEnd();
       useAppStore.getState().setHasPlayedTimeboxSound(true);
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(t('notify_timebox_end_title'), { body: t('notify_timebox_end_body'), icon: '/bots/tia_avatar.png' });
+
+      const title = t('notify_timebox_end_title');
+      const body = t('notify_timebox_end_body');
+
+      if (isTauri) {
+        import('@tauri-apps/plugin-notification').then(async ({ isPermissionGranted, requestPermission, sendNotification }) => {
+          try {
+            let granted = await isPermissionGranted();
+            if (!granted) {
+              const p = await requestPermission();
+              granted = p === 'granted';
+            }
+            if (granted) sendNotification({ title, body });
+          } catch (e) {
+            console.warn('[Tauri] timebox notification failed:', e);
+          }
+        });
+      } else {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, { body, icon: '/bots/tia_avatar.png' });
+        }
       }
     }
-  }, [activeSeconds, timerState]);
+  }, [activeSeconds, timerState, t]);
 
   // ==================== 定期提醒 ====================
   useEffect(() => {
@@ -229,7 +272,7 @@ function App() {
 
   // ==================== 通知权限 & 拖拽拦截 ====================
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+    if (!isTauri && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
     const preventDefault = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); };

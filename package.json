@@ -1,14 +1,15 @@
 {
   "name": "modelvault-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "predev": "node scripts/check-port.js",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release": "node scripts/bump-version.js"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.10.8",

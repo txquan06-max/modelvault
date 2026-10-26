@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "ModelJourney",
-  "version": "0.1.0",
+  "productName": "模途",
+  "version": "0.1.1",
   "identifier": "com.modeljourney.app",
   "build": {
     "frontendDist": "../dist",

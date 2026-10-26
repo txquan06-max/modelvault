@@ -55,10 +55,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: 'ModelJourney v__VERSION__'
           releaseBody: 'See the assets to download and install this version.'
+          # 保持 Draft：等所有平台的附件都传完再统一发布
           releaseDraft: true
           prerelease: false
+          # 关键：自动生成并上传 latest.json，缺了它自动更新就失效
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # 🚀 所有平台都构建完成后，自动把草稿转为正式发布（用户无需手动点任何东西）
+  publish-release:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 从 push 触发的 tag 拿到版本名，将 Draft 一次性发布
+          gh release edit "${{ github.ref_name }}" --draft=false
+          echo "✅ Release ${{ github.ref_name }} has been published."

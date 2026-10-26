@@ -9,6 +9,8 @@ import { useAppStore } from '../store/useAppStore';
 import type { ShareCardTemplate } from '../utils/shareCard';
 import { generateShareCard } from '../utils/shareCard';
 
+const isTauriEnv = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
 const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -61,6 +63,7 @@ export const ModelDetail = (props: any) => {
   const [editingNoteStageId, setEditingNoteStageId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [template, setTemplate] = useState<ShareCardTemplate>('cyber');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -85,7 +88,7 @@ export const ModelDetail = (props: any) => {
 
     const updated = ModelManager.updateStageNote(taskId, stageId, noteText);
     setModels(updated);
-    refreshData(); 
+    refreshData();
     setEditingNoteStageId(null);
     setNoteText('');
 
@@ -94,12 +97,28 @@ export const ModelDetail = (props: any) => {
     }
   };
 
-  const handleGenerateShareCard = () => {
+  // 🌟 修复战报生成：Blob 输出 + 三端保存逻辑
+  const handleGenerateShareCard = async () => {
+    if (isGenerating) return;
     AudioManager.playClick();
+    setIsGenerating(true);
+
     const detailedStats = ModelManager.getDetailedStatsForShareCard(viewingModel.id);
-    if (detailedStats) {
-      const formatFn = (sec: number) => { const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0'); const s = (sec % 60).toString().padStart(2, '0'); if (h > 0) return `${h}:${m}:${s}`; return `${m}:${s}`; };
-      generateShareCard({
+    if (!detailedStats) {
+      setIsGenerating(false);
+      return;
+    }
+
+    const formatFn = (sec: number) => {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      if (h > 0) return `${h}:${m}:${s}`;
+      return `${m}:${s}`;
+    };
+
+    try {
+      const blob = await generateShareCard({
         model: detailedStats.model,
         totalTime: detailedStats.totalTime,
         stageTimes: detailedStats.stageTimes,
@@ -110,14 +129,44 @@ export const ModelDetail = (props: any) => {
         currentBot,
         equippedTitle,
         formatTime: formatFn,
-        t
-      }).then((url) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ModelVault_${detailedStats.model.name.en.replace(/\s+/g, '_')}.jpg`;
-        a.click();
-        showToast(t('toast_report_saved'));
-      }).catch(() => showToast(t('toast_report_fail')));
+        t,
+      });
+
+      const safeName = (detailedStats.model.name.en || 'model').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+      const filename = `ModelVault_${safeName}_${Date.now()}.jpg`;
+
+      if (isTauriEnv) {
+        // 🌟 Tauri 端优先保存到挂载的本地图库
+        const localPath = await StorageManager.saveFileToLocal(filename, blob);
+        if (localPath) {
+          AudioManager.playFinishPart();
+          showToast(isZh ? '✅ 已保存到本地图库' : '✅ Saved to local gallery');
+          setIsGenerating(false);
+          return;
+        }
+        // 未挂载图库 → 明确提示用户先挂载
+        showToast(isZh ? '⚠️ 请先在个人中心挂载本地图库' : '⚠️ Please mount a local gallery first (Profile → Data Expansion)');
+        setIsGenerating(false);
+        return;
+      }
+
+      // Web 端：传统浏览器下载
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      AudioManager.playFinishPart();
+      showToast(t('toast_report_saved'));
+    } catch (err) {
+      console.error('[Share Card] Failed:', err);
+      showToast(t('toast_report_fail'));
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -218,13 +267,13 @@ export const ModelDetail = (props: any) => {
                   <span style={{ color: '#666', fontSize: '12px', width: '16px', textAlign: 'center' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
               </div>
-              
+
               {isExpanded && (
                 <div className="timeline-content" style={{ padding: '16px' }}>
                   {task.stages.map((stage: any) => {
                     const stageTime = taskSessions.filter((s: any) => s.stageId === stage.id).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
                     const isEditingThisNote = editingNoteStageId === stage.id;
-                    
+
                     return (
                       <div key={stage.id} className={`stage-detail-item ${stage.status === 'Completed' ? 'done' : ''}`}>
                         <div className={`stage-detail-header ${stage.status === 'Completed' ? 'done' : ''}`}>
@@ -234,9 +283,9 @@ export const ModelDetail = (props: any) => {
                             <span>{stage.status === 'Completed' ? 'Done' : (stage.status === 'InProgress' ? 'In Progress' : 'Pending')}</span>
                           </div>
                         </div>
-                        
+
                         {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
-                        
+
                         <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
                           {isEditingThisNote ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -253,7 +302,7 @@ export const ModelDetail = (props: any) => {
                               </div>
                             </div>
                           ) : (
-                            <div 
+                            <div
                               onClick={() => { setEditingNoteStageId(stage.id); setNoteText(stage.note || ''); }}
                               style={{ fontSize: '12px', color: stage.note ? '#ccc' : '#666', cursor: 'pointer', fontStyle: stage.note ? 'normal' : 'italic', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                             >
@@ -265,7 +314,7 @@ export const ModelDetail = (props: any) => {
                       </div>
                     );
                   })}
-                  
+
                   {(!needsRebuild || task.name !== 'part_legacy') && (
                     <button className="mini-btn" style={{ width: '100%', marginTop: '12px', background: '#3b82f6', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold' }} onClick={() => { AudioManager.playClick(); handleJumpToFocus(task.id, task.stages.find((s: any) => s.status !== 'Completed')?.id || task.stages[0].id); }}>
                       ⏱ {t('start_focus')}
@@ -296,8 +345,13 @@ export const ModelDetail = (props: any) => {
             </button>
           ))}
         </div>
-        <button className="btn start" style={{ width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px', fontWeight: 'bold' }} onClick={handleGenerateShareCard}>
-          📸 {t('btn_gen_report')}
+        <button
+          className="btn start"
+          style={{ width: '100%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', border: 'none', padding: '12px', fontWeight: 'bold', opacity: isGenerating ? 0.6 : 1 }}
+          onClick={handleGenerateShareCard}
+          disabled={isGenerating}
+        >
+          {isGenerating ? '⏳ ' + (isZh ? '生成中...' : 'Generating...') : `📸 ${t('btn_gen_report')}`}
         </button>
       </div>
     </div>

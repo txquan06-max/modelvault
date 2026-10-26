@@ -19,18 +19,31 @@ interface ShareCardProps {
   t: (key: string) => string;
 }
 
+// 🌟 修复：blob/data URL 不设置 crossOrigin，避免 Tauri WebView2 下 Canvas 污染
+// 这是战报生成失败的核心原因：
+//   local:// → StorageManager.loadLocalFileUrl → blob://xxx
+//   blob URL + crossOrigin='anonymous' → CORS 失败 → Canvas 污染 → toDataURL 抛 SecurityError
 const loadImage = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (!src.startsWith('blob:') && !src.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;
   });
 };
 
-// 🌟 新增：限制文本宽度的辅助函数（超长则缩小字号，极限情况截断加省略号）
-const fitText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number, baseFontSize: number, fontFamily: string, fontWeight = 'bold', minFontSize = 24) => {
+const fitText = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  baseFontSize: number,
+  fontFamily: string,
+  fontWeight = 'bold',
+  minFontSize = 24
+) => {
   let fontSize = baseFontSize;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
   while (ctx.measureText(text).width > maxWidth && fontSize > minFontSize) {
@@ -47,11 +60,12 @@ const fitText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
   return text;
 };
 
-export const generateShareCard = async (props: ShareCardProps) => {
+// 🌟 返回类型改为 Blob，支持 Tauri saveFileToLocal 直接写入本地图库
+export const generateShareCard = async (props: ShareCardProps): Promise<Blob> => {
   const { model, totalTime, stageTimes, template, isZh, username, level, currentBot, equippedTitle, formatTime, t } = props;
-  
+
   const canvas = document.createElement('canvas');
-  canvas.width = 800; 
+  canvas.width = 800;
   canvas.height = 1200;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context failed');
@@ -59,11 +73,8 @@ export const generateShareCard = async (props: ShareCardProps) => {
   const botData = BOTS[currentBot];
   const botColor = botData.color;
 
-  // 准备基础数据
   const title = UserManager.getTitleLibrary().find(t => t.id === equippedTitle);
-  // 兜底称号改为 i18n（原硬编码 isZh ? '新晋胶佬' : 'New Builder'）
   const titleName = title ? t(title.nameKey) : t('share_default_title');
-  // 数据字段，保留 isZh 选择语言版本
   const modelName = isZh ? model.name.zh : model.name.en;
   const seriesName = isZh ? model.series.zh : model.series.en;
 
@@ -76,17 +87,17 @@ export const generateShareCard = async (props: ShareCardProps) => {
         if (blobUrl) imgUrl = blobUrl;
       }
       coverImg = await loadImage(imgUrl);
-    } catch (e) { console.warn('背景图加载失败'); }
+    } catch (e) { console.warn('背景图加载失败', e); }
   }
 
   let avatarImg: HTMLImageElement | null = null;
-  try { avatarImg = await loadImage(botData.avatar); } catch(e) {}
+  try { avatarImg = await loadImage(botData.avatar); } catch (e) {}
 
   // ============================================
   // 🎨 模板 1: 赛博光晕 (Cyber)
   // ============================================
   if (template === 'cyber') {
-    ctx.fillStyle = '#09090b'; 
+    ctx.fillStyle = '#09090b';
     ctx.fillRect(0, 0, 800, 1200);
 
     const gradient = ctx.createRadialGradient(400, 600, 100, 400, 600, 600);
@@ -102,7 +113,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.globalAlpha = 0.3;
       ctx.drawImage(coverImg, x, y, w, h);
       ctx.globalAlpha = 1.0;
-      
+
       const bottomGrad = ctx.createLinearGradient(0, 600, 0, 1200);
       bottomGrad.addColorStop(0, 'rgba(9,9,11,0.4)');
       bottomGrad.addColorStop(1, 'rgba(9,9,11,1)');
@@ -111,7 +122,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
     }
 
     // 赛博网格
-    ctx.strokeStyle = `${botColor}15`; 
+    ctx.strokeStyle = `${botColor}15`;
     ctx.lineWidth = 1;
     for (let i = 0; i < 800; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1200); ctx.stroke(); }
     for (let i = 0; i < 1200; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
@@ -122,10 +133,9 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.font = 'bold 36px monospace';
     ctx.textAlign = 'left';
     ctx.fillText('MODELJOURNEY', 85, 115);
-    
+
     ctx.fillStyle = '#888';
     ctx.font = '18px monospace';
-    // 修复：'BUILD REPORT // 战报' 拆分为英文美术前缀 + i18n 标签
     ctx.fillText(`BUILD REPORT // ${t('share_report_label')}`, 85, 145);
 
     if (avatarImg) {
@@ -137,20 +147,19 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.beginPath(); ctx.arc(680, 110, 42, 0, Math.PI * 2); ctx.stroke();
     }
 
-    // 使用 fitText 限制宽度 680
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; 
+    // 🌟 修复：原 525 超出画布右侧，改回 400 居中
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
     const fittedModelName = fitText(ctx, modelName, 680, 56, 'sans-serif', 'bold', 28);
-    ctx.fillText(fittedModelName, 525, 300);
+    ctx.fillText(fittedModelName, 400, 300);
 
-    ctx.fillStyle = botColor; ctx.font = 'bold 24px monospace'; 
+    ctx.fillStyle = botColor; ctx.font = 'bold 24px monospace';
     ctx.fillText(`[ ${model.grade} | ${seriesName} ]`, 400, 750);
 
-    ctx.fillStyle = '#10b981'; ctx.font = 'bold 100px monospace'; 
+    ctx.fillStyle = '#10b981'; ctx.font = 'bold 100px monospace';
     ctx.fillText(formatTime(totalTime), 400, 870);
-    ctx.fillStyle = '#666'; ctx.font = 'bold 18px monospace'; 
+    ctx.fillStyle = '#666'; ctx.font = 'bold 18px monospace';
     ctx.fillText('TOTAL FOCUS TIME', 400, 910);
 
-    // 极简数据面板
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.strokeStyle = `${botColor}50`; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(60, 1030, 680, 100, 16); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'left';
@@ -165,7 +174,7 @@ export const generateShareCard = async (props: ShareCardProps) => {
   // 🎨 模板 2: 极简白描 (Minimal)
   // ============================================
   else if (template === 'minimal') {
-    ctx.fillStyle = '#f8f9fa'; 
+    ctx.fillStyle = '#f8f9fa';
     ctx.fillRect(0, 0, 800, 1200);
 
     if (coverImg) {
@@ -177,7 +186,6 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.fillStyle = '#e9ecef'; ctx.fillRect(0, 0, 800, 600);
     }
 
-    // 中间过渡线
     ctx.fillStyle = botColor; ctx.fillRect(0, 596, 800, 8);
 
     ctx.fillStyle = '#212529'; ctx.textAlign = 'center';
@@ -192,12 +200,11 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.fillStyle = '#adb5bd'; ctx.font = '16px monospace';
     ctx.fillText('TOTAL FOCUS TIME', 400, 940);
 
-    // 耗时拆分 (最多展示前 3 个工序)
     const topStages = Object.entries(stageTimes)
       .filter(([_, time]) => time > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
-    
+
     let startY = 990;
     topStages.forEach(([stageKey, time], idx) => {
       ctx.fillStyle = '#495057'; ctx.font = '20px sans-serif'; ctx.textAlign = 'left';
@@ -216,11 +223,10 @@ export const generateShareCard = async (props: ShareCardProps) => {
   // 🎨 模板 3: 故障风 (Glitch)
   // ============================================
   else if (template === 'glitch') {
-    ctx.fillStyle = '#0a0a0a'; 
+    ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, 800, 1200);
 
     if (coverImg) {
-      // 错位重影
       ctx.globalAlpha = 0.4;
       ctx.drawImage(coverImg, -10, 0, 820, 820);
       ctx.fillStyle = 'rgba(255,0,0,0.3)';
@@ -232,7 +238,6 @@ export const generateShareCard = async (props: ShareCardProps) => {
       ctx.fillStyle = 'rgba(10,10,10,0.6)'; ctx.fillRect(0, 0, 800, 800);
     }
 
-    // 扫描线
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let i = 0; i < 1200; i += 4) { ctx.fillRect(0, i, 800, 1); }
 
@@ -240,12 +245,12 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.fillText('SYSTEM_DATA_RECOVERED', 60, 100);
     ctx.fillStyle = '#00f0ff'; ctx.fillText('ERR_0x00FF', 60, 140);
 
-    // 错位字效
+    // 🌟 修复：错位字效主文字回正到 400, 700（原 525, 300 是笔误）
     ctx.textAlign = 'center';
     const fittedModelName = fitText(ctx, modelName, 680, 70, 'monospace', 'bold', 30);
     ctx.fillStyle = '#ff003c'; ctx.fillText(fittedModelName, 405, 705);
     ctx.fillStyle = '#00f0ff'; ctx.fillText(fittedModelName, 395, 695);
-    ctx.fillStyle = '#ffffff'; ctx.fillText(fittedModelName, 525, 300);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(fittedModelName, 400, 700);
 
     ctx.fillStyle = '#888'; ctx.font = '24px monospace';
     ctx.fillText(`> ${model.grade} / ${seriesName}`, 400, 760);
@@ -258,10 +263,16 @@ export const generateShareCard = async (props: ShareCardProps) => {
     ctx.fillStyle = '#fff'; ctx.font = '18px monospace'; ctx.textAlign = 'left';
     ctx.fillText(`USER: ${username}`, 80, 1080);
     ctx.fillText(`LV: ${level} | TITLE: ${titleName}`, 80, 1120);
-    
+
     ctx.fillStyle = '#ff003c'; ctx.textAlign = 'right';
     ctx.fillText(`LINK_ESTABLISHED: ${isZh ? botData.name : botData.enName}`, 720, 1120);
   }
 
-  return canvas.toDataURL('image/jpeg', 0.9);
+  // 🌟 返回 Blob（Tauri 可直存图库，Web 可下载）
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas toBlob failed'));
+    }, 'image/jpeg', 0.9);
+  });
 };

@@ -4,6 +4,7 @@ import { StorageManager, FILE_SUBDIRS } from '../core/StorageManager';
 import { ModelManager } from '../core/ModelManager';
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
 import type { ShareCardTemplate } from '../utils/shareCard';
@@ -11,6 +12,9 @@ import { generateShareCard } from '../utils/shareCard';
 
 const isTauriEnv = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
+// ============================================
+// 图片加载 Hook（处理 local:// 路径）
+// ============================================
 const useLocalImageSrc = (image?: string): string | null => {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -41,6 +45,32 @@ const LocalHero = ({ image, children, onClick }: { image: string, children: Reac
   );
 };
 
+// ============================================
+// 缩略图组件
+// ============================================
+const PhotoThumbnail = ({ photoUrl, onClick, onRemove }: { photoUrl: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
+  const url = useLocalImageSrc(photoUrl);
+  return (
+    <div style={{ position: 'relative', width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', background: '#222' }} onClick={onClick}>
+      {url ? (
+        <img src={url} alt="progress" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', color: '#666' }}>加载中</div>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove(e); }}
+        style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: '#ef4444', border: 'none', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+        title="删除"
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
+// ============================================
+// 主组件
+// ============================================
 export const ModelDetail = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
@@ -65,6 +95,11 @@ export const ModelDetail = (props: any) => {
   const [template, setTemplate] = useState<ShareCardTemplate>('cyber');
   const [isGenerating, setIsGenerating] = useState(false);
   const [saveProgress, setSaveProgress] = useState('');
+
+  // 🌟 相册相关 State
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<{ taskId: string, stageId: string, photoUrl: string } | null>(null);
+  const previewResolvedUrl = useLocalImageSrc(previewPhotoUrl || undefined);
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -98,7 +133,61 @@ export const ModelDetail = (props: any) => {
     }
   };
 
-  // 🌟 战报保存到 reports/ 子目录
+  // 🌟 上传过程照
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, taskId: string, stageId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    showToast(t('processing'));
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async (ev) => {
+      const img = new Image();
+      img.src = ev.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width; let h = img.height;
+        if (w > 1280) { h = Math.round((h * 1280) / w); w = 1280; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(async (blob) => {
+          let finalBlob = blob;
+          let ext = 'webp';
+          if (!blob) {
+            finalBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+            ext = 'jpg';
+          }
+          if (!finalBlob) return;
+          
+          const filename = `${FILE_SUBDIRS.PROGRESS}/progress_${Date.now()}.${ext}`;
+          const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
+          const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
+          
+          const updated = ModelManager.addStagePhoto(taskId, stageId, finalUrl);
+          setModels(updated);
+          refreshData();
+          showToast(t('toast_photo_added') || '✅ 已添加过程照');
+          useAppStore.getState().triggerAutoBackup();
+        }, 'image/webp', 0.6);
+      };
+    };
+    e.target.value = '';
+  };
+
+  // 🌟 确认删除过程照
+  const confirmRemovePhoto = () => {
+    if (!deletePhotoConfirm) return;
+    const { taskId, stageId, photoUrl } = deletePhotoConfirm;
+    AudioManager.playClick();
+    const updated = ModelManager.removeStagePhoto(taskId, stageId, photoUrl);
+    setModels(updated);
+    refreshData();
+    setDeletePhotoConfirm(null);
+    showToast(t('toast_deleted'));
+    useAppStore.getState().triggerAutoBackup();
+  };
+
+  // 🌟 生成战报
   const handleGenerateShareCard = async () => {
     if (isGenerating) return;
     AudioManager.playClick();
@@ -136,8 +225,6 @@ export const ModelDetail = (props: any) => {
       });
 
       const safeName = (detailedStats.model.name.en || 'model').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
-      
-      // 🌟 使用 FILE_SUBDIRS.REPORT 常量，自动存入 reports/ 目录
       const filename = `${FILE_SUBDIRS.REPORT}/ModelVault_${safeName}_${Date.now()}.jpg`;
 
       if (isTauriEnv) {
@@ -150,11 +237,9 @@ export const ModelDetail = (props: any) => {
           showToast(isZh ? '⚠️ 请先在个人中心挂载本地图库' : '⚠️ Please mount a local gallery first (Profile → Data Expansion)');
         }
       } else {
-        // Web 端传统下载（无法直接写本地文件夹）
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        // Web 端仍使用默认下载路径，但文件名保持一致
         a.download = filename.split('/').pop() || filename;
         document.body.appendChild(a);
         a.click();
@@ -275,6 +360,7 @@ export const ModelDetail = (props: any) => {
                   {task.stages.map((stage: any) => {
                     const stageTime = taskSessions.filter((s: any) => s.stageId === stage.id).reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
                     const isEditingThisNote = editingNoteStageId === stage.id;
+                    const photos = stage.processPhotos || [];
 
                     return (
                       <div key={stage.id} className={`stage-detail-item ${stage.status === 'Completed' ? 'done' : ''}`}>
@@ -286,7 +372,22 @@ export const ModelDetail = (props: any) => {
                           </div>
                         </div>
 
-                        {stage.photoUrl && <img src={stage.photoUrl} alt="progress" className="stage-photo" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                        {/* 🌟 相册区域 */}
+                        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginTop: '8px' }}>
+                          {photos.map((url: string, idx: number) => (
+                            <PhotoThumbnail
+                              key={idx}
+                              photoUrl={url}
+                              onClick={() => setPreviewPhotoUrl(url)}
+                              onRemove={() => setDeletePhotoConfirm({ taskId: task.id, stageId: stage.id, photoUrl: url })}
+                            />
+                          ))}
+                          {/* 上传按钮 */}
+                          <label style={{ width: '80px', height: '60px', flexShrink: 0, borderRadius: '6px', border: '1px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', fontSize: '20px' }}>
+                            +
+                            <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, task.id, stage.id)} style={{ display: 'none' }} />
+                          </label>
+                        </div>
 
                         <div style={{ marginTop: '8px', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
                           {isEditingThisNote ? (
@@ -329,6 +430,7 @@ export const ModelDetail = (props: any) => {
         })}
       </div>
 
+      {/* 战报生成区 */}
       <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🎨 {t('report_select_style')}</div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -359,6 +461,39 @@ export const ModelDetail = (props: any) => {
           {isGenerating ? `⏳ ${saveProgress}` : `📸 ${t('btn_gen_report')}`}
         </button>
       </div>
+
+      {/* ============================================
+          全屏大图预览 Modal
+         ============================================ */}
+      {previewPhotoUrl && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'zoom-out' }} onClick={() => setPreviewPhotoUrl(null)}>
+          {previewResolvedUrl ? (
+            <img src={previewResolvedUrl} alt="preview" style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 0 50px rgba(0,0,0,0.5)' }} />
+          ) : (
+            <div style={{ color: '#fff' }}>{isZh ? '加载中...' : 'Loading...'}</div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* ============================================
+          删除二次确认 Modal
+         ============================================ */}
+      {deletePhotoConfirm && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '12px', border: '1px solid #444', maxWidth: '320px', width: '100%' }}>
+            <h3 style={{ color: '#ef4444', marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>⚠️ {isZh ? '删除照片' : 'Delete Photo'}</h3>
+            <p style={{ fontSize: '13px', color: '#ccc', marginBottom: '20px', lineHeight: 1.5 }}>
+              {isZh ? '确定要删除这张过程照片吗？此操作不可逆。' : 'Are you sure you want to delete this progress photo? This cannot be undone.'}
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn yes" style={{ flex: 1, background: '#ef4444' }} onClick={confirmRemovePhoto}>{t('confirm')}</button>
+              <button className="btn no" style={{ flex: 1 }} onClick={() => { AudioManager.playClick(); setDeletePhotoConfirm(null); }}>{t('cancel')}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

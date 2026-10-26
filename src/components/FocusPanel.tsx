@@ -19,11 +19,6 @@ interface FocusPanelProps {
   onClose?: () => void;
 }
 
-/**
- * 双端兼容的通知函数
- * - Tauri 端：@tauri-apps/plugin-notification
- * - Web 端：浏览器 Notification API
- */
 const sendNativeNotification = (title: string, body: string) => {
   if (typeof window === 'undefined') return;
 
@@ -112,7 +107,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - activeSeconds) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && activeSeconds > 0;
 
-  // ===== Effects =====
   useEffect(() => {
     const timer = setInterval(() => {
       setLocalTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -195,7 +189,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [newModelNameInput, selectedGunpla, searchTrigger]);
 
-  // ===== 事件处理 =====
   const togglePipLayout = () => {
     const next = pipLayout === 'left' ? 'right' : 'left';
     setPipLayout(next);
@@ -213,11 +206,8 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     const result = CheckinManager.checkin();
     if (result.success) {
       AudioManager.playAchievement();
-      // 🌟 关键修复：直接同步更新 store，不依赖异步 refreshData
-      // 这样即便用户立刻切到极简模式，极简模式的 FocusPanel 也能读到最新状态
       useAppStore.setState({ isCheckedIn: true, checkinStreak: result.streak });
       showToast(t('toast_checkin_success', { streak: result.streak, xp: result.rewardXp, coins: result.rewardCoins }));
-      // 其他数据（金币、XP、成就等）通过 refreshData 异步刷新即可
       refreshData();
       AchievementManager.checkAll();
     } else showToast(t('alreadyCheckedIn'));
@@ -313,8 +303,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
   };
 
-  // 🌟 PiP 打开改为派发事件，由 App.tsx 统一通过 React Portal 处理
-  // 这样可以避免 PiP 窗口因 location.href 重定向被浏览器自动关闭
   const handleOpenWebPiP = () => {
     if (!('documentPictureInPicture' in window)) {
       showToast(t('toast_pip_not_supported'));
@@ -362,7 +350,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     </div>
   );
 
-  // ==================== PiP 模式（含 Tauri 525×300 横窗口 + Web PiP Portal） ====================
+  // ==================== PiP 模式 ====================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -686,14 +674,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
             <button className="btn no" onClick={() => setIsFinishingPart(false)}>{t('cancel')}</button>
           </div>
         </div>
-      ) : lastSession ? (
-        <div className="inline-confirm" style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}>
-          <div className="confirm-text">{t('saved')}: {formatTime(lastSession.duration)}<br /><span>{t('confirmStage')}</span></div>
-          <div className="confirm-actions" style={{ marginTop: '16px', flexWrap: 'wrap', gap: '8px' }}>
-            <button className="btn yes" onClick={handleConfirmStageDone}>{t('yesDone')}</button>
-            <button className="btn no" onClick={handleCancelDone}>{t('keepWorking')}</button>
-          </div>
-        </div>
       ) : (
         <div className="controls" style={{ width: '100%', marginTop: '12px', flexWrap: 'wrap' }}>
           {timerState === 'Idle' && <button className="btn start" style={{ padding: '14px', fontSize: '16px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
@@ -706,9 +686,55 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   );
 
   return (
-    <div className="focus-layout">
-      <div className="focus-left">{leftContent}</div>
-      <div className="focus-right">{rightContent}</div>
-    </div>
+    <>
+      <div className="focus-layout">
+        <div className="focus-left">{leftContent}</div>
+        <div className="focus-right">{rightContent}</div>
+      </div>
+
+      {/* 🌟 标准模式下的专注结算全屏浮层 */}
+      {lastSession && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{
+            background: 'linear-gradient(145deg, #1e293b, #0f172a)',
+            border: `1px solid ${botData.color}80`,
+            boxShadow: `0 10px 40px ${botData.color}30`,
+            borderRadius: '24px',
+            padding: '30px 20px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            position: 'relative',
+            animation: 'fadeIn 0.3s ease-out'
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: `linear-gradient(90deg, transparent, ${botData.color}, transparent)`, borderTopLeftRadius: '24px', borderTopRightRadius: '24px' }} />
+            
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', margin: '0 auto 16px', border: `3px solid ${botData.color}`, background: '#111', overflow: 'hidden', boxShadow: `0 0 20px ${botData.color}50` }}>
+              <img src={botData.avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            
+            <h2 style={{ fontSize: '18px', color: '#fff', marginBottom: '8px', fontWeight: 'bold' }}>{t('focus_complete_title')}</h2>
+            <p style={{ fontSize: '13px', color: botData.color, marginBottom: '20px', lineHeight: '1.5', fontStyle: 'italic', minHeight: '40px' }}>
+              「 {QuoteEngine.getCompleteQuote(i18n.language)} 」
+            </p>
+            
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>{t('saved')}</div>
+            <div style={{ fontSize: '56px', fontWeight: 'bold', fontFamily: 'monospace', color: '#f8fafc', marginBottom: '20px', textShadow: `0 0 20px ${botData.color}40`, fontVariantNumeric: 'tabular-nums' }}>
+              {formatTime(lastSession.duration)}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button className="btn start" style={{ padding: '16px', fontSize: '16px', fontWeight: 'bold', borderRadius: '12px' }} onClick={handleConfirmStageDone}>
+                ✅ {t('yesDone')}
+              </button>
+              <button className="btn no" style={{ padding: '16px', fontSize: '16px', fontWeight: 'bold', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={handleCancelDone}>
+                🔄 {t('keepWorking')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };

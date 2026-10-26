@@ -436,5 +436,6 @@
   "add_progress_photo": "添加拼装相册",
   "add_stage_photo": "添加工序照片",
   "toast_time_saved": "✅ 时长已保存，下次点击开始即可接着拼",
-  "reset_clear_assets": "同时清空本地图库中的媒体文件（封面、相册、音频）","scroll_to_top": "回到顶部"
+  "reset_clear_assets": "同时清空本地图库中的媒体文件（封面、相册、音频）","scroll_to_top": "回到顶部",
+  "focus_complete_title": "本轮专注完成！"
 }

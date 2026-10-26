@@ -437,5 +437,6 @@
   "add_stage_photo": "Add Stage Photo",
   "toast_time_saved": "✅ Time saved. Click Start to continue anytime.",
   "reset_clear_assets": "Also clear media files in the mounted gallery (covers, photos, audio)",
-  "scroll_to_top": "Scroll to Top"
+  "scroll_to_top": "Scroll to Top",
+  "focus_complete_title": "Focus Session Complete!"
 }

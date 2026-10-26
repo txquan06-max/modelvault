@@ -97,6 +97,23 @@ function App() {
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
 
+  // ==================== 🌟 新增：音频挂起与释放清理 ====================
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        AudioManager.suspend();
+      } else {
+        AudioManager.resume();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // 卸载时清理所有音频资源
+      AudioManager.dispose();
+    };
+  }, []);
+
   // ==================== 启动静音 + 首次交互解锁 ====================
   useEffect(() => {
     AudioManager.lock();
@@ -603,37 +620,27 @@ function App() {
     showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
   };
 
-  // ==================== 教程 (Update) ====================
+  // ==================== 教程 ====================
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
     { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
     { targetId: 'btn-add-task', title: t('tut_step2_title'), content: t('tut_step2_content'), page: 'focus' },
     { targetId: 'tour-timer', title: t('tut_timer_title'), content: t('tut_timer_content'), page: 'focus' },
     { targetId: 'tour-checkin', title: t('tut_checkin_title'), content: t('tut_checkin_content'), page: 'focus' },
-    
-    // 🌟 桌面端专属：快捷键提示（不需要真实 DOM 节点）
     ...(isTauri
       ? [{ targetId: '', title: t('tut_shortcut_title'), content: t('tut_shortcut_content'), page: 'focus' as const }]
       : [{ targetId: 'btn-web-pip', title: t('tut_pip_title'), content: t('tut_pip_content'), page: 'focus' as const }]
     ),
-    
-    // 🌟 桌面端专属：极简模式
     ...(isTauri
       ? [{ targetId: 'btn-mini-mode', title: t('tut_mini_title'), content: t('tut_mini_content'), page: 'focus' as const }]
       : []
     ),
-
     { targetId: 'tab-gundam', title: t('tut_gundam_title'), content: t('tut_gundam_content'), page: 'gundam' },
     { targetId: 'tab-journal', title: t('tut_journal_title'), content: t('tut_journal_content'), page: 'journal' },
     { targetId: 'tab-hangar', title: t('tut_hangar_title'), content: t('tut_hangar_content'), page: 'hangar' },
-    
-    // 🌟 提示相册功能（挂在 Hangar 界面）
     { targetId: '', title: t('tut_photo_title'), content: t('tut_photo_content'), page: 'hangar' },
-
     { targetId: 'tab-gallery', title: t('tut_gallery_title'), content: t('tut_gallery_content'), page: 'gallery' },
     { targetId: 'tab-profile', title: t('tut_profile_title'), content: t('tut_profile_content'), page: 'profile' },
-
-    // 🌟 提示本地图库挂载（挂在 Profile 界面）
     { targetId: 'tour-gallery-mount', title: t('tut_gallery_mount_title'), content: t('tut_gallery_mount_content'), page: 'profile' }
   ];
 

@@ -71,6 +71,8 @@ const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>
   },
 };
 
+const AUDIO_URL_CACHE_MAX = 10;
+
 export class AudioManager {
   private static ctx: AudioContext | null = null;
   private static lastClickTime = 0;
@@ -84,8 +86,8 @@ export class AudioManager {
   private static lastPlayTime: Record<string, number> = {};
   private static DEBOUNCE_MS = 100;
 
-  // 🌟 新增：缓存 local:// 音效转换后的 blob URL
-  private static audioUrlCache: Record<string, string> = {};
+  // 🌟 改为 LRU 缓存结构
+  private static audioUrlCache: Map<string, { url: string, lastAccess: number }> = new Map();
 
   private static getCtx(): AudioContext {
     if (!this.ctx) {
@@ -115,7 +117,40 @@ export class AudioManager {
     this.unlocked = false;
   }
 
-  // 🌟 新增：预加载自定义音效（解决 local:// 协议无法直接播放的问题）
+  // 🌟 新增：页面隐藏时挂起上下文，节省后台电量
+  static async suspend() {
+    if (!this.ctx) return;
+    if (this.isCtxRunning(this.ctx)) {
+      try { await this.ctx.suspend(); } catch (e) {}
+    }
+  }
+
+  static async resume() {
+    if (!this.ctx) return;
+    if (!this.isCtxRunning(this.ctx)) {
+      try { await this.ctx.resume(); } catch (e) {}
+    }
+  }
+
+  // 🌟 新增：彻底释放所有资源（用于全局卸载/重置）
+  static dispose() {
+    this.stopAmbient();
+    
+    this.audioUrlCache.forEach(val => URL.revokeObjectURL(val.url));
+    this.audioUrlCache.clear();
+
+    if (this.ctx) {
+      try { this.ctx.close(); } catch (e) {}
+      this.ctx = null;
+    }
+
+    this.lastPlayTime = {};
+    this.pendingPlays.forEach(t => clearTimeout(t));
+    this.pendingPlays.clear();
+    this.unlocked = true;
+  }
+
+  // 🌟 修改：预加载并执行 LRU 清理
   static async preloadCustomAudios() {
     const customAudios = StorageManager.getCustomAudios();
     const wakeup = StorageManager.getCustomWakeupSound();
@@ -123,16 +158,42 @@ export class AudioManager {
     const urlsToLoad = [...Object.values(customAudios), wakeup].filter(u => typeof u === 'string' && u.startsWith('local://')) as string[];
     
     for (const url of urlsToLoad) {
-      if (!this.audioUrlCache[url]) {
+      if (!this.audioUrlCache.has(url)) {
         const blobUrl = await StorageManager.loadLocalFileUrl(url);
-        if (blobUrl) this.audioUrlCache[url] = blobUrl;
+        if (blobUrl) {
+          // 如果达到上限，清理最旧的
+          if (this.audioUrlCache.size >= AUDIO_URL_CACHE_MAX) {
+            let oldestKey = '';
+            let oldestTime = Infinity;
+            for (const [k, v] of this.audioUrlCache.entries()) {
+              if (v.lastAccess < oldestTime) {
+                oldestTime = v.lastAccess;
+                oldestKey = k;
+              }
+            }
+            if (oldestKey) {
+              URL.revokeObjectURL(this.audioUrlCache.get(oldestKey)!.url);
+              this.audioUrlCache.delete(oldestKey);
+            }
+          }
+          this.audioUrlCache.set(url, { url: blobUrl, lastAccess: Date.now() });
+        }
+      } else {
+        // 更新访问时间
+        const cached = this.audioUrlCache.get(url)!;
+        cached.lastAccess = Date.now();
       }
     }
   }
 
   private static getPlayableUrl(src: string): string | null {
     if (src.startsWith('local://')) {
-      return this.audioUrlCache[src] || null;
+      const cached = this.audioUrlCache.get(src);
+      if (cached) {
+        cached.lastAccess = Date.now();
+        return cached.url;
+      }
+      return null;
     }
     return src;
   }
@@ -179,6 +240,13 @@ export class AudioManager {
 
       osc.start(now);
       osc.stop(now + spec.duration + 0.02);
+      
+      // 显式断开连接，帮助 GC
+      setTimeout(() => {
+        osc.disconnect();
+        gain.disconnect();
+      }, (spec.duration + 0.1) * 1000);
+      
     } catch (e) {}
   }
 
@@ -208,14 +276,14 @@ export class AudioManager {
         audio.play().catch(e => console.warn('Audio play failed', e));
         return true;
       }
-      // 如果是从 local:// 加载但还没准备好，尝试异步加载一次并播放
       if (src.startsWith('local://')) {
         StorageManager.loadLocalFileUrl(src).then(blobUrl => {
           if (blobUrl) {
-            this.audioUrlCache[src] = blobUrl;
+            // 此处不加入 audioUrlCache，避免瞬时播放把 LRU 冲掉，直接播放后释放
             const audio = new Audio(blobUrl);
             audio.volume = 0.5;
             audio.play().catch(e => console.warn('Audio play failed', e));
+            audio.onended = () => URL.revokeObjectURL(blobUrl);
           }
         });
         return true;
@@ -224,10 +292,11 @@ export class AudioManager {
     return false;
   }
 
+  private static pendingPlays = new Map<SoundType, ReturnType<typeof setTimeout>>();
+
   private static play(type: SoundType) {
     if (!this.unlocked) return;
 
-    // wakeup 走自定义音效路径（不受防抖限制，闹钟必须响）
     if (type === 'wakeup') {
       const customWakeup = StorageManager.getCustomWakeupSound();
       if (customWakeup) {
@@ -241,10 +310,10 @@ export class AudioManager {
         if (customWakeup.startsWith('local://')) {
           StorageManager.loadLocalFileUrl(customWakeup).then(blobUrl => {
             if (blobUrl) {
-              this.audioUrlCache[customWakeup] = blobUrl;
               const audio = new Audio(blobUrl);
               audio.volume = 1.0;
               audio.play().catch(e => console.warn('Wakeup sound play failed', e));
+              audio.onended = () => URL.revokeObjectURL(blobUrl);
             }
           });
           return;
@@ -275,11 +344,17 @@ export class AudioManager {
     }
 
     try { ctx.resume().catch(() => {}); } catch {}
-    this.ensureRunning(ctx).then((ok) => {
-      if (!ok) return;
-      if (this.lastPlayTime[type] !== requestTime) return;
-      this.playSpecs(spec);
-    });
+    
+    if (this.pendingPlays.has(type)) return;
+    const timer = setTimeout(() => {
+      this.pendingPlays.delete(type);
+      this.ensureRunning(ctx).then((ok) => {
+        if (!ok) return;
+        if (this.lastPlayTime[type] !== requestTime) return;
+        this.playSpecs(spec);
+      });
+    }, 80);
+    this.pendingPlays.set(type, timer);
   }
 
   static playClick() {
@@ -374,10 +449,11 @@ export class AudioManager {
 
   static stopAmbient() {
     if (this.ambientSource) {
-      try { this.ambientSource.stop(); } catch (e) {}
+      try { this.ambientSource.stop(); this.ambientSource.disconnect(); } catch (e) {}
       this.ambientSource = null;
     }
     if (this.ambientGain) {
+      this.ambientGain.disconnect();
       this.ambientGain = null;
     }
     this.currentAmbient = 'none';

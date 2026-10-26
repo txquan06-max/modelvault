@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { SessionManager } from './core/SessionManager';
 import { ModelManager } from './core/ModelManager';
@@ -27,14 +28,10 @@ import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
-// 教程完成奖励标记
 const TUTORIAL_REWARD_KEY = 'mv_tutorial_rewarded';
-
-// 极简模式目标尺寸
 const MINI_MODE_SIZE = { width: 525, height: 300 };
 const NORMAL_MODE_SIZE = { width: 1100, height: 800 };
 
-// 本地文件 blob URL 组件
 const LocalImage = ({ src, ...props }: any) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -92,10 +89,28 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
+  // 🌟 Web PiP：Portal 容器
+  const [webPipContainer, setWebPipContainer] = useState<HTMLElement | null>(null);
+
   const isMiniModeRef = useRef(isMiniMode);
   useEffect(() => { isMiniModeRef.current = isMiniMode; }, [isMiniMode]);
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
+
+  // ==================== 启动静音 + 首次交互解锁 ====================
+  // 避免启动时塑灵问候语的打字机音效提前跑出来
+  useEffect(() => {
+    AudioManager.lock();
+    const unlock = () => { AudioManager.unlock(); };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
 
   // ==================== Splash & 更新 ====================
   const handleFinishSplash = useCallback(() => setShowSplash(false), []);
@@ -117,7 +132,7 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // ==================== Tauri 托盘事件监听（系统托盘右键 开始/暂停 计时） ====================
+  // ==================== Tauri 托盘事件监听 ====================
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: any = null;
@@ -135,8 +150,7 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // ==================== 🌟 选项 A - 2：全局快捷键 Ctrl+Shift+S 监听 ====================
-  // 语义：Idle → 开始（需有部位）；Running → 暂停；Paused → 继续
+  // ==================== 全局快捷键 Ctrl+Shift+S 监听 ====================
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: any = null;
@@ -158,6 +172,69 @@ function App() {
     });
     return () => { if (unlisten) unlisten(); };
   }, [i18n]);
+
+  // ==================== 🌟 Web PiP：Portal 方案 ====================
+  // 用户点击"网页悬浮窗" → dispatchEvent('mv-open-web-pip')
+  // 这里创建 PiP 窗口 + 复制样式 + 挂载容器，供 render 里 Portal FocusPanel
+  useEffect(() => {
+    const handler = async () => {
+      if (!('documentPictureInPicture' in window)) {
+        showToast(t('toast_pip_not_supported'));
+        return;
+      }
+
+      // 已存在则先关闭旧的
+      const existingWin = (window as any).documentPictureInPicture.window;
+      if (existingWin) {
+        try { existingWin.close(); } catch {}
+        setWebPipContainer(null);
+      }
+
+      try {
+        const pipWin = await (window as any).documentPictureInPicture.requestWindow({
+          width: 400,
+          height: 700,
+        });
+
+        // 复制所有 <style> 和 <link rel="stylesheet">
+        // 让 PiP 窗口的样式与原窗口一致
+        const styleNodes = document.head.querySelectorAll('style, link[rel="stylesheet"]');
+        styleNodes.forEach((node) => {
+          try {
+            pipWin.document.head.appendChild(node.cloneNode(true));
+          } catch (e) {
+            console.warn('[PiP] style clone failed:', e);
+          }
+        });
+
+        // PiP 窗口基础样式
+        pipWin.document.body.style.backgroundColor = '#1e1e1e';
+        pipWin.document.body.style.margin = '0';
+        pipWin.document.body.style.overflow = 'hidden';
+
+        // 挂载容器
+        const container = pipWin.document.createElement('div');
+        container.id = 'pip-root';
+        container.style.width = '100vw';
+        container.style.height = '100vh';
+        container.style.overflow = 'hidden';
+        pipWin.document.body.appendChild(container);
+
+        // PiP 窗口关闭 → 清理 state
+        pipWin.addEventListener('pagehide', () => {
+          setWebPipContainer(null);
+        });
+
+        setWebPipContainer(container);
+        AudioManager.playClick();
+      } catch (err) {
+        console.error('[PiP] open failed:', err);
+        showToast(t('toast_pip_open_fail'));
+      }
+    };
+    window.addEventListener('mv-open-web-pip', handler as EventListener);
+    return () => window.removeEventListener('mv-open-web-pip', handler as EventListener);
+  }, [t, showToast]);
 
   // ==================== Timer tick ====================
   useEffect(() => {
@@ -224,7 +301,7 @@ function App() {
     };
   }, [i18n.language, webChatInterval, pipChatInterval, isMiniMode, showSplash, isWindowActive]);
 
-  // ==================== 🌟 选项 A - 3：Timebox 结束通知（双端兼容） ====================
+  // ==================== Timebox 结束通知（双端兼容） ====================
   useEffect(() => {
     const state = useAppStore.getState();
     if (timerState === 'Running' && state.timeboxTarget > 0 && activeSeconds >= state.timeboxTarget && !state.hasPlayedTimeboxSound) {
@@ -325,7 +402,6 @@ function App() {
             await win.unmaximize();
             await new Promise(r => setTimeout(r, 200));
           }
-          // 525 x 300 横窗口
           await win.setSize(new LogicalSize(MINI_MODE_SIZE.width, MINI_MODE_SIZE.height));
           await win.setAlwaysOnTop(true);
         } catch (e) {}
@@ -536,18 +612,16 @@ function App() {
     showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
   };
 
-  // ==================== 教程（两端隔开 + 首次完成奖励） ====================
+  // ==================== 教程 ====================
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
     { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
     { targetId: 'btn-add-task', title: t('tut_step2_title'), content: t('tut_step2_content'), page: 'focus' },
-    // 平台专属第 4 步：Tauri = 专注极简模式；Web = 网页悬浮窗
     ...(isTauri
       ? [{ targetId: 'btn-mini-mode', title: t('tut_mini_title'), content: t('tut_mini_content'), page: 'focus' as const }]
       : [{ targetId: 'btn-web-pip', title: t('tut_pip_title'), content: t('tut_pip_content'), page: 'focus' as const }]
     ),
     { targetId: 'tour-timer', title: t('tut_timer_title'), content: t('tut_timer_content'), page: 'focus' },
-    // 新增：打卡
     { targetId: 'tour-checkin', title: t('tut_checkin_title'), content: t('tut_checkin_content'), page: 'focus' },
     { targetId: 'tab-gundam', title: t('tut_gundam_title'), content: t('tut_gundam_content'), page: 'gundam' },
     { targetId: 'tab-journal', title: t('tut_journal_title'), content: t('tut_journal_content'), page: 'journal' },
@@ -560,7 +634,6 @@ function App() {
     setShowTutorial(false);
     localStorage.setItem('hasSeenTutorial', 'true');
 
-    // 首次完成教程 → 给奖励
     if (!localStorage.getItem(TUTORIAL_REWARD_KEY)) {
       localStorage.setItem(TUTORIAL_REWARD_KEY, '1');
       const coins = 100;
@@ -578,7 +651,7 @@ function App() {
     localStorage.setItem('hasSeenTutorial', 'true');
   };
 
-  // ==================== PiP 独立窗口 ====================
+  // ==================== PiP 独立窗口（老式 URL 参数兼容） ====================
   if (isPipMode) {
     return (
       <div className="app-wrapper" style={{ background: 'transparent' }}>
@@ -587,7 +660,7 @@ function App() {
     );
   }
 
-  // ==================== Mini 模式（Tauri 525×300 横窗口） ====================
+  // ==================== Mini 模式 ====================
   if (isMiniMode) {
     return (
       <div className="app-wrapper mini-mode-wrapper" style={{ background: '#09090b' }}>
@@ -757,6 +830,12 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* 🌟 Web PiP：通过 Portal 挂载 FocusPanel 到 PiP 窗口的容器 */}
+      {webPipContainer && createPortal(
+        <FocusPanel isPip={true} onClose={() => setWebPipContainer(null)} />,
+        webPipContainer
+      )}
     </>
   );
 }

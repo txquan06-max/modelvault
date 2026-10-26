@@ -20,9 +20,9 @@ interface FocusPanelProps {
 }
 
 /**
- * 🌟 选项 A - 3：双端兼容的通知函数
- * - Tauri 端：走 @tauri-apps/plugin-notification（原生系统通知）
- * - Web 端：走浏览器 Notification API
+ * 双端兼容的通知函数
+ * - Tauri 端：@tauri-apps/plugin-notification
+ * - Web 端：浏览器 Notification API
  */
 const sendNativeNotification = (title: string, body: string) => {
   if (typeof window === 'undefined') return;
@@ -49,9 +49,6 @@ const sendNativeNotification = (title: string, body: string) => {
   }
 };
 
-/**
- * FocusPanel 零 props 化 + 平台差异化 + 挂机声音修复
- */
 export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
@@ -216,7 +213,11 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     const result = CheckinManager.checkin();
     if (result.success) {
       AudioManager.playAchievement();
+      // 🌟 关键修复：直接同步更新 store，不依赖异步 refreshData
+      // 这样即便用户立刻切到极简模式，极简模式的 FocusPanel 也能读到最新状态
+      useAppStore.setState({ isCheckedIn: true, checkinStreak: result.streak });
       showToast(t('toast_checkin_success', { streak: result.streak, xp: result.rewardXp, coins: result.rewardCoins }));
+      // 其他数据（金币、XP、成就等）通过 refreshData 异步刷新即可
       refreshData();
       AchievementManager.checkAll();
     } else showToast(t('alreadyCheckedIn'));
@@ -312,34 +313,14 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
   };
 
-  const handleOpenWebPiP = async () => {
+  // 🌟 PiP 打开改为派发事件，由 App.tsx 统一通过 React Portal 处理
+  // 这样可以避免 PiP 窗口因 location.href 重定向被浏览器自动关闭
+  const handleOpenWebPiP = () => {
     if (!('documentPictureInPicture' in window)) {
       showToast(t('toast_pip_not_supported'));
       return;
     }
-    try {
-      const pipWin = await (window as any).documentPictureInPicture.requestWindow({ width: 400, height: 700 });
-      Array.from(document.styleSheets).forEach((styleSheet) => {
-        try {
-          const cssRules = Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join('');
-          const style = document.createElement('style');
-          style.textContent = cssRules;
-          pipWin.document.head.appendChild(style);
-        } catch (e) {
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = (styleSheet as any).href;
-          pipWin.document.head.appendChild(link);
-        }
-      });
-      pipWin.document.body.style.backgroundColor = '#1e1e1e';
-      pipWin.document.body.style.margin = '0';
-      pipWin.document.body.style.overflow = 'hidden';
-      pipWin.location.href = `${window.location.origin}${window.location.pathname}?pip=true`;
-    } catch (err) {
-      console.error(err);
-      showToast(t('toast_pip_open_fail'));
-    }
+    window.dispatchEvent(new CustomEvent('mv-open-web-pip'));
   };
 
   const renderChatHistory = (isPipView: boolean) => (
@@ -381,7 +362,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     </div>
   );
 
-  // ==================== PiP 模式（含 Tauri 525×300 横窗口） ====================
+  // ==================== PiP 模式（含 Tauri 525×300 横窗口 + Web PiP Portal） ====================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -561,7 +542,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
-          {/* 🔧 修复：极简模式按钮仅 Tauri 显示（Web 端只有网页悬浮窗） */}
           {isTauriEnv && (
             <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
           )}

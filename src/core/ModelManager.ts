@@ -93,10 +93,40 @@ export class ModelManager {
     return model.tasks.length > 0 && model.tasks.every(t => t.status === 'Completed');
   }
 
+  // 🌟 修改：级联物理删除关联图片（异步，不阻塞主流程）
   static deleteModel(modelId: string): Model[] {
-    const models = this.getAllModels().filter(m => m.id !== modelId);
-    this.saveModels(models);
-    return models;
+    const models = this.getAllModels();
+    const modelToDelete = models.find(m => m.id === modelId);
+    
+    // 收集需要删除的物理文件路径
+    const filesToDelete: string[] = [];
+    if (modelToDelete) {
+      if (modelToDelete.coverImage?.startsWith('local://')) {
+        filesToDelete.push(modelToDelete.coverImage);
+      }
+      modelToDelete.galleryPhotos?.forEach(url => {
+        if (url.startsWith('local://')) filesToDelete.push(url);
+      });
+      modelToDelete.tasks.forEach(task => {
+        task.stages.forEach(stage => {
+          if (stage.photoUrl?.startsWith('local://')) filesToDelete.push(stage.photoUrl);
+          stage.processPhotos?.forEach(url => {
+            if (url.startsWith('local://')) filesToDelete.push(url);
+          });
+        });
+      });
+    }
+
+    // 后台静默删除物理文件
+    if (filesToDelete.length > 0) {
+      Promise.all(filesToDelete.map(url => StorageManager.deleteLocalFile(url)))
+        .catch(e => console.warn('删除本地物理文件失败:', e));
+    }
+
+    // 移除数据并保存
+    const updatedModels = models.filter(m => m.id !== modelId);
+    this.saveModels(updatedModels);
+    return updatedModels;
   }
 
   static updateModelCover(modelId: string, coverImage: string): Model[] {
@@ -126,6 +156,9 @@ export class ModelManager {
     if (model && model.galleryPhotos) {
       model.galleryPhotos = model.galleryPhotos.filter(url => url !== photoUrl);
       this.saveModels(models);
+      if (photoUrl.startsWith('local://')) {
+        StorageManager.deleteLocalFile(photoUrl).catch(e => console.warn(e));
+      }
     }
     return models;
   }
@@ -278,20 +311,17 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 修复 Bug 1 + Bug 2：只有整个模型已完成时才进入 rebuild
   static startStage(taskId: string, stageId: string | null): Model[] {
     const models = this.getAllModels();
     for (const m of models) {
       const task = m.tasks.find(t => t.id === taskId);
       if (task) {
         if (m.status === 'Completed') {
-          // 整个模型已完成 → rebuild 模式，重置 task 下已完成工序
           m.status = 'InProgress';
           m.isRebuilding = true;
           task.status = 'InProgress';
           task.stages.forEach(s => { if (s.status === 'Completed') s.status = 'InProgress'; });
         } else if (task.status === 'Completed') {
-          // 仅单部位已完成 → 只重开该 task，不改模型状态，不动其他工序
           task.status = 'InProgress';
         } else if (task.status === 'NotStarted') {
           task.status = 'InProgress';
@@ -353,6 +383,9 @@ export class ModelManager {
       }
     }
     this.saveModels(models);
+    if (photoUrl.startsWith('local://')) {
+      StorageManager.deleteLocalFile(photoUrl).catch(e => console.warn(e));
+    }
     return models;
   }
 
@@ -383,7 +416,6 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 修复 Bug 3：部位完成照写入通用相册，不再误当 coverImage
   static finishTask(taskId: string, partPhotoUrl?: string): { models: Model[], error?: string } {
     const models = this.getAllModels(); 
     let changedModelId: string | null = null;
@@ -393,7 +425,6 @@ export class ModelManager {
         const assembly = task.stages.find(s => s.nameKey === 'stage_assembly');
         if (assembly && assembly.status !== 'Completed') return { models, error: 'errorAssemblyRequired' };
         if (task.status !== 'Completed') { task.status = 'Completed'; UserManager.addCoins(50); }
-        // 🌟 部位完成照存到模型通用相册（详情页顶部相册可见）
         if (partPhotoUrl && partPhotoUrl.trim()) {
           if (!m.galleryPhotos) m.galleryPhotos = [];
           m.galleryPhotos.push(partPhotoUrl);

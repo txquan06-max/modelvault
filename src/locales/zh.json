@@ -435,5 +435,6 @@
   "tut_gallery_mount_content": "点击这里挂载一个本地文件夹！封面、过程照和战报会自动分类保存到你的硬盘上，安全又省空间。",
   "add_progress_photo": "添加拼装相册",
   "add_stage_photo": "添加工序照片",
-  "toast_time_saved": "✅ 时长已保存，下次点击开始即可接着拼"
+  "toast_time_saved": "✅ 时长已保存，下次点击开始即可接着拼",
+  "reset_clear_assets": "同时清空本地图库中的媒体文件（封面、相册、音频）"
 }

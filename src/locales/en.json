@@ -435,5 +435,6 @@
   "tut_gallery_mount_content": "Click here to mount a local folder! Covers, progress photos, and reports will be saved to your disk, safe and space-saving.",
   "add_progress_photo": "Add Photo",
   "add_stage_photo": "Add Stage Photo",
-  "toast_time_saved": "✅ Time saved. Click Start to continue anytime."
+  "toast_time_saved": "✅ Time saved. Click Start to continue anytime.",
+  "reset_clear_assets": "Also clear media files in the mounted gallery (covers, photos, audio)"
 }

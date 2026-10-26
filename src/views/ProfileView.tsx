@@ -43,6 +43,7 @@ export const ProfileView = () => {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [clearAssets, setClearAssets] = useState(false); // 🌟 新增：是否同时清空物理文件
 
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
@@ -243,9 +244,41 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
+  // 🌟 优化：如果勾选了同时清空资产，先遍历删除物理文件
   const handleResetData = async () => {
     AudioManager.playClick();
     setIsResetting(true);
+
+    try {
+      if (clearAssets && isAssetsMounted) {
+        const allModels = ModelManager.getAllModels();
+        const filesToDelete: string[] = [];
+
+        allModels.forEach(m => {
+          if (m.coverImage?.startsWith('local://')) filesToDelete.push(m.coverImage);
+          m.galleryPhotos?.forEach(url => { if (url.startsWith('local://')) filesToDelete.push(url); });
+          m.tasks.forEach(task => {
+            task.stages.forEach(stage => {
+              if (stage.photoUrl?.startsWith('local://')) filesToDelete.push(stage.photoUrl);
+              stage.processPhotos?.forEach(url => { if (url.startsWith('local://')) filesToDelete.push(url); });
+            });
+          });
+        });
+
+        const bgMain = StorageManager.getBgMain();
+        const bgPip = StorageManager.getBgPip();
+        if (bgMain?.startsWith('local://')) filesToDelete.push(bgMain);
+        if (bgPip?.startsWith('local://')) filesToDelete.push(bgPip);
+
+        const audios = StorageManager.getCustomAudios();
+        Object.values(audios).forEach(url => { if (typeof url === 'string' && url.startsWith('local://')) filesToDelete.push(url); });
+
+        await Promise.all(filesToDelete.map(url => StorageManager.deleteLocalFile(url)));
+      }
+    } catch (e) {
+      console.error('清理物理文件失败:', e);
+    }
+
     try { await StorageManager.resetAll(); } catch (e) { console.error(e); }
     window.location.href = window.location.origin + window.location.pathname;
   };
@@ -403,7 +436,6 @@ export const ProfileView = () => {
               <div>{t('quota_label')}: {storageEstimate.quota} GB</div>
               <div style={{ color: '#10b981' }}>{t('used_label')}: {storageEstimate.usage} GB</div>
             </div>
-            {/* 🌟 加了 id="tour-gallery-mount"，供教程定位 */}
             <button id="tour-gallery-mount" className="mini-btn" onClick={async () => {
               AudioManager.playClick();
               const success = await StorageManager.selectAssetsFolder();
@@ -681,6 +713,15 @@ export const ProfileView = () => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>{t('resetConfirm')}</p>
+              
+              {/* 🌟 新增：是否同时清空物理文件 */}
+              {isAssetsMounted && (
+                <label className="checkbox-label" style={{ marginBottom: '8px' }}>
+                  <input type="checkbox" checked={clearAssets} onChange={e => setClearAssets(e.target.checked)} />
+                  {t('reset_clear_assets')}
+                </label>
+              )}
+
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button className="btn yes" style={{ background: '#ef4444', flex: 1, padding: '6px', minWidth: '100px' }} onClick={handleResetData} disabled={isResetting}>{isResetting ? t('clearing') : t('confirm')}</button>
                 <button className="btn no" style={{ flex: 1, padding: '6px', minWidth: '100px' }} onClick={() => { AudioManager.playClick(); setShowResetConfirm(false); }} disabled={isResetting}>{t('cancel')}</button>

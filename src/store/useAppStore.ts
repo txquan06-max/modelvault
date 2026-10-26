@@ -159,7 +159,10 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
     completeModelId: null,
 
     chatMessages: (() => {
-      try { const saved = sessionStorage.getItem('mv_chat_messages'); if (saved) return JSON.parse(saved); } catch (e) {}
+      try {
+        const saved = sessionStorage.getItem('mv_chat_messages');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
       return [];
     })(),
 
@@ -201,32 +204,32 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
       const available = allModels.filter((m: Model) => m.status !== 'Completed');
 
       let { currentModelId, currentTaskId, currentStageId } = get();
+      const isCurrentValid = currentModelId && available.some((m: Model) => m.id === currentModelId);
 
-      // 🌟 优先尝试从持久化恢复工作现场
-      const savedWorkbench = StorageManager.getLastWorkbench();
-      if (savedWorkbench && available.some(m => m.id === savedWorkbench.modelId)) {
-        const savedModel = available.find(m => m.id === savedWorkbench.modelId)!;
-        const savedTask = savedModel.tasks.find(t => t.id === savedWorkbench.taskId);
-        if (savedTask) {
-          currentModelId = savedModel.id;
-          currentTaskId = savedTask.id;
-          if (savedWorkbench.stageId && savedTask.stages.some(s => s.id === savedWorkbench.stageId)) {
-            currentStageId = savedWorkbench.stageId;
-          } else {
-            currentStageId = savedTask.stages.find(s => s.status !== 'Completed')?.id || savedTask.stages[0]?.id || null;
+      // 🌟 智能恢复：仅当当前状态无效（应用重启、被删、已完成）时，才读工作现场
+      if (!isCurrentValid) {
+        const savedWorkbench = StorageManager.getLastWorkbench();
+        if (savedWorkbench && available.some(m => m.id === savedWorkbench.modelId)) {
+          const savedModel = available.find(m => m.id === savedWorkbench.modelId)!;
+          const savedTask = savedModel.tasks.find(t => t.id === savedWorkbench.taskId);
+          if (savedTask) {
+            currentModelId = savedModel.id;
+            currentTaskId = savedTask.id;
+            if (savedWorkbench.stageId && savedTask.stages.some(s => s.id === savedWorkbench.stageId)) {
+              currentStageId = savedWorkbench.stageId;
+            } else {
+              currentStageId = savedTask.stages.find(s => s.status !== 'Completed')?.id || savedTask.stages[0]?.id || null;
+            }
           }
-        }
-      }
-
-      // 如果工作现场无效，走原有的 fallback 逻辑
-      if (available.length > 0) {
-        if (!currentModelId || !available.some((m: Model) => m.id === currentModelId)) {
+        } else if (available.length > 0) {
           currentModelId = available[0].id;
+          currentTaskId = '';
+          currentStageId = null;
+        } else {
+          currentModelId = '';
+          currentTaskId = '';
+          currentStageId = null;
         }
-      } else {
-        currentModelId = '';
-        currentTaskId = '';
-        currentStageId = null;
       }
 
       let tasks: Task[] = [];
@@ -275,6 +278,7 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
         storageEstimate: est,
       });
 
+      // 同步工作现场到硬盘，确保刷新/重启时能恢复
       saveWorkbench(currentModelId, currentTaskId, currentStageId);
       AudioManager.preloadCustomAudios().catch(e => console.warn('预加载音效失败', e));
     },

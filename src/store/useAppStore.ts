@@ -161,7 +161,8 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   timerState: 'Idle',
   activeSeconds: 0,
   lastSession: null,
-  timeboxTarget: StorageManager.getTimeboxTarget(),
+  // 🌟 番茄钟是每次会话的临时选择，不依赖 StorageManager 初始化
+  timeboxTarget: 0,
   hasPlayedTimeboxSound: false,
 
   showCompleteModelConfirm: false,
@@ -179,7 +180,9 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
 
   isAutoBackupEnabled: false,
 
-  username: StorageManager.getUsername(),
+  // 🌟 全部硬编码安全默认值（不依赖 StorageManager 初始化时序）
+  // 真实数据由 refreshData() 在 StorageManager.init() 完成后统一刷入
+  username: 'New Builder',
   level: 1,
   levelProgress: { current: 0, next: 100, percent: 0 },
   todayTotal: 0,
@@ -189,20 +192,23 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   checkinStreak: 0,
   isCheckedIn: false,
 
-  unlockedBots: (StorageManager.getUnlockedBots() as BotType[]),
-  currentBot: ((StorageManager.getCurrentBot() as BotType) || 'tu'),
+  unlockedBots: ['tu'] as BotType[],
+  currentBot: 'tu' as BotType,
 
-  bgMain: StorageManager.getBgMain(),
-  bgPip: StorageManager.getBgPip(),
-  bgSize: StorageManager.getBgSize(),
-  bgPosition: StorageManager.getBgPosition(),
-  audioSettings: StorageManager.getAudioSettings(),
-  customAudios: StorageManager.getCustomAudios(),
+  bgMain: '',
+  bgPip: '',
+  bgSize: 'cover',
+  bgPosition: 'center',
+  audioSettings: {
+    click: 'default', start: 'default', pause: 'default', complete: 'default',
+    finishPart: 'default', stage: 'default', timebox: 'default', achievement: 'default', typing: 'default',
+  },
+  customAudios: {},
   storageEstimate: { usage: 0, quota: 0, percent: 0 },
 
   activeTab: 'focus',
-  webChatInterval: StorageManager.getWebChatInterval(),
-  pipChatInterval: StorageManager.getPipChatInterval(),
+  webChatInterval: 8000,
+  pipChatInterval: 60000,
   isAssetsMounted: false,
 
   // ==================== refreshData ====================
@@ -210,7 +216,7 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
     const xp = ModelManager.getTotalXP();
     const allModels = ModelManager.getAllModels();
     const available = allModels.filter((m: Model) => m.status !== 'Completed');
-    
+
     let { currentModelId, currentTaskId, currentStageId } = get();
 
     if (available.length > 0) {
@@ -231,7 +237,7 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
         if (!tasks.some((t: Task) => t.id === currentTaskId) && tasks.length > 0) {
           currentTaskId = tasks[0].id;
         }
-        
+
         const task = tasks.find((t: Task) => t.id === currentTaskId);
         if (task && !task.stages.some((s: any) => s.id === currentStageId)) {
           const nextStage = task.stages.find((s: any) => s.status !== 'Completed');
@@ -248,6 +254,13 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
       tasks,
       currentTaskId,
       currentStageId,
+      // 🌟 以下为本次修复补充：所有持久化字段从 StorageManager 统一刷新
+      username: StorageManager.getUsername(),
+      unlockedBots: StorageManager.getUnlockedBots() as BotType[],
+      currentBot: ((StorageManager.getCurrentBot() as BotType) || 'tu'),
+      webChatInterval: StorageManager.getWebChatInterval(),
+      pipChatInterval: StorageManager.getPipChatInterval(),
+      // 原有刷新
       level: UserManager.getLevel(xp),
       levelProgress: UserManager.getLevelProgress(xp),
       todayTotal: SessionManager.getTodayTotalSeconds(),

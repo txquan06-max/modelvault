@@ -22,7 +22,7 @@ import { Modals } from './components/Modals';
 import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
 import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
-import { ScrollToTop } from './components/ScrollToTop'; // 🌟 新增引入
+import { ScrollToTop } from './components/ScrollToTop';
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
@@ -30,6 +30,7 @@ const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTER
 const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'true';
 
 const TUTORIAL_REWARD_KEY = 'mv_tutorial_rewarded';
+const DATA_RECOVERY_WARNED = 'mv_data_recovery_warned_v011';
 const MINI_MODE_SIZE = { width: 525, height: 300 };
 const NORMAL_MODE_SIZE = { width: 1100, height: 800 };
 const WEB_PIP_SIZE = { width: 455, height: 260 };
@@ -74,6 +75,10 @@ function App() {
   const [isMiniMode, setIsMiniMode] = useState(false);
   const [isWindowActive, setIsWindowActive] = useState(true);
 
+  // 🌟 数据抢救弹窗状态
+  const [showDataRecovery, setShowDataRecovery] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -111,6 +116,14 @@ function App() {
       window.removeEventListener('touchstart', unlock);
     };
   }, []);
+
+  // 🌟 数据恢复检测逻辑
+  useEffect(() => {
+    if (showSplash) return;
+    if (models.length === 0 && !localStorage.getItem(DATA_RECOVERY_WARNED)) {
+      setShowDataRecovery(true);
+    }
+  }, [models, showSplash]);
 
   // ==================== Splash & 更新 ====================
   const handleFinishSplash = useCallback(() => setShowSplash(false), []);
@@ -173,7 +186,7 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, [i18n]);
 
-  // ==================== Web PiP：Portal 方案 ====================
+  // ==================== Web PiP ====================
   useEffect(() => {
     const handler = async () => {
       if (!('documentPictureInPicture' in window)) {
@@ -369,6 +382,37 @@ function App() {
   const processAchievements = () => {
     const newlyEarned = AchievementManager.checkAll();
     if (newlyEarned.length > 0) setAchievementQueue(prev => [...prev, ...newlyEarned as AchievementData[]]);
+  };
+
+  // ==================== 数据抢救处理 ====================
+  const handleRecoveryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsRecovering(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        const success = await StorageManager.importAll(data);
+        if (success) {
+          localStorage.setItem(DATA_RECOVERY_WARNED, '1');
+          window.location.reload();
+        } else {
+          showToast(t('importError'));
+          setIsRecovering(false);
+        }
+      } catch (err) {
+        showToast(t('importError'));
+        setIsRecovering(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const dismissRecovery = () => {
+    localStorage.setItem(DATA_RECOVERY_WARNED, '1');
+    setShowDataRecovery(false);
   };
 
   // ==================== 极简模式 ====================
@@ -670,6 +714,30 @@ function App() {
   return (
     <>
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
+
+      {/* 🌟 数据抢救弹窗 */}
+      {showDataRecovery && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #3b82f6', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(59, 130, 246, 0.2)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛡️</div>
+            <h2 style={{ fontSize: '20px', color: '#fff', marginBottom: '12px', fontWeight: 'bold' }}>{t('recovery_title')}</h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.6', marginBottom: '24px' }}>
+              {t('recovery_desc')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label className="btn start" style={{ padding: '14px', fontSize: '15px', borderRadius: '8px', cursor: isRecovering ? 'not-allowed' : 'pointer', margin: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: isRecovering ? 0.6 : 1 }}>
+                {isRecovering ? t('processing') : t('recovery_import_btn')}
+                <input type="file" accept=".json" onChange={handleRecoveryImport} style={{ display: 'none' }} disabled={isRecovering} />
+              </label>
+              <button className="btn no" style={{ padding: '14px', fontSize: '15px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={dismissRecovery} disabled={isRecovering}>
+                {t('recovery_skip_btn')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showTutorial && !showSplash && (
         <TutorialTour
           steps={tutorialSteps}
@@ -793,7 +861,7 @@ function App() {
           i18n={i18n}
         />
         <AchievementOverlay achievement={activeAchievement} onClose={() => setActiveAchievement(null)} t={t} i18n={i18n} />
-        <ScrollToTop /> {/* 🌟 挂载回顶按钮 */}
+        <ScrollToTop />
 
         {pendingTabChange && (
           <div className="modal-overlay" style={{ zIndex: 9999 }}>

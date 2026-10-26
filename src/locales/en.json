@@ -427,6 +427,7 @@
   "report_saving": "Saving...",
   "toast_report_saved_to_gallery": "Saved to local gallery",
   "toast_gallery_not_mounted": "⚠️ Please mount a local gallery first",
+  "toast_time_saved": "✅ Time saved. Click Start to continue anytime.",
   "tut_shortcut_title": "Global Shortcut",
   "tut_shortcut_content": "On desktop, press `Ctrl + Shift + S` anytime to start or pause the timer without switching apps!",
   "tut_photo_title": "Progress Album",
@@ -435,8 +436,11 @@
   "tut_gallery_mount_content": "Click here to mount a local folder! Covers, progress photos, and reports will be saved to your disk, safe and space-saving.",
   "add_progress_photo": "Add Photo",
   "add_stage_photo": "Add Stage Photo",
-  "toast_time_saved": "✅ Time saved. Click Start to continue anytime.",
-  "reset_clear_assets": "Also clear media files in the mounted gallery (covers, photos, audio)",
   "scroll_to_top": "Scroll to Top",
-  "focus_complete_title": "Focus Session Complete!"
+  "focus_complete_title": "Focus Session Complete!",
+  "reset_clear_assets": "Also clear media files in the mounted gallery (covers, photos, audio)",
+  "recovery_title": "Data Recovery Check",
+  "recovery_desc": "Due to a local storage issue in the previous version, your data might not have been saved. If you previously exported a .json backup, please import it here. If you are a new user, you can safely skip.",
+  "recovery_import_btn": "📁 Select Backup to Import",
+  "recovery_skip_btn": "New User / No Backup"
 }

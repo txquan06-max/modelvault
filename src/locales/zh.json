@@ -427,6 +427,7 @@
   "report_saving": "保存中...",
   "toast_report_saved_to_gallery": "已保存到本地图库",
   "toast_gallery_not_mounted": "⚠️ 请先在个人中心挂载本地图库",
+  "toast_time_saved": "✅ 时长已保存，下次点击开始即可接着拼",
   "tut_shortcut_title": "全局快捷键",
   "tut_shortcut_content": "在桌面端，随时按下 `Ctrl + Shift + S` 即可快速开始或暂停计时，不用切回应用！",
   "tut_photo_title": "拼装相册",
@@ -435,7 +436,11 @@
   "tut_gallery_mount_content": "点击这里挂载一个本地文件夹！封面、过程照和战报会自动分类保存到你的硬盘上，安全又省空间。",
   "add_progress_photo": "添加拼装相册",
   "add_stage_photo": "添加工序照片",
-  "toast_time_saved": "✅ 时长已保存，下次点击开始即可接着拼",
-  "reset_clear_assets": "同时清空本地图库中的媒体文件（封面、相册、音频）","scroll_to_top": "回到顶部",
-  "focus_complete_title": "本轮专注完成！"
+  "scroll_to_top": "回到顶部",
+  "focus_complete_title": "本轮专注完成！",
+  "reset_clear_assets": "同时清空本地图库中的媒体文件（封面、相册、音频）",
+  "recovery_title": "数据恢复检测",
+  "recovery_desc": "由于上一个版本存在本地存储缺陷，您的数据可能未能成功保存。如果您曾在旧版本中使用过「数据备份 → 导出数据」，请在此处导入您的 .json 备份文件。如果您是新用户，可直接跳过。",
+  "recovery_import_btn": "📁 选择备份文件导入",
+  "recovery_skip_btn": "我是新用户 / 暂无备份"
 }

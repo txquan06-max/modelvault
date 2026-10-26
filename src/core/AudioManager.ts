@@ -13,7 +13,7 @@ interface ToneSpec {
   gain: number;
 }
 
-// 🌟 所有音效自合成，完全弃用 uisfx
+// 所有音效自合成，完全弃用 uisfx
 const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>> = {
   click: {
     default: { freq: 1400, duration: 0.05, type: 'sine', gain: 0.1 },
@@ -163,15 +163,15 @@ export class AudioManager {
   private static ctx: AudioContext | null = null;
   private static lastClickTime = 0;
   private static resumeInFlight = false;
-  // 🌟 unlocked 默认 true（保持原行为），App.tsx 可调 lock() 启用启动静音
   private static unlocked = true;
 
   private static ambientSource: AudioBufferSourceNode | null = null;
   private static ambientGain: GainNode | null = null;
   private static currentAmbient: AmbientType = 'none';
 
-  // 🌟 挂机后点击音效防叠加：debounce 合并
-  private static pendingPlays = new Map<SoundType, ReturnType<typeof setTimeout>>();
+  // 🌟 核心防抖：以 type 为 key 记录最后播放时间 + 请求 ID
+  private static lastPlayTime: Record<string, number> = {};
+  private static DEBOUNCE_MS = 100;
 
   private static getCtx(): AudioContext {
     if (!this.ctx) {
@@ -199,8 +199,6 @@ export class AudioManager {
 
   static lock() {
     this.unlocked = false;
-    this.pendingPlays.forEach(t => clearTimeout(t));
-    this.pendingPlays.clear();
   }
 
   private static async ensureRunning(ctx: AudioContext): Promise<boolean> {
@@ -280,6 +278,7 @@ export class AudioManager {
   private static play(type: SoundType) {
     if (!this.unlocked) return;
 
+    // wakeup 走自定义音效路径（不受防抖限制，闹钟必须响）
     if (type === 'wakeup') {
       const customWakeup = StorageManager.getCustomWakeupSound();
       if (customWakeup) {
@@ -289,6 +288,14 @@ export class AudioManager {
         return;
       }
     }
+
+    // 🌟 核心防抖：100ms 内同类型音效只播一次
+    const now = Date.now();
+    if (this.lastPlayTime[type] && now - this.lastPlayTime[type] < this.DEBOUNCE_MS) {
+      return;
+    }
+    this.lastPlayTime[type] = now;
+    const requestTime = now;
 
     const settings = StorageManager.getAudioSettings();
     const style = settings[type] || 'default';
@@ -300,25 +307,21 @@ export class AudioManager {
 
     const ctx = this.getCtx();
 
-    // 🌟 关键：同步尝试 resume（首次点击必须在事件同步栈里才被浏览器接受）
-    if (!this.isCtxRunning(ctx)) {
-      try { ctx.resume().catch(() => {}); } catch {}
-    }
-
     if (this.isCtxRunning(ctx)) {
+      // running: 立即播放
       this.playSpecs(spec);
       return;
     }
 
-    // 🌟 挂机后：debounce 合并为一次播放，避免多次点击排队叠加
-    if (this.pendingPlays.has(type)) return;
-    const timer = setTimeout(() => {
-      this.pendingPlays.delete(type);
-      this.ensureRunning(ctx).then((ok) => {
-        if (ok) this.playSpecs(spec);
-      });
-    }, 80);
-    this.pendingPlays.set(type, timer);
+    // suspended: resume 完成后播放一次
+    // 关键：如果 resume 期间用户又点击了，lastPlayTime 会被更新，
+    //      此时旧请求直接作废，只保留新请求（避免两条路径叠加）
+    try { ctx.resume().catch(() => {}); } catch {}
+    this.ensureRunning(ctx).then((ok) => {
+      if (!ok) return;
+      if (this.lastPlayTime[type] !== requestTime) return; // 被后续点击覆盖，作废
+      this.playSpecs(spec);
+    });
   }
 
   static playClick() {
@@ -341,6 +344,11 @@ export class AudioManager {
   static playTypeTick() {
     if (!this.unlocked) return;
 
+    // 打字机音效：60ms 防抖（比主音效更短，保留节奏感）
+    const now = Date.now();
+    if (this.lastPlayTime['typing'] && now - this.lastPlayTime['typing'] < 60) return;
+    this.lastPlayTime['typing'] = now;
+
     const settings = StorageManager.getAudioSettings();
     const style = settings['typing'] || 'default';
     if (style === 'off') return;
@@ -348,7 +356,6 @@ export class AudioManager {
 
     const ctx = this.getCtx();
     if (!this.isCtxRunning(ctx)) {
-      // 挂机时打字机只恢复 ctx，不排队播放
       this.ensureRunning(ctx);
       return;
     }

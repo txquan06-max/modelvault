@@ -31,6 +31,8 @@ const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'tr
 const TUTORIAL_REWARD_KEY = 'mv_tutorial_rewarded';
 const MINI_MODE_SIZE = { width: 525, height: 300 };
 const NORMAL_MODE_SIZE = { width: 1100, height: 800 };
+// 🌟 网页 PiP 尺寸：横条布局，和极简模式风格一致但更小
+const WEB_PIP_SIZE = { width: 455, height: 260 };
 
 const LocalImage = ({ src, ...props }: any) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -89,7 +91,6 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
-  // 🌟 Web PiP：Portal 容器
   const [webPipContainer, setWebPipContainer] = useState<HTMLElement | null>(null);
 
   const isMiniModeRef = useRef(isMiniMode);
@@ -98,7 +99,6 @@ function App() {
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
 
   // ==================== 启动静音 + 首次交互解锁 ====================
-  // 避免启动时塑灵问候语的打字机音效提前跑出来
   useEffect(() => {
     AudioManager.lock();
     const unlock = () => { AudioManager.unlock(); };
@@ -173,9 +173,7 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, [i18n]);
 
-  // ==================== 🌟 Web PiP：Portal 方案 ====================
-  // 用户点击"网页悬浮窗" → dispatchEvent('mv-open-web-pip')
-  // 这里创建 PiP 窗口 + 复制样式 + 挂载容器，供 render 里 Portal FocusPanel
+  // ==================== Web PiP：Portal 方案 ====================
   useEffect(() => {
     const handler = async () => {
       if (!('documentPictureInPicture' in window)) {
@@ -183,7 +181,6 @@ function App() {
         return;
       }
 
-      // 已存在则先关闭旧的
       const existingWin = (window as any).documentPictureInPicture.window;
       if (existingWin) {
         try { existingWin.close(); } catch {}
@@ -191,13 +188,12 @@ function App() {
       }
 
       try {
+        // 🌟 PiP 尺寸：455×260 横条布局
         const pipWin = await (window as any).documentPictureInPicture.requestWindow({
-          width: 400,
-          height: 700,
+          width: WEB_PIP_SIZE.width,
+          height: WEB_PIP_SIZE.height,
         });
 
-        // 复制所有 <style> 和 <link rel="stylesheet">
-        // 让 PiP 窗口的样式与原窗口一致
         const styleNodes = document.head.querySelectorAll('style, link[rel="stylesheet"]');
         styleNodes.forEach((node) => {
           try {
@@ -207,12 +203,10 @@ function App() {
           }
         });
 
-        // PiP 窗口基础样式
         pipWin.document.body.style.backgroundColor = '#1e1e1e';
         pipWin.document.body.style.margin = '0';
         pipWin.document.body.style.overflow = 'hidden';
 
-        // 挂载容器
         const container = pipWin.document.createElement('div');
         container.id = 'pip-root';
         container.style.width = '100vw';
@@ -220,7 +214,6 @@ function App() {
         container.style.overflow = 'hidden';
         pipWin.document.body.appendChild(container);
 
-        // PiP 窗口关闭 → 清理 state
         pipWin.addEventListener('pagehide', () => {
           setWebPipContainer(null);
         });
@@ -301,7 +294,7 @@ function App() {
     };
   }, [i18n.language, webChatInterval, pipChatInterval, isMiniMode, showSplash, isWindowActive]);
 
-  // ==================== Timebox 结束通知（双端兼容） ====================
+  // ==================== Timebox 结束通知 ====================
   useEffect(() => {
     const state = useAppStore.getState();
     if (timerState === 'Running' && state.timeboxTarget > 0 && activeSeconds >= state.timeboxTarget && !state.hasPlayedTimeboxSound) {
@@ -379,7 +372,7 @@ function App() {
     if (newlyEarned.length > 0) setAchievementQueue(prev => [...prev, ...newlyEarned as AchievementData[]]);
   };
 
-  // ==================== 极简模式（525 × 300 横窗口） ====================
+  // ==================== 极简模式 ====================
   const handleToggleMiniMode = useCallback(async () => {
     if (isMiniModeRef.current) {
       setIsMiniMode(false);
@@ -651,7 +644,7 @@ function App() {
     localStorage.setItem('hasSeenTutorial', 'true');
   };
 
-  // ==================== PiP 独立窗口（老式 URL 参数兼容） ====================
+  // ==================== PiP 独立窗口 ====================
   if (isPipMode) {
     return (
       <div className="app-wrapper" style={{ background: 'transparent' }}>
@@ -831,7 +824,6 @@ function App() {
         )}
       </div>
 
-      {/* 🌟 Web PiP：通过 Portal 挂载 FocusPanel 到 PiP 窗口的容器 */}
       {webPipContainer && createPortal(
         <FocusPanel isPip={true} onClose={() => setWebPipContainer(null)} />,
         webPipContainer

@@ -69,78 +69,88 @@ const tauriInvoke = async <T = any>(cmd: string, args?: Record<string, any>): Pr
 export const StorageManager = {
   async init() {
     if (isInit) return;
-    await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
-    // 1. 迁移 localStorage 遗留数据到 localforage
-    const legacyKeys = Object.keys(localStorage).filter(
-      (k) => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data'
-    );
-    if (legacyKeys.length > 0) {
-      for (const key of legacyKeys) {
-        const val = localStorage.getItem(key);
-        if (val) {
-          memoryCache[key] = val;
-          await localforage.setItem(key, val);
-        }
-      }
-      legacyKeys.forEach((k) => localStorage.removeItem(k));
-    }
-
-    // 2. 迁移旧版 localStorage 中的塑灵状态
-    const legacyUnlocked = localStorage.getItem('mv_unlocked_bots');
-    if (legacyUnlocked && !memoryCache[KEYS.UNLOCKED_BOTS]) {
-      memoryCache[KEYS.UNLOCKED_BOTS] = legacyUnlocked;
-      await localforage.setItem(KEYS.UNLOCKED_BOTS, legacyUnlocked);
-      localStorage.removeItem('mv_unlocked_bots');
-    }
-    const legacyCurrent = localStorage.getItem('mv_current_bot');
-    if (legacyCurrent && !memoryCache[KEYS.CURRENT_BOT]) {
-      memoryCache[KEYS.CURRENT_BOT] = legacyCurrent;
-      await localforage.setItem(KEYS.CURRENT_BOT, legacyCurrent);
-      localStorage.removeItem('mv_current_bot');
-    }
-
-    // 3. 从 localforage 加载所有数据到内存
-    const keys = await localforage.keys();
-    for (const key of keys) {
-      const val = await localforage.getItem<string>(key);
-      if (val !== null) memoryCache[key] = val;
-    }
-
-    // 4. 使用 MigrationManager 进行 schema 迁移
     try {
-      const rawData = memoryCache[DATA_KEY];
-      if (rawData) {
-        const parsed = JSON.parse(rawData);
-        const migrated = await MigrationManager.migrate(parsed, async (backupStr) => {
-          await localforage.setItem('modelvault_backup_before_migration', backupStr);
-        });
-        
-        if (migrated.schemaVersion !== parsed.schemaVersion) {
-          const newDataStr = JSON.stringify(migrated);
-          memoryCache[DATA_KEY] = newDataStr;
-          await localforage.setItem(DATA_KEY, newDataStr);
-          console.log(`✅ 数据已迁移至 v${CURRENT_SCHEMA_VERSION}`);
-        }
-      }
-    } catch (e) {
-      console.error('❌ 数据迁移失败:', e);
-    }
+      await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
-    // 5. Tauri 侧恢复素材挂载状态（Rust state 在页面刷新后仍保留）
-    if (isTauriEnv()) {
+      // 1. 迁移 localStorage 遗留数据到 localforage
+      const legacyKeys = Object.keys(localStorage).filter(
+        (k) => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data'
+      );
+      if (legacyKeys.length > 0) {
+        for (const key of legacyKeys) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            memoryCache[key] = val;
+            await localforage.setItem(key, val);
+          }
+        }
+        legacyKeys.forEach((k) => localStorage.removeItem(k));
+      }
+
+      // 2. 迁移旧版 localStorage 中的塑灵状态
+      const legacyUnlocked = localStorage.getItem('mv_unlocked_bots');
+      if (legacyUnlocked && !memoryCache[KEYS.UNLOCKED_BOTS]) {
+        memoryCache[KEYS.UNLOCKED_BOTS] = legacyUnlocked;
+        await localforage.setItem(KEYS.UNLOCKED_BOTS, legacyUnlocked);
+        localStorage.removeItem('mv_unlocked_bots');
+      }
+      const legacyCurrent = localStorage.getItem('mv_current_bot');
+      if (legacyCurrent && !memoryCache[KEYS.CURRENT_BOT]) {
+        memoryCache[KEYS.CURRENT_BOT] = legacyCurrent;
+        await localforage.setItem(KEYS.CURRENT_BOT, legacyCurrent);
+        localStorage.removeItem('mv_current_bot');
+      }
+
+      // 3. 从 localforage 加载所有数据到内存
+      const keys = await localforage.keys();
+      for (const key of keys) {
+        const val = await localforage.getItem<string>(key);
+        if (val !== null) memoryCache[key] = val;
+      }
+
+      // 4. 使用 MigrationManager 进行 schema 迁移
       try {
-        const saved = await tauriInvoke<string | null>('get_assets_dir');
-        if (saved) {
-          assetsMounted = true;
-          console.log('✅ 已恢复素材文件夹挂载:', saved);
+        const rawData = memoryCache[DATA_KEY];
+        if (rawData) {
+          const parsed = JSON.parse(rawData);
+          const migrated = await MigrationManager.migrate(parsed, async (backupStr) => {
+            await localforage.setItem('modelvault_backup_before_migration', backupStr);
+          });
+
+          if (migrated.schemaVersion !== parsed.schemaVersion) {
+            const newDataStr = JSON.stringify(migrated);
+            memoryCache[DATA_KEY] = newDataStr;
+            await localforage.setItem(DATA_KEY, newDataStr);
+            console.log(`✅ 数据已迁移至 v${CURRENT_SCHEMA_VERSION}`);
+          }
         }
       } catch (e) {
-        console.warn('[Tauri] 恢复素材文件夹挂载失败:', e);
+        console.error('❌ 数据迁移失败:', e);
       }
-    }
 
-    isInit = true;
+      // 5. Tauri 侧恢复素材挂载状态（Rust state 在页面刷新后仍保留）
+      if (isTauriEnv()) {
+        try {
+          const saved = await tauriInvoke<string | null>('get_assets_dir');
+          if (saved) {
+            assetsMounted = true;
+            console.log('✅ 已恢复素材文件夹挂载:', saved);
+          }
+        } catch (e) {
+          console.warn('[Tauri] 恢复素材文件夹挂载失败:', e);
+        }
+      }
+
+      console.log(
+        `[StorageManager] init 完成 - DATA_KEY 已加载: ${memoryCache[DATA_KEY] ? '是' : '否'}，缓存键数: ${Object.keys(memoryCache).length}`
+      );
+    } catch (err) {
+      console.error('[StorageManager] init 失败:', err);
+    } finally {
+      // 🌟 无论成功失败都标记完成，避免 main.tsx 永远白屏
+      isInit = true;
+    }
   },
 
   async requestPersistentStorage() {
@@ -208,7 +218,7 @@ export const StorageManager = {
         return false;
       }
     }
-    
+
     // Web Fallback
     if (!('showDirectoryPicker' in window)) return false;
     try {
@@ -322,6 +332,12 @@ export const StorageManager = {
   },
 
   async _set(key: string, val: string) {
+    // 🌟 防护：数据核心在 init 完成前不允许写入，避免覆盖尚未加载的旧数据
+    if (key === DATA_KEY && !isInit) {
+      console.warn('[StorageManager] _set(DATA_KEY) 在 init 完成前被调用，已跳过以防覆盖');
+      return;
+    }
+
     if (key === DATA_KEY && memoryCache[DATA_KEY]) {
       const now = Date.now();
       if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
@@ -420,8 +436,17 @@ export const StorageManager = {
   },
 
   saveRawStorage(models: any[]) {
+    // 🌟 防护：init 完成前拒绝写入，避免"空数据覆盖旧数据"
+    if (!isInit) {
+      console.warn('[StorageManager] saveRawStorage 在 init 完成前被调用，已跳过以防覆盖');
+      return;
+    }
     const current = StorageManager.getRawStorage();
     StorageManager._set(DATA_KEY, JSON.stringify({ ...current, models }));
+  },
+
+  isDataLoaded(): boolean {
+    return isInit;
   },
 
   // ============================================================

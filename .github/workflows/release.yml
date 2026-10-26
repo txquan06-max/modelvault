@@ -55,7 +55,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: 'ModelJourney v__VERSION__'
@@ -76,7 +75,6 @@ jobs:
       - name: Publish draft release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 🌟 修复点 2：加上 --repo 显式指定仓库，双保险
+        run: |             # 🌟 修复点 2：加上 --repo 显式指定仓库，双保险
           gh release edit "${{ github.ref_name }}" --draft=false --repo ${{ github.repository }}
           echo "✅ Release ${{ github.ref_name }} has been published."

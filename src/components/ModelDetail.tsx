@@ -1,6 +1,6 @@
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
-import { StorageManager } from '../core/StorageManager';
+import { StorageManager, FILE_SUBDIRS } from '../core/StorageManager';
 import { ModelManager } from '../core/ModelManager';
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { useEffect, useState } from 'react';
@@ -98,6 +98,7 @@ export const ModelDetail = (props: any) => {
     }
   };
 
+  // 🌟 战报保存到 reports/ 子目录
   const handleGenerateShareCard = async () => {
     if (isGenerating) return;
     AudioManager.playClick();
@@ -135,22 +136,26 @@ export const ModelDetail = (props: any) => {
       });
 
       const safeName = (detailedStats.model.name.en || 'model').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
-      const filename = `ModelVault_${safeName}_${Date.now()}.jpg`;
+      
+      // 🌟 使用 FILE_SUBDIRS.REPORT 常量，自动存入 reports/ 目录
+      const filename = `${FILE_SUBDIRS.REPORT}/ModelVault_${safeName}_${Date.now()}.jpg`;
 
       if (isTauriEnv) {
         setSaveProgress(isZh ? '保存中...' : 'Saving...');
         const localPath = await StorageManager.saveFileToLocal(filename, blob);
         if (localPath) {
           AudioManager.playFinishPart();
-          showToast(`✅ ${isZh ? '已保存到本地图库' : 'Saved to local gallery'}: ${filename}`);
+          showToast(`✅ ${isZh ? '已保存到本地图库' : 'Saved to local gallery'}: reports/...`);
         } else {
           showToast(isZh ? '⚠️ 请先在个人中心挂载本地图库' : '⚠️ Please mount a local gallery first (Profile → Data Expansion)');
         }
       } else {
+        // Web 端传统下载（无法直接写本地文件夹）
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        // Web 端仍使用默认下载路径，但文件名保持一致
+        a.download = filename.split('/').pop() || filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

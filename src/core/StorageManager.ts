@@ -6,12 +6,13 @@ const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
 const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
 
-// 🌟 图库分区常量：业务代码统一使用，避免硬编码拼错
+// 🌟 图库分区常量
 export const FILE_SUBDIRS = {
   COVER: 'covers',
   REPORT: 'reports',
   BACKGROUND: 'backgrounds',
   AUDIO: 'audios',
+  PROGRESS: 'progress', // 🌟 新增：工序过程照
 } as const;
 
 export const KEYS = {
@@ -66,7 +67,6 @@ const tauriInvoke = async <T = any>(cmd: string, args?: Record<string, any>): Pr
   return invoke<T>(cmd, args);
 };
 
-// 🌟 Web 端辅助：按路径逐级获取目录句柄
 const getNestedDirectoryHandle = async (
   rootHandle: any,
   parts: string[],
@@ -228,11 +228,7 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
-  // ============================================================
-  // 保存文件到本地（支持子目录路径，如 "covers/cover_1.webp"）
-  // ============================================================
   async saveFileToLocal(filename: string, blob: Blob): Promise<string | null> {
-    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -248,14 +244,12 @@ export const StorageManager = {
       }
     }
 
-    // -------- Web --------
     if (!assetsDirHandle) return null;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
         if ((await assetsDirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') return null;
       }
 
-      // 处理多级路径：covers/cover_xxx.webp → ['covers', 'cover_xxx.webp']
       const parts = filename.split('/').filter(p => p);
       const actualFilename = parts.pop()!;
       const dirHandle = parts.length > 0
@@ -273,9 +267,6 @@ export const StorageManager = {
     }
   },
 
-  // ============================================================
-  // 加载本地文件（支持子目录路径）
-  // ============================================================
   async loadLocalFileUrl(filename: string): Promise<string | null> {
     const cached = localUrlCache.get(filename);
     if (cached) {
@@ -286,7 +277,6 @@ export const StorageManager = {
     const cleanFilename = filename.replace('local://', '');
     let url: string | null = null;
 
-    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -297,7 +287,6 @@ export const StorageManager = {
         console.warn('[Tauri] read_local_file failed:', err);
       }
     }
-    // -------- Web --------
     else if (assetsDirHandle) {
       try {
         const parts = cleanFilename.split('/').filter(p => p);
@@ -463,9 +452,6 @@ export const StorageManager = {
     return isInit;
   },
 
-  // ============================================================
-  // Getter / Setter
-  // ============================================================
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
   getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
   getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',

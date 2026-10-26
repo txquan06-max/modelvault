@@ -8,7 +8,8 @@ export interface BuildStage {
   nameKey: string;
   status: StageStatus;
   xpReward: number;
-  photoUrl?: string;
+  photoUrl?: string; // 🌟 保留：兼容旧版
+  processPhotos?: string[]; // 🌟 新增：多图相册
   note?: string;
 }
 
@@ -41,7 +42,13 @@ const STAGE_DEFS = [
 
 export const DEFAULT_TASK_KEYS = ['part_head', 'part_torso', 'part_waist', 'part_right_arm', 'part_left_arm', 'part_right_leg', 'part_left_leg', 'part_backpack', 'part_weapons'];
 
-const generateStages = () => STAGE_DEFS.map(s => ({ id: crypto.randomUUID(), nameKey: s.key, status: 'NotStarted' as StageStatus, xpReward: s.xp }));
+const generateStages = () => STAGE_DEFS.map(s => ({
+  id: crypto.randomUUID(),
+  nameKey: s.key,
+  status: 'NotStarted' as StageStatus,
+  xpReward: s.xp,
+  processPhotos: [] as string[],
+}));
 
 const generateImportedTask = (modelId: string) => ({
   id: crypto.randomUUID(), 
@@ -52,7 +59,8 @@ const generateImportedTask = (modelId: string) => ({
     id: crypto.randomUUID(), 
     nameKey: s.key, 
     status: s.key === 'stage_assembly' ? 'Completed' : 'NotStarted' as StageStatus, 
-    xpReward: s.xp 
+    xpReward: s.xp,
+    processPhotos: [] as string[],
   }))
 });
 
@@ -286,6 +294,42 @@ export class ModelManager {
     return models;
   }
 
+  // 🌟 新增：追加过程照到指定工序
+  static addStagePhoto(taskId: string, stageId: string, photoUrl: string): Model[] {
+    const models = this.getAllModels();
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        const stage = task.stages.find(s => s.id === stageId);
+        if (stage) {
+          if (!stage.processPhotos) stage.processPhotos = [];
+          stage.processPhotos.push(photoUrl);
+          break;
+        }
+      }
+    }
+    this.saveModels(models);
+    return models;
+  }
+
+  // 🌟 新增：移除指定的过程照
+  static removeStagePhoto(taskId: string, stageId: string, photoUrl: string): Model[] {
+    const models = this.getAllModels();
+    for (const m of models) {
+      const task = m.tasks.find(t => t.id === taskId);
+      if (task) {
+        const stage = task.stages.find(s => s.id === stageId);
+        if (stage && stage.processPhotos) {
+          stage.processPhotos = stage.processPhotos.filter(url => url !== photoUrl);
+          break;
+        }
+      }
+    }
+    this.saveModels(models);
+    return models;
+  }
+
+  // 🌟 修改：completeStage 自动把 photoUrl 存入 processPhotos
   static completeStage(taskId: string, stageId: string | null, photoUrl?: string, note?: string): Model[] {
     const models = this.getAllModels();
     let isStageCompletedNow = false;
@@ -296,12 +340,16 @@ export class ModelManager {
           const stage = task.stages.find(s => s.id === stageId); 
           if (stage && stage.status !== 'Completed') { 
             stage.status = 'Completed'; 
-            if (photoUrl) stage.photoUrl = photoUrl; 
+            if (photoUrl) {
+              stage.photoUrl = photoUrl; // 保留旧字段
+              if (!stage.processPhotos) stage.processPhotos = [];
+              stage.processPhotos.push(photoUrl);
+            }
             if (note) stage.note = note;
             isStageCompletedNow = true; 
           } 
         }
-        break; // 🌟 删除了多余的 changedModelId 记录
+        break;
       }
     }
     this.saveModels(models); 

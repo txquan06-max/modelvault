@@ -5,7 +5,7 @@ import { SessionManager } from './core/SessionManager';
 import { ModelManager } from './core/ModelManager';
 import { AchievementManager } from './core/AchievementManager';
 import { AudioManager } from './core/AudioManager';
-import { StorageManager } from './core/StorageManager';
+import { StorageManager, FILE_SUBDIRS } from './core/StorageManager';
 import { useAppStore, type MainTab } from './store/useAppStore';
 import { formatTime } from './utils/format';
 import './App.css';
@@ -31,7 +31,6 @@ const isPipMode = new URLSearchParams(window.location.search).get('pip') === 'tr
 const TUTORIAL_REWARD_KEY = 'mv_tutorial_rewarded';
 const MINI_MODE_SIZE = { width: 525, height: 300 };
 const NORMAL_MODE_SIZE = { width: 1100, height: 800 };
-// 🌟 网页 PiP 尺寸：横条布局，和极简模式风格一致但更小
 const WEB_PIP_SIZE = { width: 455, height: 260 };
 
 const LocalImage = ({ src, ...props }: any) => {
@@ -188,7 +187,6 @@ function App() {
       }
 
       try {
-        // 🌟 PiP 尺寸：455×260 横条布局
         const pipWin = await (window as any).documentPictureInPicture.requestWindow({
           width: WEB_PIP_SIZE.width,
           height: WEB_PIP_SIZE.height,
@@ -549,6 +547,7 @@ function App() {
     useAppStore.getState().triggerAutoBackup();
   };
 
+  // 🌟 封面图保存到 covers/ 子目录
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && viewingModelId) {
@@ -572,7 +571,8 @@ function App() {
               ext = 'jpg';
             }
             if (!finalBlob) return;
-            const filename = `cover_${Date.now()}.${ext}`;
+            // 🌟 使用 FILE_SUBDIRS.COVER 常量
+            const filename = `${FILE_SUBDIRS.COVER}/cover_${Date.now()}.${ext}`;
             const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
             const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
             const updated = ModelManager.updateModelCover(viewingModelId, finalUrl);

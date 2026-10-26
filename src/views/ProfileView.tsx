@@ -3,22 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
 import { DailyQuestManager, type DailyQuest } from '../core/DailyQuestManager';
-import { StatsChart } from '../components/StatsChart'; 
+import { StatsChart } from '../components/StatsChart';
 import { ModelManager } from '../core/ModelManager';
 import { UserManager } from '../core/UserManager';
-import { StorageManager } from '../core/StorageManager';
+import { StorageManager, FILE_SUBDIRS } from '../core/StorageManager';
 import { AchievementManager } from '../core/AchievementManager';
 import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { useAppStore } from '../store/useAppStore';
 import { formatTime, handleFocusScroll } from '../utils/format';
 
-/**
- * ProfileView 完全零 props 化
- * - 全局状态从 useAppStore 拿（含 toastMsg / showToast）
- * - 本地 UI 状态全部内聚（legacy / reset / snapshot / upload ...）
- * - 业务逻辑内联（导出/导入/上传/删除/购称号 ...）
- * - formatTime / handleFocusScroll 从 utils/format 拿
- */
 export const ProfileView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
@@ -28,7 +21,6 @@ export const ProfileView = () => {
     earnedTitles, equippedTitle, setEquippedTitle,
     bgMain, setBgMain, bgPip, setBgPip,
     audioSettings, setAudioSettings,
-    // 🌟 修复：补漏 setCustomAudios（handleAudioUpload 需要）
     customAudios, setCustomAudios,
     webChatInterval, setWebChatInterval,
     pipChatInterval, setPipChatInterval, storageEstimate,
@@ -36,14 +28,12 @@ export const ProfileView = () => {
     showToast,
   } = useAppStore();
 
-  // ===== 本地 UI 状态（原本来自 App.tsx props） =====
   const [quests, setQuests] = useState<DailyQuest[]>([]);
   const [snapshots, setSnapshots] = useState<{ index: number; timestamp: number | null; size: number }[]>([]);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [restoringIndex, setRestoringIndex] = useState<number | null>(null);
   const [isUploadingWakeup, setIsUploadingWakeup] = useState(false);
 
-  // 历史补录
   const [showLegacyForm, setShowLegacyForm] = useState(false);
   const [legacyInput, setLegacyInput] = useState('');
   const [legacyResults, setLegacyResults] = useState<GunplaItem[]>([]);
@@ -51,15 +41,12 @@ export const ProfileView = () => {
   const [isLegacySearching, setIsLegacySearching] = useState(false);
   const [legacySearchTrigger, setLegacySearchTrigger] = useState(0);
 
-  // 危险区
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  // 统计展开
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
 
-  // ===== 生命周期 =====
   useEffect(() => {
     setQuests(DailyQuestManager.getTodayQuests());
   }, []);
@@ -69,7 +56,6 @@ export const ProfileView = () => {
     StorageManager.listSnapshots().then((list: any[]) => setSnapshots(list));
   }, [showSnapshots]);
 
-  // 历史补录搜索防抖 200ms（复用 GunplaSearch）
   useEffect(() => {
     const query = legacyInput.trim();
     if (query.length < 1) {
@@ -100,7 +86,6 @@ export const ProfileView = () => {
     };
   }, [legacyInput, legacySearchTrigger]);
 
-  // ===== 业务逻辑 =====
   const handleClaim = (questId: string) => {
     AudioManager.playAchievement();
     if (DailyQuestManager.claimReward(questId)) {
@@ -155,7 +140,7 @@ export const ProfileView = () => {
     return raw;
   })();
 
-  // 背景图上传（内联自 App.tsx handleBgFileUpload）
+  // 🌟 背景图保存到 backgrounds/ 子目录
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -179,7 +164,8 @@ export const ProfileView = () => {
             ext = 'jpg';
           }
           if (!finalBlob) return;
-          const filename = `bg_${type}_${Date.now()}.${ext}`;
+          // 🌟 使用 FILE_SUBDIRS.BACKGROUND 常量
+          const filename = `${FILE_SUBDIRS.BACKGROUND}/bg_${type}_${Date.now()}.${ext}`;
           const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
           const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
           if (type === 'main') { setBgMain(finalUrl); } else { setBgPip(finalUrl); }
@@ -190,12 +176,13 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 音效上传（内联自 App.tsx handleAudioUpload）
+  // 🌟 自定义音效保存到 audios/ 子目录
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
-    const filename = `audio_${type}_${Date.now()}.mp3`;
+    // 🌟 使用 FILE_SUBDIRS.AUDIO 常量
+    const filename = `${FILE_SUBDIRS.AUDIO}/audio_${type}_${Date.now()}.mp3`;
     StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
       const finalPath = localPath || await new Promise<string>((res) => {
         const reader = new FileReader();
@@ -210,7 +197,6 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 导出数据
   const exportData = () => {
     AudioManager.playClick();
     const data = StorageManager.exportAll();
@@ -223,7 +209,6 @@ export const ProfileView = () => {
     URL.revokeObjectURL(url);
   };
 
-  // 导入数据
   const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -241,7 +226,6 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 重置数据
   const handleResetData = async () => {
     AudioManager.playClick();
     setIsResetting(true);
@@ -249,7 +233,6 @@ export const ProfileView = () => {
     window.location.href = window.location.origin + window.location.pathname;
   };
 
-  // 历史补录：添加
   const addToLegacyList = (item: GunplaItem) => {
     if (!legacyList.some((i: any) => i.name.en === item.name.en)) {
       setLegacyList([...legacyList, item]);
@@ -289,7 +272,6 @@ export const ProfileView = () => {
     }
   };
 
-  // 购买称号（内联自 App.tsx buyTitle）
   const buyTitle = (id: string) => {
     const result = UserManager.buyTitle(id);
     if (result.success) {

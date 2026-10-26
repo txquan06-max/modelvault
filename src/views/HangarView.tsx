@@ -58,7 +58,7 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
     setStyle({
       transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
       transition: 'transform 0.4s ease-out, box-shadow 0.4s ease-out',
-      boxShadow: activeSubTab === 'backlog' ? '0 4px 10px rgba(0,0,0,0.3)' : '0 4px 10px rgba(0,0,0,0.3)'
+      boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
     });
     setGlare({ opacity: 0 });
   };
@@ -76,17 +76,21 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
         border: activeSubTab === 'backlog' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #555',
         height: '100%',
         position: 'relative',
-        transformStyle: 'preserve-3d'
+        transformStyle: 'preserve-3d',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
       <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none', transition: 'opacity 0.2s', ...glare }} />
       
-      <div className="hangar-cover" style={{ transform: 'translateZ(20px)' }}>
+      {/* 🌟 flex: 0 0 60% 让封面占卡片 60% 高度，aspectRatio auto 覆盖默认值 */}
+      <div className="hangar-cover" style={{ flex: '0 0 60%', aspectRatio: 'auto', transform: 'translateZ(20px)' }}>
         {model.coverImage ? <LocalCover image={model.coverImage} fallback="📷" /> : <span>📷 {t('noImage')}</span>}
         {model.isRebuilding && <span className="rebuild-badge-overlay">🔧 {t('rebuilding')}</span>}
         {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{t('statusInProgress')}</span>}
       </div>
-      <div className="hangar-info" style={{ transform: 'translateZ(30px)' }}>
+      <div className="hangar-info" style={{ flex: 1, transform: 'translateZ(30px)' }}>
         <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6', display: 'flex', justifyContent: 'space-between' }}>
           <span>{model.grade}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>⏱ {getModelTotalTime(model)}</span>
@@ -102,7 +106,6 @@ export const HangarView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 批次 10B：完全零 props，全部从 store 读取
   const { models, setCurrentModelId, setActiveTab, setViewingModelId, setExpandedTaskId } = useAppStore();
 
   const [activeSubTab, setActiveSubTab] = useState<'completed' | 'backlog'>('completed');
@@ -121,8 +124,9 @@ export const HangarView = () => {
     return () => resizeObserver.disconnect();
   }, []);
 
+  // 🌟 修复 Bug 1：只显示真正完成（status=Completed）的模型
   const completedModels = models
-    .filter((m: any) => m.status === 'Completed' || m.isRebuilding)
+    .filter((m: any) => m.status === 'Completed')
     .sort((a: any, b: any) => a.grade.localeCompare(b.grade));
 
   const backlogModels = models
@@ -162,7 +166,8 @@ export const HangarView = () => {
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 200, 
+    // 🌟 修复 Bug 4：增大 estimateSize 到 240，容纳 cover + info 完整高度
+    estimateSize: () => 240,
     overscan: 5,
   });
 
@@ -212,6 +217,8 @@ export const HangarView = () => {
                       top: 0,
                       left: 0,
                       width: '100%',
+                      // 🌟 修复 Bug 4：虚拟行必须有明确高度，否则相邻行重叠
+                      height: `${virtualRow.size}px`,
                       display: 'grid',
                       gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
                       gap: `${gap}px`,

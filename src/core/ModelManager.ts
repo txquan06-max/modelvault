@@ -29,7 +29,7 @@ export interface Model {
   grade: string;
   status: 'NotStarted' | 'InProgress' | 'Completed';
   coverImage?: string;
-  galleryPhotos?: string[]; // 🌟 新增：模型级相册
+  galleryPhotos?: string[];
   isRebuilding?: boolean;
   isImported?: boolean; 
   tasks: Task[];
@@ -76,7 +76,7 @@ export class ModelManager {
         ...m,
         name: isLegacyName ? { en: m.name, zh: m.name } : m.name,
         series: typeof m.series === 'string' ? { en: m.series, zh: m.series } : m.series,
-        galleryPhotos: Array.isArray(m.galleryPhotos) ? m.galleryPhotos : [], // 🌟 兼容补全
+        galleryPhotos: Array.isArray(m.galleryPhotos) ? m.galleryPhotos : [],
       };
     });
 
@@ -109,7 +109,6 @@ export class ModelManager {
     return models;
   }
 
-  // 🌟 新增：模型通用相册增删
   static addModelGalleryPhoto(modelId: string, photoUrl: string): Model[] {
     const models = this.getAllModels();
     const model = models.find(m => m.id === modelId);
@@ -279,16 +278,21 @@ export class ModelManager {
     return models;
   }
 
+  // 🌟 修复 Bug 1 + Bug 2：只有整个模型已完成时才进入 rebuild
   static startStage(taskId: string, stageId: string | null): Model[] {
     const models = this.getAllModels();
     for (const m of models) {
       const task = m.tasks.find(t => t.id === taskId);
       if (task) {
-        if (m.status === 'Completed' || task.status === 'Completed') {
+        if (m.status === 'Completed') {
+          // 整个模型已完成 → rebuild 模式，重置 task 下已完成工序
           m.status = 'InProgress';
           m.isRebuilding = true;
           task.status = 'InProgress';
           task.stages.forEach(s => { if (s.status === 'Completed') s.status = 'InProgress'; });
+        } else if (task.status === 'Completed') {
+          // 仅单部位已完成 → 只重开该 task，不改模型状态，不动其他工序
+          task.status = 'InProgress';
         } else if (task.status === 'NotStarted') {
           task.status = 'InProgress';
         }
@@ -379,25 +383,37 @@ export class ModelManager {
     return models;
   }
 
-  static finishTask(taskId: string, coverImage?: string): { models: Model[], error?: string } {
-    const models = this.getAllModels(); let changedModelId: string | null = null;
+  // 🌟 修复 Bug 3：部位完成照写入通用相册，不再误当 coverImage
+  static finishTask(taskId: string, partPhotoUrl?: string): { models: Model[], error?: string } {
+    const models = this.getAllModels(); 
+    let changedModelId: string | null = null;
     for (const m of models) {
       const task = m.tasks.find(t => t.id === taskId);
       if (task) {
         const assembly = task.stages.find(s => s.nameKey === 'stage_assembly');
         if (assembly && assembly.status !== 'Completed') return { models, error: 'errorAssemblyRequired' };
         if (task.status !== 'Completed') { task.status = 'Completed'; UserManager.addCoins(50); }
-        changedModelId = m.id; break;
+        // 🌟 部位完成照存到模型通用相册（详情页顶部相册可见）
+        if (partPhotoUrl && partPhotoUrl.trim()) {
+          if (!m.galleryPhotos) m.galleryPhotos = [];
+          m.galleryPhotos.push(partPhotoUrl);
+        }
+        changedModelId = m.id; 
+        break;
       }
     }
     if (changedModelId) {
       const model = models.find(m => m.id === changedModelId)!;
       if (model.tasks.every(t => t.status === 'Completed')) {
-        if (model.status !== 'Completed') { model.status = 'Completed'; if (coverImage) model.coverImage = coverImage; UserManager.addCoins(200); }
+        if (model.status !== 'Completed') { 
+          model.status = 'Completed'; 
+          UserManager.addCoins(200); 
+        }
         model.isRebuilding = false;
       }
     }
-    this.saveModels(models); return { models };
+    this.saveModels(models); 
+    return { models };
   }
 
   static reopenModel(modelId: string): Model[] {
@@ -407,7 +423,7 @@ export class ModelManager {
     this.saveModels(models); return models;
   }
 
-  static getCompletedModels(): Model[] { return this.getAllModels().filter(m => m.status === 'Completed' || m.isRebuilding); }
+  static getCompletedModels(): Model[] { return this.getAllModels().filter(m => m.status === 'Completed'); }
 
   static getTaskDetails(taskId: string): { modelName: { en: string; zh: string }; taskName: string } | null {
     for (const m of this.getAllModels()) { const t = m.tasks.find(t => t.id === taskId); if (t) return { modelName: m.name, taskName: t.name }; }

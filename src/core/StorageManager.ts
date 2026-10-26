@@ -6,7 +6,6 @@ const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
 const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
 
-// 🌟 图库分区常量
 export const FILE_SUBDIRS = {
   COVER: 'covers',
   REPORT: 'reports',
@@ -42,7 +41,7 @@ export const KEYS = {
   DAILY_QUESTS: 'mv_daily_quests_data',
   UNLOCKED_BOTS: 'mv_unlocked_bots_v2',
   CURRENT_BOT: 'mv_current_bot_v2',
-  LAST_WORKBENCH: 'mv_last_workbench', // 🌟 断点续传核心 Key
+  LAST_WORKBENCH: 'mv_last_workbench',
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
@@ -325,6 +324,52 @@ export const StorageManager = {
     return null;
   },
 
+  // 🌟 新增：物理删除本地文件
+  async deleteLocalFile(filename: string): Promise<boolean> {
+    const cleanFilename = filename.replace('local://', '');
+    
+    // 1. 清理内存缓存
+    const cached = localUrlCache.get(filename);
+    if (cached) {
+      URL.revokeObjectURL(cached.url);
+      localUrlCache.delete(filename);
+    }
+
+    // 2. Tauri 端
+    if (isTauriEnv()) {
+      if (!assetsMounted) return false;
+      try {
+        await tauriInvoke('delete_local_file', { filename: cleanFilename });
+        return true;
+      } catch (err) {
+        console.warn('[Tauri] delete_local_file failed:', err);
+        return false;
+      }
+    }
+
+    // 3. Web 端
+    if (!assetsDirHandle) return false;
+    try {
+      if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+        if ((await assetsDirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') return false;
+      }
+      const parts = cleanFilename.split('/').filter(p => p);
+      const actualFilename = parts.pop()!;
+      const dirHandle = parts.length > 0
+        ? await getNestedDirectoryHandle(assetsDirHandle, parts, false)
+        : assetsDirHandle;
+
+      if (dirHandle) {
+        await dirHandle.removeEntry(actualFilename);
+        return true;
+      }
+    } catch (err) {
+      // 如果文件不存在，会抛出 NotFoundError，忽略即可
+      console.warn('[Web] deleteLocalFile failed:', err);
+    }
+    return false;
+  },
+
   async clearAssetsFolder() {
     assetsMounted = false;
     assetsDirHandle = null;
@@ -453,7 +498,6 @@ export const StorageManager = {
     return isInit;
   },
 
-  // 🌟 工作现场恢复机制
   getLastWorkbench: (): { modelId: string, taskId: string, stageId: string | null } | null => {
     try {
       const raw = memoryCache[KEYS.LAST_WORKBENCH];

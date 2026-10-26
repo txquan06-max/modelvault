@@ -42,11 +42,6 @@ fn clear_assets_dir(state: State<AssetsDir>) -> Result<(), String> {
 
 // ============================================================
 // 11b. save_local_file：支持子目录自动创建 + 路径安全
-// ------------------------------------------------------------
-// filename 示例：
-//   - "cover_123.webp"           → <挂载目录>/cover_123.webp（兼容旧数据）
-//   - "covers/cover_123.webp"    → <挂载目录>/covers/cover_123.webp
-//   - "reports/report_1.jpg"     → <挂载目录>/reports/report_1.jpg
 // ============================================================
 #[tauri::command]
 fn save_local_file(
@@ -54,7 +49,6 @@ fn save_local_file(
     filename: String,
     bytes: Vec<u8>,
 ) -> Result<String, String> {
-    // 安全校验：拒绝路径穿越
     if filename.contains("..") {
         return Err("invalid_filename_path_traversal".to_string());
     }
@@ -63,7 +57,6 @@ fn save_local_file(
     let dir = guard.as_ref().ok_or("assets_dir_not_mounted")?;
     let file_path = dir.join(&filename);
 
-    // 如果有子目录（如 covers/），自动创建
     if let Some(parent) = file_path.parent() {
         if !parent.exists() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -75,7 +68,7 @@ fn save_local_file(
 }
 
 // ============================================================
-// 11c. read_local_file：同样支持子目录路径
+// 11c. read_local_file：支持子目录路径
 // ============================================================
 #[tauri::command]
 fn read_local_file(state: State<AssetsDir>, filename: String) -> Result<Vec<u8>, String> {
@@ -87,6 +80,27 @@ fn read_local_file(state: State<AssetsDir>, filename: String) -> Result<Vec<u8>,
     let dir = guard.as_ref().ok_or("assets_dir_not_mounted")?;
     let file_path = dir.join(&filename);
     std::fs::read(&file_path).map_err(|e| e.to_string())
+}
+
+// ============================================================
+// 11d. delete_local_file：安全删除本地文件（幂等）
+// ============================================================
+#[tauri::command]
+fn delete_local_file(state: State<AssetsDir>, filename: String) -> Result<(), String> {
+    if filename.contains("..") {
+        return Err("invalid_filename_path_traversal".to_string());
+    }
+
+    let guard = state.0.lock().map_err(|e| e.to_string())?;
+    let dir = guard.as_ref().ok_or("assets_dir_not_mounted")?;
+    let file_path = dir.join(&filename);
+
+    if file_path.exists() && file_path.is_file() {
+        std::fs::remove_file(&file_path).map_err(|e| e.to_string())?;
+    }
+    
+    // 如果文件不存在，直接返回 Ok，保证幂等性
+    Ok(())
 }
 
 // ============================================================
@@ -238,6 +252,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_local_file,
             read_local_file,
+            delete_local_file,
             set_assets_dir,
             get_assets_dir,
             clear_assets_dir,

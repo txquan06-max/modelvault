@@ -13,7 +13,6 @@ interface ToneSpec {
   gain: number;
 }
 
-// 所有音效自合成，完全弃用 uisfx
 const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>> = {
   click: {
     default: { freq: 1400, duration: 0.05, type: 'sine', gain: 0.1 },
@@ -26,63 +25,24 @@ const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>
     soft: { freq: 1200, duration: 0.04, type: 'sine', gain: 0.008 },
   },
   start: {
-    default: [
-      { freq: 600, duration: 0.08, type: 'sine', gain: 0.12 },
-      { freq: 900, duration: 0.12, type: 'sine', gain: 0.12 },
-    ],
-    chiptune: [
-      { freq: 800, duration: 0.06, type: 'square', gain: 0.1 },
-      { freq: 1200, duration: 0.08, type: 'square', gain: 0.1 },
-    ],
-    soft: [
-      { freq: 500, duration: 0.12, type: 'sine', gain: 0.1 },
-      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 600, duration: 0.08, type: 'sine', gain: 0.12 }, { freq: 900, duration: 0.12, type: 'sine', gain: 0.12 }],
+    chiptune: [{ freq: 800, duration: 0.06, type: 'square', gain: 0.1 }, { freq: 1200, duration: 0.08, type: 'square', gain: 0.1 }],
+    soft: [{ freq: 500, duration: 0.12, type: 'sine', gain: 0.1 }, { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 }],
   },
   pause: {
-    default: [
-      { freq: 900, duration: 0.08, type: 'sine', gain: 0.12 },
-      { freq: 500, duration: 0.12, type: 'sine', gain: 0.1 },
-    ],
-    chiptune: [
-      { freq: 1200, duration: 0.06, type: 'square', gain: 0.1 },
-      { freq: 700, duration: 0.08, type: 'square', gain: 0.08 },
-    ],
-    soft: [
-      { freq: 800, duration: 0.12, type: 'sine', gain: 0.08 },
-      { freq: 500, duration: 0.15, type: 'sine', gain: 0.08 },
-    ],
+    default: [{ freq: 900, duration: 0.08, type: 'sine', gain: 0.12 }, { freq: 500, duration: 0.12, type: 'sine', gain: 0.1 }],
+    chiptune: [{ freq: 1200, duration: 0.06, type: 'square', gain: 0.1 }, { freq: 700, duration: 0.08, type: 'square', gain: 0.08 }],
+    soft: [{ freq: 800, duration: 0.12, type: 'sine', gain: 0.08 }, { freq: 500, duration: 0.15, type: 'sine', gain: 0.08 }],
   },
   complete: {
-    default: [
-      { freq: 800, duration: 0.1, type: 'sine', gain: 0.15 },
-      { freq: 1100, duration: 0.1, type: 'sine', gain: 0.15 },
-      { freq: 1500, duration: 0.2, type: 'sine', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 1000, duration: 0.08, type: 'square', gain: 0.12 },
-      { freq: 1400, duration: 0.08, type: 'square', gain: 0.12 },
-      { freq: 1800, duration: 0.15, type: 'square', gain: 0.12 },
-    ],
-    soft: [
-      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1300, duration: 0.2, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 800, duration: 0.1, type: 'sine', gain: 0.15 }, { freq: 1100, duration: 0.1, type: 'sine', gain: 0.15 }, { freq: 1500, duration: 0.2, type: 'sine', gain: 0.15 }],
+    chiptune: [{ freq: 1000, duration: 0.08, type: 'square', gain: 0.12 }, { freq: 1400, duration: 0.08, type: 'square', gain: 0.12 }, { freq: 1800, duration: 0.15, type: 'square', gain: 0.12 }],
+    soft: [{ freq: 700, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1300, duration: 0.2, type: 'sine', gain: 0.1 }],
   },
   finishPart: {
-    default: [
-      { freq: 1000, duration: 0.08, type: 'sine', gain: 0.15 },
-      { freq: 1400, duration: 0.15, type: 'sine', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 1200, duration: 0.06, type: 'square', gain: 0.12 },
-      { freq: 1600, duration: 0.1, type: 'square', gain: 0.12 },
-    ],
-    soft: [
-      { freq: 800, duration: 0.1, type: 'sine', gain: 0.1 },
-      { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 1000, duration: 0.08, type: 'sine', gain: 0.15 }, { freq: 1400, duration: 0.15, type: 'sine', gain: 0.15 }],
+    chiptune: [{ freq: 1200, duration: 0.06, type: 'square', gain: 0.12 }, { freq: 1600, duration: 0.1, type: 'square', gain: 0.12 }],
+    soft: [{ freq: 800, duration: 0.1, type: 'sine', gain: 0.1 }, { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 }],
   },
   stage: {
     default: { freq: 1000, duration: 0.08, type: 'sine', gain: 0.12 },
@@ -90,72 +50,24 @@ const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>
     soft: { freq: 800, duration: 0.1, type: 'sine', gain: 0.08 },
   },
   timebox: {
-    default: [
-      { freq: 700, duration: 0.12, type: 'sine', gain: 0.15 },
-      { freq: 900, duration: 0.12, type: 'sine', gain: 0.15 },
-      { freq: 1200, duration: 0.2, type: 'sine', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 800, duration: 0.1, type: 'square', gain: 0.12 },
-      { freq: 1100, duration: 0.1, type: 'square', gain: 0.12 },
-      { freq: 1500, duration: 0.15, type: 'square', gain: 0.12 },
-    ],
-    soft: [
-      { freq: 600, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 800, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1100, duration: 0.2, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 700, duration: 0.12, type: 'sine', gain: 0.15 }, { freq: 900, duration: 0.12, type: 'sine', gain: 0.15 }, { freq: 1200, duration: 0.2, type: 'sine', gain: 0.15 }],
+    chiptune: [{ freq: 800, duration: 0.1, type: 'square', gain: 0.12 }, { freq: 1100, duration: 0.1, type: 'square', gain: 0.12 }, { freq: 1500, duration: 0.15, type: 'square', gain: 0.12 }],
+    soft: [{ freq: 600, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 800, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1100, duration: 0.2, type: 'sine', gain: 0.1 }],
   },
   achievement: {
-    default: [
-      { freq: 800, duration: 0.1, type: 'sine', gain: 0.15 },
-      { freq: 1000, duration: 0.1, type: 'sine', gain: 0.15 },
-      { freq: 1200, duration: 0.1, type: 'sine', gain: 0.15 },
-      { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 1000, duration: 0.08, type: 'square', gain: 0.12 },
-      { freq: 1300, duration: 0.08, type: 'square', gain: 0.12 },
-      { freq: 1600, duration: 0.08, type: 'square', gain: 0.12 },
-      { freq: 2000, duration: 0.2, type: 'square', gain: 0.12 },
-    ],
-    soft: [
-      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 900, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1400, duration: 0.25, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 800, duration: 0.1, type: 'sine', gain: 0.15 }, { freq: 1000, duration: 0.1, type: 'sine', gain: 0.15 }, { freq: 1200, duration: 0.1, type: 'sine', gain: 0.15 }, { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 }],
+    chiptune: [{ freq: 1000, duration: 0.08, type: 'square', gain: 0.12 }, { freq: 1300, duration: 0.08, type: 'square', gain: 0.12 }, { freq: 1600, duration: 0.08, type: 'square', gain: 0.12 }, { freq: 2000, duration: 0.2, type: 'square', gain: 0.12 }],
+    soft: [{ freq: 700, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 900, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1400, duration: 0.25, type: 'sine', gain: 0.1 }],
   },
   distraction: {
-    default: [
-      { freq: 350, freqEnd: 180, duration: 0.3, type: 'triangle', gain: 0.15 },
-      { freq: 300, freqEnd: 150, duration: 0.3, type: 'triangle', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 400, freqEnd: 200, duration: 0.25, type: 'square', gain: 0.1 },
-      { freq: 350, freqEnd: 180, duration: 0.25, type: 'square', gain: 0.1 },
-    ],
-    soft: [
-      { freq: 300, freqEnd: 150, duration: 0.4, type: 'sine', gain: 0.1 },
-      { freq: 250, freqEnd: 120, duration: 0.4, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 350, freqEnd: 180, duration: 0.3, type: 'triangle', gain: 0.15 }, { freq: 300, freqEnd: 150, duration: 0.3, type: 'triangle', gain: 0.15 }],
+    chiptune: [{ freq: 400, freqEnd: 200, duration: 0.25, type: 'square', gain: 0.1 }, { freq: 350, freqEnd: 180, duration: 0.25, type: 'square', gain: 0.1 }],
+    soft: [{ freq: 300, freqEnd: 150, duration: 0.4, type: 'sine', gain: 0.1 }, { freq: 250, freqEnd: 120, duration: 0.4, type: 'sine', gain: 0.1 }],
   },
   wakeup: {
-    default: [
-      { freq: 800, duration: 0.12, type: 'sine', gain: 0.15 },
-      { freq: 1200, duration: 0.12, type: 'sine', gain: 0.15 },
-      { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 },
-    ],
-    chiptune: [
-      { freq: 1000, duration: 0.1, type: 'square', gain: 0.12 },
-      { freq: 1400, duration: 0.1, type: 'square', gain: 0.12 },
-      { freq: 1800, duration: 0.2, type: 'square', gain: 0.12 },
-    ],
-    soft: [
-      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 },
-      { freq: 1300, duration: 0.25, type: 'sine', gain: 0.1 },
-    ],
+    default: [{ freq: 800, duration: 0.12, type: 'sine', gain: 0.15 }, { freq: 1200, duration: 0.12, type: 'sine', gain: 0.15 }, { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 }],
+    chiptune: [{ freq: 1000, duration: 0.1, type: 'square', gain: 0.12 }, { freq: 1400, duration: 0.1, type: 'square', gain: 0.12 }, { freq: 1800, duration: 0.2, type: 'square', gain: 0.12 }],
+    soft: [{ freq: 700, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 }, { freq: 1300, duration: 0.25, type: 'sine', gain: 0.1 }],
   },
 };
 
@@ -169,9 +81,11 @@ export class AudioManager {
   private static ambientGain: GainNode | null = null;
   private static currentAmbient: AmbientType = 'none';
 
-  // 🌟 核心防抖：以 type 为 key 记录最后播放时间 + 请求 ID
   private static lastPlayTime: Record<string, number> = {};
   private static DEBOUNCE_MS = 100;
+
+  // 🌟 新增：缓存 local:// 音效转换后的 blob URL
+  private static audioUrlCache: Record<string, string> = {};
 
   private static getCtx(): AudioContext {
     if (!this.ctx) {
@@ -199,6 +113,28 @@ export class AudioManager {
 
   static lock() {
     this.unlocked = false;
+  }
+
+  // 🌟 新增：预加载自定义音效（解决 local:// 协议无法直接播放的问题）
+  static async preloadCustomAudios() {
+    const customAudios = StorageManager.getCustomAudios();
+    const wakeup = StorageManager.getCustomWakeupSound();
+    
+    const urlsToLoad = [...Object.values(customAudios), wakeup].filter(u => typeof u === 'string' && u.startsWith('local://')) as string[];
+    
+    for (const url of urlsToLoad) {
+      if (!this.audioUrlCache[url]) {
+        const blobUrl = await StorageManager.loadLocalFileUrl(url);
+        if (blobUrl) this.audioUrlCache[url] = blobUrl;
+      }
+    }
+  }
+
+  private static getPlayableUrl(src: string): string | null {
+    if (src.startsWith('local://')) {
+      return this.audioUrlCache[src] || null;
+    }
+    return src;
   }
 
   private static async ensureRunning(ctx: AudioContext): Promise<boolean> {
@@ -243,9 +179,7 @@ export class AudioManager {
 
       osc.start(now);
       osc.stop(now + spec.duration + 0.02);
-    } catch (e) {
-      console.warn('playTone failed', e);
-    }
+    } catch (e) {}
   }
 
   private static playSpecs(specs: ToneSpec | ToneSpec[]) {
@@ -265,12 +199,27 @@ export class AudioManager {
 
   private static playCustom(type: SoundType): boolean {
     const customAudios = StorageManager.getCustomAudios();
-    const base64 = customAudios[type];
-    if (base64) {
-      const audio = new Audio(base64);
-      audio.volume = 0.5;
-      audio.play().catch(e => console.warn('Audio play failed', e));
-      return true;
+    const src = customAudios[type];
+    if (src) {
+      const playUrl = this.getPlayableUrl(src);
+      if (playUrl) {
+        const audio = new Audio(playUrl);
+        audio.volume = 0.5;
+        audio.play().catch(e => console.warn('Audio play failed', e));
+        return true;
+      }
+      // 如果是从 local:// 加载但还没准备好，尝试异步加载一次并播放
+      if (src.startsWith('local://')) {
+        StorageManager.loadLocalFileUrl(src).then(blobUrl => {
+          if (blobUrl) {
+            this.audioUrlCache[src] = blobUrl;
+            const audio = new Audio(blobUrl);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.warn('Audio play failed', e));
+          }
+        });
+        return true;
+      }
     }
     return false;
   }
@@ -282,14 +231,27 @@ export class AudioManager {
     if (type === 'wakeup') {
       const customWakeup = StorageManager.getCustomWakeupSound();
       if (customWakeup) {
-        const audio = new Audio(customWakeup);
-        audio.volume = 1.0;
-        audio.play().catch(e => console.warn('Wakeup sound play failed', e));
-        return;
+        const playUrl = this.getPlayableUrl(customWakeup);
+        if (playUrl) {
+          const audio = new Audio(playUrl);
+          audio.volume = 1.0;
+          audio.play().catch(e => console.warn('Wakeup sound play failed', e));
+          return;
+        }
+        if (customWakeup.startsWith('local://')) {
+          StorageManager.loadLocalFileUrl(customWakeup).then(blobUrl => {
+            if (blobUrl) {
+              this.audioUrlCache[customWakeup] = blobUrl;
+              const audio = new Audio(blobUrl);
+              audio.volume = 1.0;
+              audio.play().catch(e => console.warn('Wakeup sound play failed', e));
+            }
+          });
+          return;
+        }
       }
     }
 
-    // 🌟 核心防抖：100ms 内同类型音效只播一次
     const now = Date.now();
     if (this.lastPlayTime[type] && now - this.lastPlayTime[type] < this.DEBOUNCE_MS) {
       return;
@@ -308,18 +270,14 @@ export class AudioManager {
     const ctx = this.getCtx();
 
     if (this.isCtxRunning(ctx)) {
-      // running: 立即播放
       this.playSpecs(spec);
       return;
     }
 
-    // suspended: resume 完成后播放一次
-    // 关键：如果 resume 期间用户又点击了，lastPlayTime 会被更新，
-    //      此时旧请求直接作废，只保留新请求（避免两条路径叠加）
     try { ctx.resume().catch(() => {}); } catch {}
     this.ensureRunning(ctx).then((ok) => {
       if (!ok) return;
-      if (this.lastPlayTime[type] !== requestTime) return; // 被后续点击覆盖，作废
+      if (this.lastPlayTime[type] !== requestTime) return;
       this.playSpecs(spec);
     });
   }
@@ -344,7 +302,6 @@ export class AudioManager {
   static playTypeTick() {
     if (!this.unlocked) return;
 
-    // 打字机音效：60ms 防抖（比主音效更短，保留节奏感）
     const now = Date.now();
     if (this.lastPlayTime['typing'] && now - this.lastPlayTime['typing'] < 60) return;
     this.lastPlayTime['typing'] = now;
@@ -371,7 +328,6 @@ export class AudioManager {
   static playAmbient(type: AmbientType) {
     if (this.currentAmbient === type) return;
     this.stopAmbient();
-
     if (type === 'none') return;
     this.currentAmbient = type;
 

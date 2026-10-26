@@ -111,7 +111,12 @@ export const ProfileView = () => {
   const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { showToast(isZh ? '音频文件太大（最大2MB）' : 'Audio file too large (max 2MB)'); return; }
+    // 🌟 限制：未挂载图库时最大 300KB
+    const maxSize = isAssetsMounted ? 2 * 1024 * 1024 : 300 * 1024;
+    if (file.size > maxSize) {
+      showToast(isAssetsMounted ? t('toast_audio_too_large') : (isZh ? '未挂载图库时音频最大 300KB' : 'Max 300KB without gallery mount'));
+      return;
+    }
     
     setIsUploadingWakeup(true);
     const reader = new FileReader();
@@ -140,7 +145,6 @@ export const ProfileView = () => {
     return raw;
   })();
 
-  // 🌟 背景图保存到 backgrounds/ 子目录
   const handleBgFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'pip') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -164,7 +168,6 @@ export const ProfileView = () => {
             ext = 'jpg';
           }
           if (!finalBlob) return;
-          // 🌟 使用 FILE_SUBDIRS.BACKGROUND 常量
           const filename = `${FILE_SUBDIRS.BACKGROUND}/bg_${type}_${Date.now()}.${ext}`;
           const localPath = await StorageManager.saveFileToLocal(filename, finalBlob);
           const finalUrl = localPath || canvas.toDataURL(`image/${ext}`, 0.7);
@@ -176,24 +179,43 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 🌟 自定义音效保存到 audios/ 子目录
+  // 🌟 优化：挂载图库走 local://，未挂载走 Base64（限制 300KB）
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) { showToast(t('toast_audio_too_large')); return; }
-    // 🌟 使用 FILE_SUBDIRS.AUDIO 常量
-    const filename = `${FILE_SUBDIRS.AUDIO}/audio_${type}_${Date.now()}.mp3`;
-    StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
-      const finalPath = localPath || await new Promise<string>((res) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => res(ev.target?.result as string);
-        reader.readAsDataURL(file);
+    const maxSize = isAssetsMounted ? 2 * 1024 * 1024 : 300 * 1024;
+    if (file.size > maxSize) {
+      showToast(isAssetsMounted ? t('toast_audio_too_large') : (isZh ? '未挂载图库时音频最大 300KB' : 'Max 300KB without gallery mount'));
+      return;
+    }
+
+    if (isAssetsMounted) {
+      // 直接存硬盘
+      const filename = `${FILE_SUBDIRS.AUDIO}/audio_${type}_${Date.now()}.mp3`;
+      StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
+        if (localPath) {
+          const newAudios = { ...customAudios, [type]: localPath };
+          setCustomAudios(newAudios);
+          setAudioSettings({ ...audioSettings, [type]: 'custom' });
+          // 重新预加载缓存
+          await AudioManager.preloadCustomAudios();
+          showToast(t('toast_audio_updated'));
+        } else {
+          showToast(t('toast_local_mount_fail'));
+        }
       });
-      const newAudios = { ...customAudios, [type]: finalPath };
-      setCustomAudios(newAudios);
-      setAudioSettings({ ...audioSettings, [type]: 'custom' });
-      showToast(t('toast_audio_updated'));
-    });
+    } else {
+      // 未挂载，转 Base64
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        const newAudios = { ...customAudios, [type]: base64 };
+        setCustomAudios(newAudios);
+        setAudioSettings({ ...audioSettings, [type]: 'custom' });
+        showToast(t('toast_audio_updated'));
+      };
+      reader.readAsDataURL(file);
+    }
     e.target.value = '';
   };
 

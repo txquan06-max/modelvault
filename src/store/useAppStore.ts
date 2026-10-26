@@ -11,7 +11,6 @@ import { AudioManager, type AmbientType } from '../core/AudioManager';
 import { TimerEngine } from '../core/TimerEngine';
 import i18n from '../i18n';
 
-// ==================== 模块级单例 ====================
 const engine = new TimerEngine();
 let toastTimer: any = null;
 
@@ -25,41 +24,32 @@ export interface ChatMessage {
 export type MainTab = 'focus' | 'journal' | 'hangar' | 'gallery' | 'gundam' | 'profile';
 
 interface AppState {
-  // 模型
   models: Model[];
   currentModelId: string;
   tasks: Task[];
   currentTaskId: string;
   currentStageId: string | null;
 
-  // UI 跳转
   viewingModelId: string | null;
   expandedTaskId: string | null;
 
-  // Toast
   toastMsg: string | null;
 
-  // Timer
   timerState: 'Idle' | 'Running' | 'Paused';
   activeSeconds: number;
   lastSession: { duration: number; stageId: string | null } | null;
   timeboxTarget: number;
   hasPlayedTimeboxSound: boolean;
 
-  // 完成模型确认弹窗
   showCompleteModelConfirm: boolean;
   completeModelId: string | null;
 
-  // Chat
   chatMessages: ChatMessage[];
 
-  // Ambient
   ambientType: AmbientType;
 
-  // 备份
   isAutoBackupEnabled: boolean;
 
-  // 用户
   username: string;
   level: number;
   levelProgress: { current: number; next: number; percent: number };
@@ -70,30 +60,24 @@ interface AppState {
   checkinStreak: number;
   isCheckedIn: boolean;
 
-  // Bot
   unlockedBots: BotType[];
   currentBot: BotType;
 
-  // 背景
   bgMain: string;
   bgPip: string;
   bgSize: string;
   bgPosition: string;
 
-  // 音频
   audioSettings: any;
   customAudios: any;
 
-  // 存储
   storageEstimate: any;
 
-  // Tab & 聊天频率
   activeTab: MainTab;
   webChatInterval: number;
   pipChatInterval: number;
   isAssetsMounted: boolean;
 
-  // ==================== Actions ====================
   refreshData: () => Promise<void>;
   setModels: (models: Model[]) => void;
   setCurrentModelId: (id: string) => void;
@@ -104,7 +88,6 @@ interface AppState {
   showToast: (msg: string) => void;
   setToastMsg: (msg: string | null) => void;
 
-  // Timer actions
   startTimer: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
@@ -124,7 +107,6 @@ interface AppState {
   setChatMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
   setAmbientType: (type: AmbientType) => void;
 
-  // 其他 setter
   setUsername: (name: string) => void;
   setBgMain: (url: string) => void;
   setBgPip: (url: string) => void;
@@ -161,7 +143,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   timerState: 'Idle',
   activeSeconds: 0,
   lastSession: null,
-  // 🌟 番茄钟是每次会话的临时选择，不依赖 StorageManager 初始化
   timeboxTarget: 0,
   hasPlayedTimeboxSound: false,
 
@@ -177,11 +158,8 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   })(),
 
   ambientType: 'none',
-
   isAutoBackupEnabled: false,
 
-  // 🌟 全部硬编码安全默认值（不依赖 StorageManager 初始化时序）
-  // 真实数据由 refreshData() 在 StorageManager.init() 完成后统一刷入
   username: 'New Builder',
   level: 1,
   levelProgress: { current: 0, next: 100, percent: 0 },
@@ -211,7 +189,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
   pipChatInterval: 60000,
   isAssetsMounted: false,
 
-  // ==================== refreshData ====================
   refreshData: async () => {
     const xp = ModelManager.getTotalXP();
     const allModels = ModelManager.getAllModels();
@@ -254,13 +231,11 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
       tasks,
       currentTaskId,
       currentStageId,
-      // 🌟 以下为本次修复补充：所有持久化字段从 StorageManager 统一刷新
       username: StorageManager.getUsername(),
       unlockedBots: StorageManager.getUnlockedBots() as BotType[],
       currentBot: ((StorageManager.getCurrentBot() as BotType) || 'tu'),
       webChatInterval: StorageManager.getWebChatInterval(),
       pipChatInterval: StorageManager.getPipChatInterval(),
-      // 原有刷新
       level: UserManager.getLevel(xp),
       levelProgress: UserManager.getLevelProgress(xp),
       todayTotal: SessionManager.getTodayTotalSeconds(),
@@ -277,6 +252,10 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
       isCheckedIn: CheckinManager.isCheckedInToday(),
       storageEstimate: est,
     });
+
+    // 🌟 新增：每次刷新数据时，预加载自定义音效（local:// 转 blob://）
+    // 不 await，在后台静默执行
+    AudioManager.preloadCustomAudios().catch(e => console.warn('预加载音效失败', e));
   },
 
   setModels: (models: Model[]) => {
@@ -300,7 +279,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
     set({ toastMsg: msg });
   },
 
-  // ==================== Timer actions ====================
   startTimer: () => {
     const { currentTaskId, currentStageId } = get();
     if (!currentTaskId) return;
@@ -356,7 +334,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
     get().setModels(updated);
     set({ lastSession: null });
 
-    // 检查是否所有部位都完成
     const currentModel = updated.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
     if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
       set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
@@ -389,7 +366,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
     set({ timeboxTarget: 0, hasPlayedTimeboxSound: false });
     get().setModels(result.models);
 
-    // 检查是否所有部位都完成
     const currentModel = result.models.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
     if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
       set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
@@ -444,7 +420,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => ({
 
   setAmbientType: (type: AmbientType) => set({ ambientType: type }),
 
-  // 其他 setter
   setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
   setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
   setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },

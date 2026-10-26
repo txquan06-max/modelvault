@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 /**
  * 启动页
- * - 图标：使用应用 logo `/icon-512.png`，加载失败降级为 emoji
- * - 副标题：t('splash_waking')（语言包最后一批补 key）
+ * - 图标：优先使用 /logo.png（需放在 public 目录下），加载失败降级为 emoji
+ * - 副标题：t('splash_waking')
  * - 逻辑：1.5s 后自动淡出 → onFinish()
  */
 export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
@@ -34,7 +34,8 @@ export const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
       {/* 应用 logo；加载失败降级到 emoji */}
       {!logoError ? (
         <img
-          src="/app-icon.png"
+          // 🌟 确保你的图片放在了 public/ 目录下
+          src="/logo.png"
           alt="ModelJourney"
           onError={() => setLogoError(true)}
           style={{

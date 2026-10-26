@@ -51,7 +51,7 @@ export const ModelDetail = (props: any) => {
     viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
     isEditingCover, setIsEditingCover, isEditingImportedStatus, setIsEditingImportedStatus,
     importedStages, setImportedStages, handleConfirmRebuild, showRebuildConfirm, setShowRebuildConfirm,
-    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload, 
+    handleDoRebuild, handleStartRebuild, handleJumpToFocus, handleCoverUpload,
     rebuildMode, setRebuildMode, showToast
   } = props;
 
@@ -64,6 +64,7 @@ export const ModelDetail = (props: any) => {
   const [noteText, setNoteText] = useState('');
   const [template, setTemplate] = useState<ShareCardTemplate>('cyber');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [saveProgress, setSaveProgress] = useState('');
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -97,15 +98,16 @@ export const ModelDetail = (props: any) => {
     }
   };
 
-  // 🌟 修复战报生成：Blob 输出 + 三端保存逻辑
   const handleGenerateShareCard = async () => {
     if (isGenerating) return;
     AudioManager.playClick();
     setIsGenerating(true);
+    setSaveProgress(isZh ? '渲染中...' : 'Rendering...');
 
     const detailedStats = ModelManager.getDetailedStatsForShareCard(viewingModel.id);
     if (!detailedStats) {
       setIsGenerating(false);
+      setSaveProgress('');
       return;
     }
 
@@ -136,37 +138,32 @@ export const ModelDetail = (props: any) => {
       const filename = `ModelVault_${safeName}_${Date.now()}.jpg`;
 
       if (isTauriEnv) {
-        // 🌟 Tauri 端优先保存到挂载的本地图库
+        setSaveProgress(isZh ? '保存中...' : 'Saving...');
         const localPath = await StorageManager.saveFileToLocal(filename, blob);
         if (localPath) {
           AudioManager.playFinishPart();
-          showToast(isZh ? '✅ 已保存到本地图库' : '✅ Saved to local gallery');
-          setIsGenerating(false);
-          return;
+          showToast(`✅ ${isZh ? '已保存到本地图库' : 'Saved to local gallery'}: ${filename}`);
+        } else {
+          showToast(isZh ? '⚠️ 请先在个人中心挂载本地图库' : '⚠️ Please mount a local gallery first (Profile → Data Expansion)');
         }
-        // 未挂载图库 → 明确提示用户先挂载
-        showToast(isZh ? '⚠️ 请先在个人中心挂载本地图库' : '⚠️ Please mount a local gallery first (Profile → Data Expansion)');
-        setIsGenerating(false);
-        return;
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        AudioManager.playFinishPart();
+        showToast(t('toast_report_saved'));
       }
-
-      // Web 端：传统浏览器下载
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-      AudioManager.playFinishPart();
-      showToast(t('toast_report_saved'));
     } catch (err) {
       console.error('[Share Card] Failed:', err);
       showToast(t('toast_report_fail'));
     } finally {
       setIsGenerating(false);
+      setSaveProgress('');
     }
   };
 
@@ -334,11 +331,14 @@ export const ModelDetail = (props: any) => {
             <button
               key={tpl}
               onClick={() => { AudioManager.playClick(); setTemplate(tpl); }}
+              disabled={isGenerating}
               style={{
-                flex: 1, padding: '8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+                flex: 1, padding: '8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
                 background: template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.05)',
                 color: template === tpl ? '#fff' : '#aaa',
-                border: `1px solid ${template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`
+                border: `1px solid ${template === tpl ? '#3b82f6' : 'rgba(255,255,255,0.1)'}`,
+                opacity: isGenerating ? 0.5 : 1,
               }}
             >
               {tpl === 'cyber' ? t('report_cyber') : tpl === 'minimal' ? t('report_minimal') : t('report_glitch')}
@@ -351,7 +351,7 @@ export const ModelDetail = (props: any) => {
           onClick={handleGenerateShareCard}
           disabled={isGenerating}
         >
-          {isGenerating ? '⏳ ' + (isZh ? '生成中...' : 'Generating...') : `📸 ${t('btn_gen_report')}`}
+          {isGenerating ? `⏳ ${saveProgress}` : `📸 ${t('btn_gen_report')}`}
         </button>
       </div>
     </div>

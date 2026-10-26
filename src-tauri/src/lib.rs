@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, State,
+    Emitter, Manager, State, WindowEvent,
 };
 
 // ============================================================
@@ -113,16 +114,91 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 // ============================================================
+// 选项 A - 2：全局快捷键 Ctrl+Shift+S
+// ------------------------------------------------------------
+// 统一构造方式，避免闭包捕获时类型不匹配
+// ============================================================
+#[cfg(desktop)]
+fn build_toggle_shortcut() -> tauri_plugin_global_shortcut::Shortcut {
+    use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyS)
+}
+
+// ============================================================
+// 选项 A - 1：窗口关闭前尺寸防护
+// ------------------------------------------------------------
+// 问题：极简模式下（525×300）直接关闭窗口，window-state 插件会把 525×300
+//       记为下次启动尺寸，导致下次打开看不见正常 UI。
+// 方案：捕获 CloseRequested，检测是否极简尺寸，是则 prevent_close，
+//       恢复 1100×800 后延迟 120ms 再真正关闭，让 window-state 记录新尺寸。
+// ============================================================
+#[cfg(desktop)]
+fn setup_window_close_guard(app: &tauri::App) {
+    if let Some(window) = app.get_webview_window("main") {
+        let win_for_event = window.clone();
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if let Ok(size) = win_for_event.inner_size() {
+                    let scale = win_for_event.scale_factor().unwrap_or(1.0);
+                    let logical_w = size.width as f64 / scale;
+                    let logical_h = size.height as f64 / scale;
+
+                    // 极简模式 ≈ 525 × 300（±10 宽容度适配不同 DPI）
+                    let is_mini = (logical_w - 525.0).abs() < 10.0
+                        && (logical_h - 300.0).abs() < 10.0;
+
+                    if is_mini {
+                        api.prevent_close();
+                        let win_a = win_for_event.clone();
+                        let win_b = win_for_event.clone();
+                        // 恢复标准尺寸 + 取消置顶，让 window-state 保存正常尺寸
+                        let _ = win_a.set_size(tauri::LogicalSize::new(1100.0, 800.0));
+                        let _ = win_a.set_always_on_top(false);
+                        // 延迟关闭：让窗口尺寸变化事件完全抵达 window-state 监听器
+                        tauri::async_runtime::spawn(async move {
+                            std::thread::sleep(Duration::from_millis(120));
+                            let _ = win_b.close();
+                        });
+                    }
+                }
+            }
+        });
+    }
+}
+
+// ============================================================
 // 入口
 // ============================================================
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
-    // 🔧 自动更新插件（仅桌面端）
     #[cfg(desktop)]
     {
+        // 自动更新插件（原有）
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+        // 选项 A - 1：窗口状态记忆
+        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+        // 选项 A - 2：全局快捷键（Ctrl+Shift+S 发出 shortcut:toggle-timer 事件）
+        builder = builder.plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() == ShortcutState::Pressed {
+                        let target = build_toggle_shortcut();
+                        if shortcut == &target {
+                            // 交由前端根据当前 timerState 决定 start / pause / resume
+                            let _ = app.emit("shortcut:toggle-timer", ());
+                        }
+                    }
+                })
+                .build(),
+        );
+
+        // 选项 A - 3：原生通知
+        builder = builder.plugin(tauri_plugin_notification::init());
     }
 
     builder
@@ -134,7 +210,19 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                // 托盘
                 setup_tray(app)?;
+                // 窗口关闭前尺寸防护
+                setup_window_close_guard(app);
+
+                // 注册全局快捷键
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                let shortcut = build_toggle_shortcut();
+                if let Err(e) = app.global_shortcut().register(shortcut) {
+                    log::warn!("[Shortcut] 全局快捷键 Ctrl+Shift+S 注册失败：{}", e);
+                } else {
+                    log::info!("[Shortcut] 已注册 Ctrl+Shift+S 全局快捷键");
+                }
             }
             Ok(())
         })

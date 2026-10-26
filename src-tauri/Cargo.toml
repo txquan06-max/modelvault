@@ -30,3 +30,13 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-process = "2"
+
+# ============================================================
+# 选项 A：桌面端体验三连（新增）
+# ============================================================
+# 1. 窗口尺寸/位置记忆
+tauri-plugin-window-state = "2"
+# 2. 全局快捷键（Ctrl+Shift+S）
+tauri-plugin-global-shortcut = "2"
+# 3. 原生系统通知
+tauri-plugin-notification = "2"

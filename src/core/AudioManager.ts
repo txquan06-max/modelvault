@@ -1,63 +1,177 @@
-import { createUISFX } from 'uisfx';
+// src/core/AudioManager.ts
 import { StorageManager } from './StorageManager';
 
 export type SoundType = 'click' | 'start' | 'pause' | 'complete' | 'finishPart' | 'stage' | 'timebox' | 'achievement' | 'typing' | 'distraction' | 'wakeup';
 export type AmbientType = 'none' | 'rain' | 'cafe' | 'wind';
+type SoundStyle = 'default' | 'chiptune' | 'soft';
 
-const ui = createUISFX({ pack: 'glass' });
+interface ToneSpec {
+  freq: number;
+  freqEnd?: number;
+  duration: number;
+  type: OscillatorType;
+  gain: number;
+}
 
-const STYLE_TO_PACK: Record<string, string> = {
-  'default': 'glass',
-  'chiptune': 'arcade',
-  'soft': 'soft',
-};
-
-const CUE_MAP: Record<SoundType, string> = {
-  click: 'press',
-  start: 'start',
-  pause: 'pause',
-  complete: 'complete',
-  finishPart: 'double-click',
-  stage: 'select',
-  timebox: 'focus',
-  achievement: 'long-press',
-  typing: 'press',
-  distraction: 'press',
-  wakeup: 'complete',
+// 🌟 所有音效自合成，完全弃用 uisfx
+const SOUND_LIBRARY: Record<SoundType, Record<SoundStyle, ToneSpec | ToneSpec[]>> = {
+  click: {
+    default: { freq: 1400, duration: 0.05, type: 'sine', gain: 0.1 },
+    chiptune: { freq: 1600, duration: 0.03, type: 'square', gain: 0.08 },
+    soft: { freq: 1200, duration: 0.04, type: 'sine', gain: 0.06 },
+  },
+  typing: {
+    default: { freq: 1600, duration: 0.03, type: 'sine', gain: 0.015 },
+    chiptune: { freq: 2200, duration: 0.02, type: 'square', gain: 0.012 },
+    soft: { freq: 1200, duration: 0.04, type: 'sine', gain: 0.008 },
+  },
+  start: {
+    default: [
+      { freq: 600, duration: 0.08, type: 'sine', gain: 0.12 },
+      { freq: 900, duration: 0.12, type: 'sine', gain: 0.12 },
+    ],
+    chiptune: [
+      { freq: 800, duration: 0.06, type: 'square', gain: 0.1 },
+      { freq: 1200, duration: 0.08, type: 'square', gain: 0.1 },
+    ],
+    soft: [
+      { freq: 500, duration: 0.12, type: 'sine', gain: 0.1 },
+      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
+    ],
+  },
+  pause: {
+    default: [
+      { freq: 900, duration: 0.08, type: 'sine', gain: 0.12 },
+      { freq: 500, duration: 0.12, type: 'sine', gain: 0.1 },
+    ],
+    chiptune: [
+      { freq: 1200, duration: 0.06, type: 'square', gain: 0.1 },
+      { freq: 700, duration: 0.08, type: 'square', gain: 0.08 },
+    ],
+    soft: [
+      { freq: 800, duration: 0.12, type: 'sine', gain: 0.08 },
+      { freq: 500, duration: 0.15, type: 'sine', gain: 0.08 },
+    ],
+  },
+  complete: {
+    default: [
+      { freq: 800, duration: 0.1, type: 'sine', gain: 0.15 },
+      { freq: 1100, duration: 0.1, type: 'sine', gain: 0.15 },
+      { freq: 1500, duration: 0.2, type: 'sine', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 1000, duration: 0.08, type: 'square', gain: 0.12 },
+      { freq: 1400, duration: 0.08, type: 'square', gain: 0.12 },
+      { freq: 1800, duration: 0.15, type: 'square', gain: 0.12 },
+    ],
+    soft: [
+      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1300, duration: 0.2, type: 'sine', gain: 0.1 },
+    ],
+  },
+  finishPart: {
+    default: [
+      { freq: 1000, duration: 0.08, type: 'sine', gain: 0.15 },
+      { freq: 1400, duration: 0.15, type: 'sine', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 1200, duration: 0.06, type: 'square', gain: 0.12 },
+      { freq: 1600, duration: 0.1, type: 'square', gain: 0.12 },
+    ],
+    soft: [
+      { freq: 800, duration: 0.1, type: 'sine', gain: 0.1 },
+      { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 },
+    ],
+  },
+  stage: {
+    default: { freq: 1000, duration: 0.08, type: 'sine', gain: 0.12 },
+    chiptune: { freq: 1200, duration: 0.06, type: 'square', gain: 0.1 },
+    soft: { freq: 800, duration: 0.1, type: 'sine', gain: 0.08 },
+  },
+  timebox: {
+    default: [
+      { freq: 700, duration: 0.12, type: 'sine', gain: 0.15 },
+      { freq: 900, duration: 0.12, type: 'sine', gain: 0.15 },
+      { freq: 1200, duration: 0.2, type: 'sine', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 800, duration: 0.1, type: 'square', gain: 0.12 },
+      { freq: 1100, duration: 0.1, type: 'square', gain: 0.12 },
+      { freq: 1500, duration: 0.15, type: 'square', gain: 0.12 },
+    ],
+    soft: [
+      { freq: 600, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 800, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1100, duration: 0.2, type: 'sine', gain: 0.1 },
+    ],
+  },
+  achievement: {
+    default: [
+      { freq: 800, duration: 0.1, type: 'sine', gain: 0.15 },
+      { freq: 1000, duration: 0.1, type: 'sine', gain: 0.15 },
+      { freq: 1200, duration: 0.1, type: 'sine', gain: 0.15 },
+      { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 1000, duration: 0.08, type: 'square', gain: 0.12 },
+      { freq: 1300, duration: 0.08, type: 'square', gain: 0.12 },
+      { freq: 1600, duration: 0.08, type: 'square', gain: 0.12 },
+      { freq: 2000, duration: 0.2, type: 'square', gain: 0.12 },
+    ],
+    soft: [
+      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 900, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1100, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1400, duration: 0.25, type: 'sine', gain: 0.1 },
+    ],
+  },
+  distraction: {
+    default: [
+      { freq: 350, freqEnd: 180, duration: 0.3, type: 'triangle', gain: 0.15 },
+      { freq: 300, freqEnd: 150, duration: 0.3, type: 'triangle', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 400, freqEnd: 200, duration: 0.25, type: 'square', gain: 0.1 },
+      { freq: 350, freqEnd: 180, duration: 0.25, type: 'square', gain: 0.1 },
+    ],
+    soft: [
+      { freq: 300, freqEnd: 150, duration: 0.4, type: 'sine', gain: 0.1 },
+      { freq: 250, freqEnd: 120, duration: 0.4, type: 'sine', gain: 0.1 },
+    ],
+  },
+  wakeup: {
+    default: [
+      { freq: 800, duration: 0.12, type: 'sine', gain: 0.15 },
+      { freq: 1200, duration: 0.12, type: 'sine', gain: 0.15 },
+      { freq: 1600, duration: 0.25, type: 'sine', gain: 0.15 },
+    ],
+    chiptune: [
+      { freq: 1000, duration: 0.1, type: 'square', gain: 0.12 },
+      { freq: 1400, duration: 0.1, type: 'square', gain: 0.12 },
+      { freq: 1800, duration: 0.2, type: 'square', gain: 0.12 },
+    ],
+    soft: [
+      { freq: 700, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1000, duration: 0.15, type: 'sine', gain: 0.1 },
+      { freq: 1300, duration: 0.25, type: 'sine', gain: 0.1 },
+    ],
+  },
 };
 
 export class AudioManager {
-  private static currentPack = 'glass';
   private static ctx: AudioContext | null = null;
-  private static lastClickTime = 0; 
-
-  // 挂机声音叠加修复：幂等锁
+  private static lastClickTime = 0;
   private static resumeInFlight = false;
-  private static unlockCalled = false;
+  // 🌟 unlocked 默认 true（保持原行为），App.tsx 可调 lock() 启用启动静音
+  private static unlocked = true;
 
   private static ambientSource: AudioBufferSourceNode | null = null;
   private static ambientGain: GainNode | null = null;
   private static currentAmbient: AmbientType = 'none';
 
-  /**
-   * 🔧 辅助方法：判断 AudioContext 是否 running
-   * 用 `as string` 绕过 TS 的类型收窄（闭包内 ctx.state 可能已经变化，
-   * 但 TS 会沿用外层 if 的收窄结果，导致 2367 报错）
-   */
-  private static isCtxRunning(ctx: AudioContext): boolean {
-    return (ctx.state as string) === 'running';
-  }
-
-  static async unlock() {
-    // 只调一次，避免 uisfx 内部重复创建 AudioContext
-    if (this.unlockCalled) return;
-    try {
-      await (ui as any).unlock();
-      this.unlockCalled = true;
-    } catch (e) {
-      console.warn('Audio unlock failed', e);
-    }
-  }
+  // 🌟 挂机后点击音效防叠加：debounce 合并
+  private static pendingPlays = new Map<SoundType, ReturnType<typeof setTimeout>>();
 
   private static getCtx(): AudioContext {
     if (!this.ctx) {
@@ -66,15 +180,32 @@ export class AudioManager {
     return this.ctx;
   }
 
-  /**
-   * 🔧 确保 AudioContext 进入 running 状态（幂等，避免并发 resume）
-   * 挂机后浏览器会 suspend AudioContext，此时创建 osc 会排队，
-   * resume 完成后一起播放 → 2 声叠加。这里用单例 promise 串行化。
-   */
+  private static isCtxRunning(ctx: AudioContext): boolean {
+    return (ctx.state as string) === 'running';
+  }
+
+  static isUnlocked(): boolean {
+    return this.unlocked;
+  }
+
+  static unlock() {
+    if (this.unlocked) return;
+    this.unlocked = true;
+    const ctx = this.getCtx();
+    if (!this.isCtxRunning(ctx)) {
+      this.ensureRunning(ctx).catch(() => {});
+    }
+  }
+
+  static lock() {
+    this.unlocked = false;
+    this.pendingPlays.forEach(t => clearTimeout(t));
+    this.pendingPlays.clear();
+  }
+
   private static async ensureRunning(ctx: AudioContext): Promise<boolean> {
     if (this.isCtxRunning(ctx)) return true;
     if (this.resumeInFlight) {
-      // 等正在进行的 resume 完成（用辅助方法避开类型收窄）
       return new Promise((resolve) => {
         const start = Date.now();
         const check = () => {
@@ -96,12 +227,42 @@ export class AudioManager {
     }
   }
 
-  private static syncPack(style: string) {
-    const targetPack = STYLE_TO_PACK[style] || 'glass';
-    if (targetPack !== this.currentPack) {
-      this.currentPack = targetPack;
-      ui.setPack(targetPack as any);
+  private static playTone(ctx: AudioContext, spec: ToneSpec, startDelay: number = 0) {
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime + startDelay;
+      osc.type = spec.type;
+      osc.frequency.setValueAtTime(spec.freq, now);
+      if (spec.freqEnd) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(spec.freqEnd, 20), now + spec.duration);
+      }
+      gain.gain.setValueAtTime(spec.gain, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + spec.duration);
+
+      osc.start(now);
+      osc.stop(now + spec.duration + 0.02);
+    } catch (e) {
+      console.warn('playTone failed', e);
     }
+  }
+
+  private static playSpecs(specs: ToneSpec | ToneSpec[]) {
+    const arr = Array.isArray(specs) ? specs : [specs];
+    const ctx = this.getCtx();
+    let delay = 0;
+    for (const spec of arr) {
+      this.playTone(ctx, spec, delay);
+      delay += spec.duration * 0.7;
+    }
+  }
+
+  private static styleToSoundStyle(style: string): SoundStyle {
+    if (style === 'chiptune' || style === 'soft') return style;
+    return 'default';
   }
 
   private static playCustom(type: SoundType): boolean {
@@ -110,90 +271,63 @@ export class AudioManager {
     if (base64) {
       const audio = new Audio(base64);
       audio.volume = 0.5;
-      audio.play().catch(e => console.warn("Audio play failed", e));
+      audio.play().catch(e => console.warn('Audio play failed', e));
       return true;
     }
     return false;
   }
 
-  /**
-   * 🔧 修复挂机后叠加：ctx 不是 running 时，先 resume 再播（只播一次），
-   *    避免多次点击导致 osc 排队 → resume 后一起播放
-   */
-  private static playCrispClick() {
-    try {
-      const ctx = this.getCtx();
-      const doPlay = () => {
-        try {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(1400, ctx.currentTime);
-          gain.gain.setValueAtTime(0.1, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.05);
-        } catch (e) {}
-      };
-
-      if (this.isCtxRunning(ctx)) {
-        doPlay();
-      } else {
-        // 挂机后首次点击：等 resume 完成后播放一次（不叠加）
-        this.ensureRunning(ctx).then((ok) => { if (ok) doPlay(); });
-      }
-    } catch (e) {}
-  }
-
-  private static playDistractionSound() {
-    try {
-      const ctx = this.getCtx();
-      const doPlay = () => {
-        try {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(350, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.3);
-          gain.gain.setValueAtTime(0.15, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.45);
-        } catch (e) {}
-      };
-      if (this.isCtxRunning(ctx)) doPlay();
-      else this.ensureRunning(ctx).then((ok) => { if (ok) doPlay(); });
-    } catch (e) {}
-  }
-
   private static play(type: SoundType) {
-    if (type === 'typing') { this.playTypeTick(); return; }
-    if (type === 'distraction') { this.playDistractionSound(); return; }
-    if (type === 'wakeup') { this.playWakeupSound(); return; }
+    if (!this.unlocked) return;
+
+    if (type === 'wakeup') {
+      const customWakeup = StorageManager.getCustomWakeupSound();
+      if (customWakeup) {
+        const audio = new Audio(customWakeup);
+        audio.volume = 1.0;
+        audio.play().catch(e => console.warn('Wakeup sound play failed', e));
+        return;
+      }
+    }
 
     const settings = StorageManager.getAudioSettings();
     const style = settings[type] || 'default';
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom(type)) return;
-    
-    if (type === 'click' && style === 'default') {
-      this.playCrispClick();
+
+    const spec = SOUND_LIBRARY[type]?.[this.styleToSoundStyle(style)];
+    if (!spec) return;
+
+    const ctx = this.getCtx();
+
+    // 🌟 关键：同步尝试 resume（首次点击必须在事件同步栈里才被浏览器接受）
+    if (!this.isCtxRunning(ctx)) {
+      try { ctx.resume().catch(() => {}); } catch {}
+    }
+
+    if (this.isCtxRunning(ctx)) {
+      this.playSpecs(spec);
       return;
     }
 
-    this.syncPack(style);
-    ui.play(CUE_MAP[type] as any);
+    // 🌟 挂机后：debounce 合并为一次播放，避免多次点击排队叠加
+    if (this.pendingPlays.has(type)) return;
+    const timer = setTimeout(() => {
+      this.pendingPlays.delete(type);
+      this.ensureRunning(ctx).then((ok) => {
+        if (ok) this.playSpecs(spec);
+      });
+    }, 80);
+    this.pendingPlays.set(type, timer);
   }
 
-  static playClick() { 
+  static playClick() {
     const now = Date.now();
     if (now - this.lastClickTime < 50) return;
     this.lastClickTime = now;
-    this.play('click'); 
+    this.play('click');
   }
-  
+
   static playStart() { this.play('start'); }
   static playPause() { this.play('pause'); }
   static playComplete() { this.play('complete'); }
@@ -201,96 +335,52 @@ export class AudioManager {
   static playStageDone() { this.play('stage'); }
   static playTimeboxEnd() { this.play('timebox'); }
   static playAchievement() { this.play('achievement'); }
-  
   static playDistraction() { this.play('distraction'); }
   static playWakeup() { this.play('wakeup'); }
-  
-  private static playWakeupSound() {
-    const customWakeup = StorageManager.getCustomWakeupSound();
-    if (customWakeup) {
-      const audio = new Audio(customWakeup);
-      audio.volume = 1.0;
-      audio.play().catch(e => console.warn('Wakeup sound play failed', e));
-      return;
-    }
-    const settings = StorageManager.getAudioSettings();
-    const style = settings['complete'] || 'default';
-    if (style !== 'off') {
-      this.syncPack(style);
-      ui.play(CUE_MAP['complete'] as any);
-    }
-  }
 
-  static previewSound(type: SoundType) { this.play(type); }
-
-  /**
-   * 🔧 打字机音效：挂机时不排队（避免 resume 后瞬间播一堆）
-   *    只用 ensureRunning 触发 ctx.resume，但不创建 osc
-   */
   static playTypeTick() {
+    if (!this.unlocked) return;
+
     const settings = StorageManager.getAudioSettings();
     const style = settings['typing'] || 'default';
     if (style === 'off') return;
     if (style === 'custom' && this.playCustom('typing')) return;
 
-    try {
-      const ctx = this.getCtx();
+    const ctx = this.getCtx();
+    if (!this.isCtxRunning(ctx)) {
+      // 挂机时打字机只恢复 ctx，不排队播放
+      this.ensureRunning(ctx);
+      return;
+    }
 
-      // 挂机时打字机不排队，只唤醒 ctx
-      if (!this.isCtxRunning(ctx)) {
-        this.ensureRunning(ctx);
-        return;
-      }
+    const spec = SOUND_LIBRARY['typing']?.[this.styleToSoundStyle(style)];
+    if (spec) this.playSpecs(spec);
+  }
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-
-      if (style === 'chiptune') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(2200, ctx.currentTime);
-        gain.gain.setValueAtTime(0.012, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.02);
-      } else if (style === 'soft') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, ctx.currentTime);
-        gain.gain.setValueAtTime(0.008, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.04);
-      } else {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1600, ctx.currentTime);
-        gain.gain.setValueAtTime(0.015, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.03);
-      }
-    } catch (e) {}
+  static previewSound(type: SoundType) {
+    this.play(type);
   }
 
   static playAmbient(type: AmbientType) {
     if (this.currentAmbient === type) return;
     this.stopAmbient();
-    
+
     if (type === 'none') return;
     this.currentAmbient = type;
 
     try {
       const ctx = this.getCtx();
-      const bufferSize = ctx.sampleRate * 2; 
+      const bufferSize = ctx.sampleRate * 2;
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
-      
+
       let lastOut = 0;
       for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
         if (type === 'rain') {
           output[i] = (lastOut + (0.02 * white)) / 1.02;
           lastOut = output[i];
-          output[i] *= 3.5; 
+          output[i] *= 3.5;
         } else if (type === 'wind') {
           output[i] = (lastOut + (0.05 * white)) / 1.05;
           lastOut = output[i];
@@ -309,7 +399,7 @@ export class AudioManager {
       filter.frequency.value = type === 'rain' ? 800 : 400;
 
       this.ambientGain = ctx.createGain();
-      this.ambientGain.gain.value = 0.2; 
+      this.ambientGain.gain.value = 0.2;
 
       this.ambientSource.connect(filter);
       filter.connect(this.ambientGain);

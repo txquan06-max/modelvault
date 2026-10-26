@@ -4,7 +4,7 @@ import { MigrationManager, CURRENT_SCHEMA_VERSION } from './MigrationManager';
 
 const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
-const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000; // 快照最小间隔：10 分钟
+const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
 
 export const KEYS = {
   SESSIONS: 'modelvault_sessions',
@@ -43,24 +43,16 @@ const DEFAULT_AUDIO = JSON.stringify({
 const memoryCache: Record<string, string> = {};
 let isInit = false;
 
-// Web 端文件句柄
 let backupDirHandle: any = null;
 let assetsDirHandle: any = null;
-
-// Tauri 端：是否已挂载素材文件夹（真实路径在 Rust state 里）
 let assetsMounted = false;
 
 const localUrlCache = new Map<string, { url: string, lastAccess: number }>();
 const MAX_URL_CACHE_SIZE = 50;
-
 let lastSnapshotAt = 0;
 
-// Tauri 环境判断
 const isTauriEnv = () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
-/**
- * Tauri 侧动态 import invoke（避免 Web 端加载 @tauri-apps/api 包报错）
- */
 const tauriInvoke = async <T = any>(cmd: string, args?: Record<string, any>): Promise<T> => {
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(cmd, args);
@@ -73,7 +65,6 @@ export const StorageManager = {
     try {
       await localforage.config({ name: 'ModelVault', storeName: 'modelvault_store' });
 
-      // 1. 迁移 localStorage 遗留数据到 localforage
       const legacyKeys = Object.keys(localStorage).filter(
         (k) => k.startsWith('mv_') || k === 'modelvault_sessions' || k === 'modelvault_achievements' || k === 'modelvault_core_data'
       );
@@ -88,7 +79,6 @@ export const StorageManager = {
         legacyKeys.forEach((k) => localStorage.removeItem(k));
       }
 
-      // 2. 迁移旧版 localStorage 中的塑灵状态
       const legacyUnlocked = localStorage.getItem('mv_unlocked_bots');
       if (legacyUnlocked && !memoryCache[KEYS.UNLOCKED_BOTS]) {
         memoryCache[KEYS.UNLOCKED_BOTS] = legacyUnlocked;
@@ -102,14 +92,12 @@ export const StorageManager = {
         localStorage.removeItem('mv_current_bot');
       }
 
-      // 3. 从 localforage 加载所有数据到内存
       const keys = await localforage.keys();
       for (const key of keys) {
         const val = await localforage.getItem<string>(key);
         if (val !== null) memoryCache[key] = val;
       }
 
-      // 4. 使用 MigrationManager 进行 schema 迁移
       try {
         const rawData = memoryCache[DATA_KEY];
         if (rawData) {
@@ -129,7 +117,6 @@ export const StorageManager = {
         console.error('❌ 数据迁移失败:', e);
       }
 
-      // 5. Tauri 侧恢复素材挂载状态（Rust state 在页面刷新后仍保留）
       if (isTauriEnv()) {
         try {
           const saved = await tauriInvoke<string | null>('get_assets_dir');
@@ -148,7 +135,6 @@ export const StorageManager = {
     } catch (err) {
       console.error('[StorageManager] init 失败:', err);
     } finally {
-      // 🌟 无论成功失败都标记完成，避免 main.tsx 永远白屏
       isInit = true;
     }
   },
@@ -175,7 +161,7 @@ export const StorageManager = {
   },
 
   async selectBackupFolder() {
-    if (isTauriEnv()) return false; // Tauri 下直接使用自动备份逻辑，无需选取
+    if (isTauriEnv()) return false;
     if (!('showDirectoryPicker' in window)) return false;
     try {
       backupDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
@@ -197,17 +183,12 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
-  // ============================================================
-  // 素材文件夹挂载（Tauri 走 Rust command，Web 走 showDirectoryPicker）
-  // ============================================================
   async selectAssetsFolder() {
     if (isTauriEnv()) {
       try {
-        // 1. 前端用 dialog 打开选文件夹对话（用户交互必须走 plugin-dialog）
         const { open } = await import('@tauri-apps/plugin-dialog');
         const selected = await open({ directory: true, multiple: false });
         if (selected && typeof selected === 'string') {
-          // 2. 把路径存到 Rust state
           await tauriInvoke('set_assets_dir', { path: selected });
           assetsMounted = true;
           return true;
@@ -219,7 +200,6 @@ export const StorageManager = {
       }
     }
 
-    // Web Fallback
     if (!('showDirectoryPicker' in window)) return false;
     try {
       assetsDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
@@ -227,11 +207,7 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
-  // ============================================================
-  // 保存文件到本地（Tauri 走 Rust command，Web 走 FileSystemDirectoryHandle）
-  // ============================================================
   async saveFileToLocal(filename: string, blob: Blob): Promise<string | null> {
-    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -240,14 +216,13 @@ export const StorageManager = {
           filename,
           bytes: Array.from(buf),
         });
-        return localUri; // 'local://filename'
+        return localUri;
       } catch (err) {
         console.error('[Tauri] save_local_file failed:', err);
         return null;
       }
     }
 
-    // -------- Web --------
     if (!assetsDirHandle) return null;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
@@ -261,9 +236,6 @@ export const StorageManager = {
     } catch (err) { return null; }
   },
 
-  // ============================================================
-  // 加载本地文件（Tauri 走 Rust command，Web 走 FileSystemDirectoryHandle）
-  // ============================================================
   async loadLocalFileUrl(filename: string): Promise<string | null> {
     const cached = localUrlCache.get(filename);
     if (cached) {
@@ -274,7 +246,6 @@ export const StorageManager = {
     const cleanFilename = filename.replace('local://', '');
     let url: string | null = null;
 
-    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -284,9 +255,7 @@ export const StorageManager = {
       } catch (err) {
         console.warn('[Tauri] read_local_file failed:', err);
       }
-    }
-    // -------- Web --------
-    else if (assetsDirHandle) {
+    } else if (assetsDirHandle) {
       try {
         const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
         const file = await fileHandle.getFile();
@@ -317,9 +286,6 @@ export const StorageManager = {
     return null;
   },
 
-  /**
-   * 断开素材文件夹挂载（Tauri 清 Rust state，Web 清 JS 句柄）
-   */
   async clearAssetsFolder() {
     assetsMounted = false;
     assetsDirHandle = null;
@@ -332,41 +298,46 @@ export const StorageManager = {
   },
 
   async _set(key: string, val: string) {
-    // 🌟 防护：数据核心在 init 完成前不允许写入，避免覆盖尚未加载的旧数据
+    // 🌟 防护：init 完成前不允许写入核心数据
     if (key === DATA_KEY && !isInit) {
       console.warn('[StorageManager] _set(DATA_KEY) 在 init 完成前被调用，已跳过以防覆盖');
       return;
     }
 
-    if (key === DATA_KEY && memoryCache[DATA_KEY]) {
-      const now = Date.now();
-      if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
-        try {
-          for (let i = 4; i >= 1; i--) {
-            const prevSnapshot = memoryCache[`${SNAPSHOT_PREFIX}${i}`];
-            if (prevSnapshot) {
-              memoryCache[`${SNAPSHOT_PREFIX}${i + 1}`] = prevSnapshot;
-              await localforage.setItem(`${SNAPSHOT_PREFIX}${i + 1}`, prevSnapshot);
-            }
-          }
-          const currentData = memoryCache[DATA_KEY];
-          let dataWithTs = currentData;
+    // 🌟 关键修复：先同步更新 memoryCache（立即生效）
+    // 让后续同步读取（如 getAllModels()）能立即看到新数据，避免补录等场景的数据滞后。
+    const prevValue = memoryCache[key];
+    memoryCache[key] = val;
+
+    try {
+      // 快照逻辑：只在 DATA_KEY 有旧值时才做，且间隔 >= 10min
+      // 用 prevValue（旧值）作为快照，是"回滚点"
+      if (key === DATA_KEY && prevValue) {
+        const now = Date.now();
+        if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
           try {
-            const parsed = JSON.parse(currentData);
-            parsed._snapshotAt = now;
-            dataWithTs = JSON.stringify(parsed);
-          } catch {}
-          memoryCache[`${SNAPSHOT_PREFIX}1`] = dataWithTs;
-          await localforage.setItem(`${SNAPSHOT_PREFIX}1`, dataWithTs);
-          lastSnapshotAt = now;
-        } catch (e) {
-          console.warn('生成快照失败', e);
+            for (let i = 4; i >= 1; i--) {
+              const prevSnapshot = memoryCache[`${SNAPSHOT_PREFIX}${i}`];
+              if (prevSnapshot) {
+                memoryCache[`${SNAPSHOT_PREFIX}${i + 1}`] = prevSnapshot;
+                await localforage.setItem(`${SNAPSHOT_PREFIX}${i + 1}`, prevSnapshot);
+              }
+            }
+            let dataWithTs = prevValue;
+            try {
+              const parsed = JSON.parse(prevValue);
+              parsed._snapshotAt = now;
+              dataWithTs = JSON.stringify(parsed);
+            } catch {}
+            memoryCache[`${SNAPSHOT_PREFIX}1`] = dataWithTs;
+            await localforage.setItem(`${SNAPSHOT_PREFIX}1`, dataWithTs);
+            lastSnapshotAt = now;
+          } catch (e) {
+            console.warn('生成快照失败', e);
+          }
         }
       }
-    }
 
-    memoryCache[key] = val;
-    try {
       await localforage.setItem(key, val);
     } catch (err) {
       console.error('Storage save failed:', err);
@@ -436,7 +407,6 @@ export const StorageManager = {
   },
 
   saveRawStorage(models: any[]) {
-    // 🌟 防护：init 完成前拒绝写入，避免"空数据覆盖旧数据"
     if (!isInit) {
       console.warn('[StorageManager] saveRawStorage 在 init 完成前被调用，已跳过以防覆盖');
       return;
@@ -449,9 +419,6 @@ export const StorageManager = {
     return isInit;
   },
 
-  // ============================================================
-  // Getter / Setter（保持原有 API 不变）
-  // ============================================================
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
   getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
   getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',

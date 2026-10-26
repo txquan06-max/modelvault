@@ -84,19 +84,18 @@ const Card3D = ({ model, activeSubTab, onClick, t, getModelName, getModelSeries,
     >
       <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none', transition: 'opacity 0.2s', ...glare }} />
       
-      {/* 🌟 flex: 0 0 60% 让封面占卡片 60% 高度，aspectRatio auto 覆盖默认值 */}
       <div className="hangar-cover" style={{ flex: '0 0 60%', aspectRatio: 'auto', transform: 'translateZ(20px)' }}>
         {model.coverImage ? <LocalCover image={model.coverImage} fallback="📷" /> : <span>📷 {t('noImage')}</span>}
         {model.isRebuilding && <span className="rebuild-badge-overlay">🔧 {t('rebuilding')}</span>}
         {activeSubTab === 'backlog' && model.status === 'InProgress' && <span className="rebuild-badge-overlay" style={{ background: '#3b82f6', color: '#fff' }}>{t('statusInProgress')}</span>}
       </div>
-      <div className="hangar-info" style={{ flex: 1, transform: 'translateZ(30px)' }}>
+      <div className="hangar-info" style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', transform: 'translateZ(30px)', background: 'rgba(0,0,0,0.4)' }}>
         <div className="hangar-grade" style={{ color: activeSubTab === 'backlog' ? '#f59e0b' : '#3b82f6', display: 'flex', justifyContent: 'space-between' }}>
           <span>{model.grade}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>⏱ {getModelTotalTime(model)}</span>
         </div>
-        <div className="hangar-name" title={getModelName(model)}>{getModelName(model)}</div>
-        <div className="hangar-series" title={getModelSeries(model)}>{getModelSeries(model)}</div>
+        <div className="hangar-name" title={getModelName(model)} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 'bold' }}>{getModelName(model)}</div>
+        <div className="hangar-series" title={getModelSeries(model)} style={{ fontSize: '10px', color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getModelSeries(model)}</div>
       </div>
     </div>
   );
@@ -124,7 +123,6 @@ export const HangarView = () => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // 🌟 修复 Bug 1：只显示真正完成（status=Completed）的模型
   const completedModels = models
     .filter((m: any) => m.status === 'Completed')
     .sort((a: any, b: any) => a.grade.localeCompare(b.grade));
@@ -166,7 +164,6 @@ export const HangarView = () => {
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    // 🌟 修复 Bug 4：增大 estimateSize 到 240，容纳 cover + info 完整高度
     estimateSize: () => 240,
     overscan: 5,
   });
@@ -217,12 +214,14 @@ export const HangarView = () => {
                       top: 0,
                       left: 0,
                       width: '100%',
-                      // 🌟 修复 Bug 4：虚拟行必须有明确高度，否则相邻行重叠
-                      height: `${virtualRow.size}px`,
+                      height: `${virtualRow.size}px`, // 🌟 强制卡死行高，杜绝重叠
+                      overflow: 'hidden',
                       display: 'grid',
                       gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
                       gap: `${gap}px`,
                       transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: `${gap}px`, // 保证卡片之间有下边距
+                      boxSizing: 'border-box',
                     }}
                   >
                     {rowItems.map((model: any) => (

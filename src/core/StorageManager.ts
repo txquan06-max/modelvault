@@ -12,7 +12,7 @@ export const FILE_SUBDIRS = {
   REPORT: 'reports',
   BACKGROUND: 'backgrounds',
   AUDIO: 'audios',
-  PROGRESS: 'progress', // 🌟 新增：工序过程照
+  PROGRESS: 'progress',
 } as const;
 
 export const KEYS = {
@@ -42,6 +42,7 @@ export const KEYS = {
   DAILY_QUESTS: 'mv_daily_quests_data',
   UNLOCKED_BOTS: 'mv_unlocked_bots_v2',
   CURRENT_BOT: 'mv_current_bot_v2',
+  LAST_WORKBENCH: 'mv_last_workbench', // 🌟 断点续传核心 Key
 };
 
 const DEFAULT_AUDIO = JSON.stringify({
@@ -450,6 +451,18 @@ export const StorageManager = {
 
   isDataLoaded(): boolean {
     return isInit;
+  },
+
+  // 🌟 工作现场恢复机制
+  getLastWorkbench: (): { modelId: string, taskId: string, stageId: string | null } | null => {
+    try {
+      const raw = memoryCache[KEYS.LAST_WORKBENCH];
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  },
+  setLastWorkbench: (data: { modelId: string, taskId: string, stageId: string | null }) => {
+    StorageManager._set(KEYS.LAST_WORKBENCH, JSON.stringify(data));
   },
 
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',

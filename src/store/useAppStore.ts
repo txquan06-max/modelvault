@@ -128,315 +128,349 @@ interface AppState {
   setIsAssetsMounted: (val: boolean) => void;
 }
 
-export const useAppStore = create<AppState>((set: any, get: any) => ({
-  models: [],
-  currentModelId: '',
-  tasks: [],
-  currentTaskId: '',
-  currentStageId: null,
-
-  viewingModelId: null,
-  expandedTaskId: null,
-
-  toastMsg: null,
-
-  timerState: 'Idle',
-  activeSeconds: 0,
-  lastSession: null,
-  timeboxTarget: 0,
-  hasPlayedTimeboxSound: false,
-
-  showCompleteModelConfirm: false,
-  completeModelId: null,
-
-  chatMessages: (() => {
-    try {
-      const saved = sessionStorage.getItem('mv_chat_messages');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
-  })(),
-
-  ambientType: 'none',
-  isAutoBackupEnabled: false,
-
-  username: 'New Builder',
-  level: 1,
-  levelProgress: { current: 0, next: 100, percent: 0 },
-  todayTotal: 0,
-  coinsBalance: 0,
-  earnedTitles: [],
-  equippedTitle: '',
-  checkinStreak: 0,
-  isCheckedIn: false,
-
-  unlockedBots: ['tu'] as BotType[],
-  currentBot: 'tu' as BotType,
-
-  bgMain: '',
-  bgPip: '',
-  bgSize: 'cover',
-  bgPosition: 'center',
-  audioSettings: {
-    click: 'default', start: 'default', pause: 'default', complete: 'default',
-    finishPart: 'default', stage: 'default', timebox: 'default', achievement: 'default', typing: 'default',
-  },
-  customAudios: {},
-  storageEstimate: { usage: 0, quota: 0, percent: 0 },
-
-  activeTab: 'focus',
-  webChatInterval: 8000,
-  pipChatInterval: 60000,
-  isAssetsMounted: false,
-
-  refreshData: async () => {
-    const xp = ModelManager.getTotalXP();
-    const allModels = ModelManager.getAllModels();
-    const available = allModels.filter((m: Model) => m.status !== 'Completed');
-
-    let { currentModelId, currentTaskId, currentStageId } = get();
-
-    if (available.length > 0) {
-      if (!currentModelId || !available.some((m: Model) => m.id === currentModelId)) {
-        currentModelId = available[0].id;
-      }
-    } else {
-      currentModelId = '';
-      currentTaskId = '';
-      currentStageId = null;
+export const useAppStore = create<AppState>((set: any, get: any) => {
+  
+  // 🌟 辅助函数：保存当前工作现场
+  const saveWorkbench = (modelId: string, taskId: string, stageId: string | null) => {
+    if (modelId && taskId) {
+      StorageManager.setLastWorkbench({ modelId, taskId, stageId });
     }
+  };
 
-    let tasks: Task[] = [];
-    if (currentModelId) {
-      const model = allModels.find((m: Model) => m.id === currentModelId);
-      if (model) {
-        tasks = model.tasks;
-        if (!tasks.some((t: Task) => t.id === currentTaskId) && tasks.length > 0) {
-          currentTaskId = tasks[0].id;
-        }
+  return {
+    models: [],
+    currentModelId: '',
+    tasks: [],
+    currentTaskId: '',
+    currentStageId: null,
 
-        const task = tasks.find((t: Task) => t.id === currentTaskId);
-        if (task && !task.stages.some((s: any) => s.id === currentStageId)) {
-          const nextStage = task.stages.find((s: any) => s.status !== 'Completed');
-          currentStageId = nextStage ? nextStage.id : (task.stages[0]?.id || null);
+    viewingModelId: null,
+    expandedTaskId: null,
+
+    toastMsg: null,
+
+    timerState: 'Idle',
+    activeSeconds: 0,
+    lastSession: null,
+    timeboxTarget: 0,
+    hasPlayedTimeboxSound: false,
+
+    showCompleteModelConfirm: false,
+    completeModelId: null,
+
+    chatMessages: (() => {
+      try { const saved = sessionStorage.getItem('mv_chat_messages'); if (saved) return JSON.parse(saved); } catch (e) {}
+      return [];
+    })(),
+
+    ambientType: 'none',
+    isAutoBackupEnabled: false,
+
+    username: 'New Builder',
+    level: 1,
+    levelProgress: { current: 0, next: 100, percent: 0 },
+    todayTotal: 0,
+    coinsBalance: 0,
+    earnedTitles: [],
+    equippedTitle: '',
+    checkinStreak: 0,
+    isCheckedIn: false,
+
+    unlockedBots: ['tu'] as BotType[],
+    currentBot: 'tu' as BotType,
+
+    bgMain: '',
+    bgPip: '',
+    bgSize: 'cover',
+    bgPosition: 'center',
+    audioSettings: {
+      click: 'default', start: 'default', pause: 'default', complete: 'default',
+      finishPart: 'default', stage: 'default', timebox: 'default', achievement: 'default', typing: 'default',
+    },
+    customAudios: {},
+    storageEstimate: { usage: 0, quota: 0, percent: 0 },
+
+    activeTab: 'focus',
+    webChatInterval: 8000,
+    pipChatInterval: 60000,
+    isAssetsMounted: false,
+
+    refreshData: async () => {
+      const xp = ModelManager.getTotalXP();
+      const allModels = ModelManager.getAllModels();
+      const available = allModels.filter((m: Model) => m.status !== 'Completed');
+
+      let { currentModelId, currentTaskId, currentStageId } = get();
+
+      // 🌟 优先尝试从持久化恢复工作现场
+      const savedWorkbench = StorageManager.getLastWorkbench();
+      if (savedWorkbench && available.some(m => m.id === savedWorkbench.modelId)) {
+        const savedModel = available.find(m => m.id === savedWorkbench.modelId)!;
+        const savedTask = savedModel.tasks.find(t => t.id === savedWorkbench.taskId);
+        if (savedTask) {
+          currentModelId = savedModel.id;
+          currentTaskId = savedTask.id;
+          if (savedWorkbench.stageId && savedTask.stages.some(s => s.id === savedWorkbench.stageId)) {
+            currentStageId = savedWorkbench.stageId;
+          } else {
+            currentStageId = savedTask.stages.find(s => s.status !== 'Completed')?.id || savedTask.stages[0]?.id || null;
+          }
         }
       }
-    }
 
-    const est = await StorageManager.getStorageEstimate();
+      // 如果工作现场无效，走原有的 fallback 逻辑
+      if (available.length > 0) {
+        if (!currentModelId || !available.some((m: Model) => m.id === currentModelId)) {
+          currentModelId = available[0].id;
+        }
+      } else {
+        currentModelId = '';
+        currentTaskId = '';
+        currentStageId = null;
+      }
 
-    set({
-      models: allModels,
-      currentModelId,
-      tasks,
-      currentTaskId,
-      currentStageId,
-      username: StorageManager.getUsername(),
-      unlockedBots: StorageManager.getUnlockedBots() as BotType[],
-      currentBot: ((StorageManager.getCurrentBot() as BotType) || 'tu'),
-      webChatInterval: StorageManager.getWebChatInterval(),
-      pipChatInterval: StorageManager.getPipChatInterval(),
-      level: UserManager.getLevel(xp),
-      levelProgress: UserManager.getLevelProgress(xp),
-      todayTotal: SessionManager.getTodayTotalSeconds(),
-      coinsBalance: StorageManager.getCoinsBalance(),
-      earnedTitles: StorageManager.getEarnedTitles(),
-      equippedTitle: StorageManager.getEquippedTitle(),
-      audioSettings: StorageManager.getAudioSettings(),
-      customAudios: StorageManager.getCustomAudios(),
-      bgMain: StorageManager.getBgMain(),
-      bgPip: StorageManager.getBgPip(),
-      bgSize: StorageManager.getBgSize(),
-      bgPosition: StorageManager.getBgPosition(),
-      checkinStreak: StorageManager.getCheckinStreak(),
-      isCheckedIn: CheckinManager.isCheckedInToday(),
-      storageEstimate: est,
-    });
+      let tasks: Task[] = [];
+      if (currentModelId) {
+        const model = allModels.find((m: Model) => m.id === currentModelId);
+        if (model) {
+          tasks = model.tasks;
+          if (!tasks.some((t: Task) => t.id === currentTaskId) && tasks.length > 0) {
+            currentTaskId = tasks[0].id;
+          }
+          const task = tasks.find((t: Task) => t.id === currentTaskId);
+          if (task && !task.stages.some((s: any) => s.id === currentStageId)) {
+            const nextStage = task.stages.find((s: any) => s.status !== 'Completed');
+            currentStageId = nextStage ? nextStage.id : (task.stages[0]?.id || null);
+          }
+        }
+      }
 
-    // 🌟 新增：每次刷新数据时，预加载自定义音效（local:// 转 blob://）
-    // 不 await，在后台静默执行
-    AudioManager.preloadCustomAudios().catch(e => console.warn('预加载音效失败', e));
-  },
+      const est = await StorageManager.getStorageEstimate();
 
-  setModels: (models: Model[]) => {
-    set({ models });
-    get().refreshData();
-  },
+      set({
+        models: allModels,
+        currentModelId,
+        tasks,
+        currentTaskId,
+        currentStageId,
+        username: StorageManager.getUsername(),
+        unlockedBots: StorageManager.getUnlockedBots() as BotType[],
+        currentBot: ((StorageManager.getCurrentBot() as BotType) || 'tu'),
+        webChatInterval: StorageManager.getWebChatInterval(),
+        pipChatInterval: StorageManager.getPipChatInterval(),
+        level: UserManager.getLevel(xp),
+        levelProgress: UserManager.getLevelProgress(xp),
+        todayTotal: SessionManager.getTodayTotalSeconds(),
+        coinsBalance: StorageManager.getCoinsBalance(),
+        earnedTitles: StorageManager.getEarnedTitles(),
+        equippedTitle: StorageManager.getEquippedTitle(),
+        audioSettings: StorageManager.getAudioSettings(),
+        customAudios: StorageManager.getCustomAudios(),
+        bgMain: StorageManager.getBgMain(),
+        bgPip: StorageManager.getBgPip(),
+        bgSize: StorageManager.getBgSize(),
+        bgPosition: StorageManager.getBgPosition(),
+        checkinStreak: StorageManager.getCheckinStreak(),
+        isCheckedIn: CheckinManager.isCheckedInToday(),
+        storageEstimate: est,
+      });
 
-  setCurrentModelId: (id: string) => set({ currentModelId: id }),
-  setCurrentTaskId: (id: string) => set({ currentTaskId: id }),
-  setCurrentStageId: (id: string | null) => set({ currentStageId: id }),
-  setViewingModelId: (id: string | null) => set({ viewingModelId: id }),
-  setExpandedTaskId: (id: string | null) => set({ expandedTaskId: id }),
+      saveWorkbench(currentModelId, currentTaskId, currentStageId);
+      AudioManager.preloadCustomAudios().catch(e => console.warn('预加载音效失败', e));
+    },
 
-  showToast: (msg: string) => {
-    if (toastTimer) clearTimeout(toastTimer);
-    set({ toastMsg: msg });
-    toastTimer = setTimeout(() => set({ toastMsg: null }), 3000);
-  },
-  setToastMsg: (msg: string | null) => {
-    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-    set({ toastMsg: msg });
-  },
+    setModels: (models: Model[]) => {
+      set({ models });
+      get().refreshData();
+    },
 
-  startTimer: () => {
-    const { currentTaskId, currentStageId } = get();
-    if (!currentTaskId) return;
-    AudioManager.playStart();
-    engine.start();
-    const updated = ModelManager.startStage(currentTaskId, currentStageId);
-    get().setModels(updated);
-    set({ hasPlayedTimeboxSound: false, lastSession: null });
-    get().pushChatMessage('start');
-  },
+    setCurrentModelId: (id: string) => {
+      set({ currentModelId: id });
+      saveWorkbench(id, get().currentTaskId, get().currentStageId);
+    },
+    setCurrentTaskId: (id: string) => {
+      set({ currentTaskId: id });
+      saveWorkbench(get().currentModelId, id, get().currentStageId);
+    },
+    setCurrentStageId: (id: string | null) => {
+      set({ currentStageId: id });
+      saveWorkbench(get().currentModelId, get().currentTaskId, id);
+    },
+    
+    setViewingModelId: (id: string | null) => set({ viewingModelId: id }),
+    setExpandedTaskId: (id: string | null) => set({ expandedTaskId: id }),
 
-  pauseTimer: () => {
-    AudioManager.playPause();
-    engine.pause();
-    get().pushChatMessage('pause');
-  },
+    showToast: (msg: string) => {
+      if (toastTimer) clearTimeout(toastTimer);
+      set({ toastMsg: msg });
+      toastTimer = setTimeout(() => set({ toastMsg: null }), 3000);
+    },
+    setToastMsg: (msg: string | null) => {
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+      set({ toastMsg: msg });
+    },
 
-  resumeTimer: () => {
-    AudioManager.playStart();
-    engine.resume();
-    get().pushChatMessage('start');
-  },
+    startTimer: () => {
+      const { currentTaskId, currentStageId } = get();
+      if (!currentTaskId) return;
+      AudioManager.playStart();
+      engine.start();
+      const updated = ModelManager.startStage(currentTaskId, currentStageId);
+      get().setModels(updated);
+      set({ hasPlayedTimeboxSound: false, lastSession: null });
+      get().pushChatMessage('start');
+    },
 
-  completeTimer: () => {
-    const result = engine.complete();
-    if (!result) return null;
-    if (result.activeSeconds < 10) return null;
+    pauseTimer: () => {
+      AudioManager.playPause();
+      engine.pause();
+      get().pushChatMessage('pause');
+    },
 
-    AudioManager.playWakeup();
-    const { currentTaskId, currentStageId } = get();
-    SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
-    DailyQuestManager.updateProgress('focus_time', result.activeSeconds);
+    resumeTimer: () => {
+      AudioManager.playStart();
+      engine.resume();
+      get().pushChatMessage('start');
+    },
 
-    get().refreshData();
-    set({ lastSession: { duration: result.activeSeconds, stageId: currentStageId } });
-    get().pushChatMessage('complete');
-    get().triggerAutoBackup();
-    return result;
-  },
+    completeTimer: () => {
+      const result = engine.complete();
+      if (!result) return null;
+      if (result.activeSeconds < 10) return null;
 
-  tickTimer: () => {
-    const secs = engine.getActiveSeconds();
-    const state = engine.getState();
-    if (secs !== get().activeSeconds || state !== get().timerState) {
-      set({ activeSeconds: secs, timerState: state });
-    }
-  },
+      AudioManager.playWakeup();
+      const { currentTaskId, currentStageId } = get();
+      SessionManager.saveSession({ id: crypto.randomUUID(), taskId: currentTaskId, stageId: currentStageId, ...result });
+      DailyQuestManager.updateProgress('focus_time', result.activeSeconds);
 
-  confirmStageDone: () => {
-    AudioManager.playStageDone();
-    const { currentTaskId, lastSession } = get();
-    const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
-    get().setModels(updated);
-    set({ lastSession: null });
+      get().refreshData();
+      set({ lastSession: { duration: result.activeSeconds, stageId: currentStageId } });
+      get().pushChatMessage('complete');
+      get().triggerAutoBackup();
+      return result;
+    },
 
-    const currentModel = updated.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
-    if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
-      set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
-    }
-    get().triggerAutoBackup();
-  },
+    tickTimer: () => {
+      const secs = engine.getActiveSeconds();
+      const state = engine.getState();
+      if (secs !== get().activeSeconds || state !== get().timerState) {
+        set({ activeSeconds: secs, timerState: state });
+      }
+    },
 
-  cancelDone: () => {
-    AudioManager.playClick();
-    set({ lastSession: null });
-  },
+    confirmStageDone: () => {
+      AudioManager.playStageDone();
+      const { currentTaskId, lastSession } = get();
+      const updated = ModelManager.completeStage(currentTaskId, lastSession?.stageId || null);
+      get().setModels(updated);
+      set({ lastSession: null });
 
-  finishPart: () => {
-    AudioManager.playClick();
-    const { currentTaskId, tasks } = get();
-    const assembly = tasks.find((t: any) => t.id === currentTaskId)?.stages.find((s: any) => s.nameKey === 'stage_assembly');
-    if (assembly && assembly.status !== 'Completed') {
-      return { ok: false, error: 'errorAssemblyRequired' };
-    }
-    return { ok: true };
-  },
+      const currentModel = updated.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
+      if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
+        set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
+      }
+      get().triggerAutoBackup();
+    },
 
-  confirmFinishPart: (photoUrl: string) => {
-    AudioManager.playFinishPart();
-    const { currentTaskId } = get();
-    const result = ModelManager.finishTask(currentTaskId, photoUrl);
-    if (result.error) return { ok: false, error: result.error };
+    cancelDone: () => {
+      AudioManager.playClick();
+      set({ lastSession: null });
+      // 🌟 优化文案：明确告诉用户时间已经保住了
+      get().showToast(i18n.t('toast_time_saved'));
+    },
 
-    DailyQuestManager.updateProgress('complete_part', 1);
-    set({ timeboxTarget: 0, hasPlayedTimeboxSound: false });
-    get().setModels(result.models);
+    finishPart: () => {
+      AudioManager.playClick();
+      const { currentTaskId, tasks } = get();
+      const assembly = tasks.find((t: any) => t.id === currentTaskId)?.stages.find((s: any) => s.nameKey === 'stage_assembly');
+      if (assembly && assembly.status !== 'Completed') {
+        return { ok: false, error: 'errorAssemblyRequired' };
+      }
+      return { ok: true };
+    },
 
-    const currentModel = result.models.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
-    if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
-      set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
-    }
-    get().triggerAutoBackup();
-    return { ok: true };
-  },
+    confirmFinishPart: (photoUrl: string) => {
+      AudioManager.playFinishPart();
+      const { currentTaskId } = get();
+      const result = ModelManager.finishTask(currentTaskId, photoUrl);
+      if (result.error) return { ok: false, error: result.error };
 
-  setTimeboxTarget: (min: number) => {
-    AudioManager.playClick();
-    set({ timeboxTarget: min * 60, hasPlayedTimeboxSound: false });
-  },
-  setHasPlayedTimeboxSound: (val: boolean) => set({ hasPlayedTimeboxSound: val }),
+      DailyQuestManager.updateProgress('complete_part', 1);
+      set({ timeboxTarget: 0, hasPlayedTimeboxSound: false });
+      get().setModels(result.models);
 
-  confirmCompleteModel: () => {
-    const { completeModelId } = get();
-    if (!completeModelId) return;
-    AudioManager.playFinishPart();
-    const updated = ModelManager.finishModel(completeModelId);
-    get().setModels(updated);
-    set({ showCompleteModelConfirm: false, completeModelId: null });
-    get().showToast(i18n.t('toast_model_finished'));
-    get().triggerAutoBackup();
-  },
-  setShowCompleteModelConfirm: (val: boolean) => set({ showCompleteModelConfirm: val }),
+      const currentModel = result.models.find((m: any) => m.tasks.some((t: any) => t.id === currentTaskId));
+      if (currentModel && currentModel.tasks.length > 0 && currentModel.tasks.every((t: any) => t.status === 'Completed') && currentModel.status !== 'Completed') {
+        set({ showCompleteModelConfirm: true, completeModelId: currentModel.id });
+      }
+      get().triggerAutoBackup();
+      return { ok: true };
+    },
 
-  setIsAutoBackupEnabled: (val: boolean) => set({ isAutoBackupEnabled: val }),
+    setTimeboxTarget: (min: number) => {
+      AudioManager.playClick();
+      set({ timeboxTarget: min * 60, hasPlayedTimeboxSound: false });
+    },
+    setHasPlayedTimeboxSound: (val: boolean) => set({ hasPlayedTimeboxSound: val }),
 
-  triggerAutoBackup: async () => {
-    if (!get().isAutoBackupEnabled) return;
-    const data = StorageManager.exportAll();
-    await StorageManager.autoBackupData(data);
-  },
+    confirmCompleteModel: () => {
+      const { completeModelId } = get();
+      if (!completeModelId) return;
+      AudioManager.playFinishPart();
+      const updated = ModelManager.finishModel(completeModelId);
+      get().setModels(updated);
+      set({ showCompleteModelConfirm: false, completeModelId: null });
+      get().showToast(i18n.t('toast_model_finished'));
+      get().triggerAutoBackup();
+    },
+    setShowCompleteModelConfirm: (val: boolean) => set({ showCompleteModelConfirm: val }),
 
-  pushChatMessage: (type: 'start' | 'pause' | 'complete') => {
-    const { currentBot } = get();
-    const lang = i18n.language;
-    const text = type === 'start' ? QuoteEngine.getStartQuote(lang)
-               : type === 'pause' ? QuoteEngine.getPauseQuote(lang)
-               : QuoteEngine.getCompleteQuote(lang);
-    set((state: AppState) => ({
-      chatMessages: [...state.chatMessages, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5),
-    }));
-  },
+    setIsAutoBackupEnabled: (val: boolean) => set({ isAutoBackupEnabled: val }),
 
-  setChatMessages: (updater) => {
-    set((state: AppState) => {
-      const next = typeof updater === 'function' ? updater(state.chatMessages) : updater;
-      return { chatMessages: next };
-    });
-  },
+    triggerAutoBackup: async () => {
+      if (!get().isAutoBackupEnabled) return;
+      const data = StorageManager.exportAll();
+      await StorageManager.autoBackupData(data);
+    },
 
-  setAmbientType: (type: AmbientType) => set({ ambientType: type }),
+    pushChatMessage: (type: 'start' | 'pause' | 'complete') => {
+      const { currentBot } = get();
+      const lang = i18n.language;
+      const text = type === 'start' ? QuoteEngine.getStartQuote(lang)
+                 : type === 'pause' ? QuoteEngine.getPauseQuote(lang)
+                 : QuoteEngine.getCompleteQuote(lang);
+      set((state: AppState) => ({
+        chatMessages: [...state.chatMessages, { id: crypto.randomUUID(), botId: currentBot, text, timestamp: Date.now() }].slice(-5),
+      }));
+    },
 
-  setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
-  setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
-  setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },
-  setBgSize: (size: string) => { StorageManager.setBgSize(size); set({ bgSize: size }); },
-  setBgPosition: (pos: string) => { StorageManager.setBgPosition(pos); set({ bgPosition: pos }); },
-  setCoinsBalance: (val: number) => { StorageManager.setCoinsBalance(val); set({ coinsBalance: val }); },
-  setEarnedTitles: (titles: string[]) => { StorageManager.setEarnedTitles(titles); set({ earnedTitles: titles }); },
-  setEquippedTitle: (title: string) => { StorageManager.setEquippedTitle(title); set({ equippedTitle: title }); },
-  setCurrentBot: (bot: BotType) => { StorageManager.setCurrentBot(bot); QuoteEngine.setBot(bot); set({ currentBot: bot }); },
-  setUnlockedBots: (bots: BotType[]) => { StorageManager.setUnlockedBots(bots); set({ unlockedBots: bots }); },
-  setAudioSettings: (settings: any) => { StorageManager.setAudioSettings(settings); set({ audioSettings: settings }); },
-  setCustomAudios: (audios: any) => { StorageManager.setCustomAudios(audios); set({ customAudios: audios }); },
-  setStorageEstimate: (est: any) => set({ storageEstimate: est }),
-  setTimerState: (state: 'Idle' | 'Running' | 'Paused') => set({ timerState: state }),
-  setActiveSeconds: (sec: number) => set({ activeSeconds: sec }),
-  setActiveTab: (tab: MainTab) => set({ activeTab: tab }),
-  setWebChatInterval: (val: number) => { StorageManager.setWebChatInterval(val); set({ webChatInterval: val }); },
-  setPipChatInterval: (val: number) => { StorageManager.setPipChatInterval(val); set({ pipChatInterval: val }); },
-  setIsAssetsMounted: (val: boolean) => set({ isAssetsMounted: val }),
-}));
+    setChatMessages: (updater) => {
+      set((state: AppState) => {
+        const next = typeof updater === 'function' ? updater(state.chatMessages) : updater;
+        return { chatMessages: next };
+      });
+    },
+
+    setAmbientType: (type: AmbientType) => set({ ambientType: type }),
+
+    setUsername: (name: string) => { StorageManager.setUsername(name); set({ username: name }); },
+    setBgMain: (url: string) => { StorageManager.setBgMain(url); set({ bgMain: url }); },
+    setBgPip: (url: string) => { StorageManager.setBgPip(url); set({ bgPip: url }); },
+    setBgSize: (size: string) => { StorageManager.setBgSize(size); set({ bgSize: size }); },
+    setBgPosition: (pos: string) => { StorageManager.setBgPosition(pos); set({ bgPosition: pos }); },
+    setCoinsBalance: (val: number) => { StorageManager.setCoinsBalance(val); set({ coinsBalance: val }); },
+    setEarnedTitles: (titles: string[]) => { StorageManager.setEarnedTitles(titles); set({ earnedTitles: titles }); },
+    setEquippedTitle: (title: string) => { StorageManager.setEquippedTitle(title); set({ equippedTitle: title }); },
+    setCurrentBot: (bot: BotType) => { StorageManager.setCurrentBot(bot); QuoteEngine.setBot(bot); set({ currentBot: bot }); },
+    setUnlockedBots: (bots: BotType[]) => { StorageManager.setUnlockedBots(bots); set({ unlockedBots: bots }); },
+    setAudioSettings: (settings: any) => { StorageManager.setAudioSettings(settings); set({ audioSettings: settings }); },
+    setCustomAudios: (audios: any) => { StorageManager.setCustomAudios(audios); set({ customAudios: audios }); },
+    setStorageEstimate: (est: any) => set({ storageEstimate: est }),
+    setTimerState: (state: 'Idle' | 'Running' | 'Paused') => set({ timerState: state }),
+    setActiveSeconds: (sec: number) => set({ activeSeconds: sec }),
+    setActiveTab: (tab: MainTab) => set({ activeTab: tab }),
+    setWebChatInterval: (val: number) => { StorageManager.setWebChatInterval(val); set({ webChatInterval: val }); },
+    setPipChatInterval: (val: number) => { StorageManager.setPipChatInterval(val); set({ pipChatInterval: val }); },
+    setIsAssetsMounted: (val: boolean) => set({ isAssetsMounted: val }),
+  };
+});

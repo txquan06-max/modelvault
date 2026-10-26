@@ -111,7 +111,6 @@ export const ProfileView = () => {
   const handleWakeupUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // 🌟 限制：未挂载图库时最大 300KB
     const maxSize = isAssetsMounted ? 2 * 1024 * 1024 : 300 * 1024;
     if (file.size > maxSize) {
       showToast(isAssetsMounted ? t('toast_audio_too_large') : (isZh ? '未挂载图库时音频最大 300KB' : 'Max 300KB without gallery mount'));
@@ -179,7 +178,6 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 🌟 优化：挂载图库走 local://，未挂载走 Base64（限制 300KB）
   const handleAudioUpload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -190,14 +188,12 @@ export const ProfileView = () => {
     }
 
     if (isAssetsMounted) {
-      // 直接存硬盘
       const filename = `${FILE_SUBDIRS.AUDIO}/audio_${type}_${Date.now()}.mp3`;
       StorageManager.saveFileToLocal(filename, file).then(async (localPath) => {
         if (localPath) {
           const newAudios = { ...customAudios, [type]: localPath };
           setCustomAudios(newAudios);
           setAudioSettings({ ...audioSettings, [type]: 'custom' });
-          // 重新预加载缓存
           await AudioManager.preloadCustomAudios();
           showToast(t('toast_audio_updated'));
         } else {
@@ -205,7 +201,6 @@ export const ProfileView = () => {
         }
       });
     } else {
-      // 未挂载，转 Base64
       const reader = new FileReader();
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
@@ -408,7 +403,8 @@ export const ProfileView = () => {
               <div>{t('quota_label')}: {storageEstimate.quota} GB</div>
               <div style={{ color: '#10b981' }}>{t('used_label')}: {storageEstimate.usage} GB</div>
             </div>
-            <button className="mini-btn" onClick={async () => {
+            {/* 🌟 加了 id="tour-gallery-mount"，供教程定位 */}
+            <button id="tour-gallery-mount" className="mini-btn" onClick={async () => {
               AudioManager.playClick();
               const success = await StorageManager.selectAssetsFolder();
               if (success) { setIsAssetsMounted(true); showToast(t('toast_local_mount_success')); }

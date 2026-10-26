@@ -426,5 +426,11 @@
   "report_rendering": "Rendering...",
   "report_saving": "Saving...",
   "toast_report_saved_to_gallery": "Saved to local gallery",
-  "toast_gallery_not_mounted": "⚠️ Please mount a local gallery first"
+  "toast_gallery_not_mounted": "⚠️ Please mount a local gallery first",
+  "tut_shortcut_title": "Global Shortcut",
+  "tut_shortcut_content": "On desktop, press `Ctrl + Shift + S` anytime to start or pause the timer without switching apps!",
+  "tut_photo_title": "Progress Album",
+  "tut_photo_content": "In the build log, click '+' under a stage to upload multiple photos. Click thumbnails for full-screen view!",
+  "tut_gallery_mount_title": "Expand Gallery",
+  "tut_gallery_mount_content": "Click here to mount a local folder! Covers, progress photos, and reports will be saved to your disk, safe and space-saving."
 }

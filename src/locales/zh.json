@@ -426,5 +426,11 @@
   "report_rendering": "渲染中...",
   "report_saving": "保存中...",
   "toast_report_saved_to_gallery": "已保存到本地图库",
-  "toast_gallery_not_mounted": "⚠️ 请先在个人中心挂载本地图库"
+  "toast_gallery_not_mounted": "⚠️ 请先在个人中心挂载本地图库",
+  "tut_shortcut_title": "全局快捷键",
+  "tut_shortcut_content": "在桌面端，随时按下 `Ctrl + Shift + S` 即可快速开始或暂停计时，不用切回应用！",
+  "tut_photo_title": "拼装相册",
+  "tut_photo_content": "在拼装日志里，点击工序下方的“+”号，可以传多张过程照，点击缩略图即可全屏查看！",
+  "tut_gallery_mount_title": "扩容图库",
+  "tut_gallery_mount_content": "点击这里挂载一个本地文件夹！封面、过程照和战报会自动分类保存到你的硬盘上，安全又省空间。"
 }

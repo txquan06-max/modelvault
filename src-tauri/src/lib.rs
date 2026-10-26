@@ -40,21 +40,49 @@ fn clear_assets_dir(state: State<AssetsDir>) -> Result<(), String> {
     Ok(())
 }
 
+// ============================================================
+// 11b. save_local_file：支持子目录自动创建 + 路径安全
+// ------------------------------------------------------------
+// filename 示例：
+//   - "cover_123.webp"           → <挂载目录>/cover_123.webp（兼容旧数据）
+//   - "covers/cover_123.webp"    → <挂载目录>/covers/cover_123.webp
+//   - "reports/report_1.jpg"     → <挂载目录>/reports/report_1.jpg
+// ============================================================
 #[tauri::command]
 fn save_local_file(
     state: State<AssetsDir>,
     filename: String,
     bytes: Vec<u8>,
 ) -> Result<String, String> {
+    // 安全校验：拒绝路径穿越
+    if filename.contains("..") {
+        return Err("invalid_filename_path_traversal".to_string());
+    }
+
     let guard = state.0.lock().map_err(|e| e.to_string())?;
     let dir = guard.as_ref().ok_or("assets_dir_not_mounted")?;
     let file_path = dir.join(&filename);
+
+    // 如果有子目录（如 covers/），自动创建
+    if let Some(parent) = file_path.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+    }
+
     std::fs::write(&file_path, &bytes).map_err(|e| e.to_string())?;
     Ok(format!("local://{}", filename))
 }
 
+// ============================================================
+// 11c. read_local_file：同样支持子目录路径
+// ============================================================
 #[tauri::command]
 fn read_local_file(state: State<AssetsDir>, filename: String) -> Result<Vec<u8>, String> {
+    if filename.contains("..") {
+        return Err("invalid_filename_path_traversal".to_string());
+    }
+
     let guard = state.0.lock().map_err(|e| e.to_string())?;
     let dir = guard.as_ref().ok_or("assets_dir_not_mounted")?;
     let file_path = dir.join(&filename);
@@ -115,8 +143,6 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
 // ============================================================
 // 选项 A - 2：全局快捷键 Ctrl+Shift+S
-// ------------------------------------------------------------
-// 统一构造方式，避免闭包捕获时类型不匹配
 // ============================================================
 #[cfg(desktop)]
 fn build_toggle_shortcut() -> tauri_plugin_global_shortcut::Shortcut {
@@ -126,11 +152,6 @@ fn build_toggle_shortcut() -> tauri_plugin_global_shortcut::Shortcut {
 
 // ============================================================
 // 选项 A - 1：窗口关闭前尺寸防护
-// ------------------------------------------------------------
-// 问题：极简模式下（525×300）直接关闭窗口，window-state 插件会把 525×300
-//       记为下次启动尺寸，导致下次打开看不见正常 UI。
-// 方案：捕获 CloseRequested，检测是否极简尺寸，是则 prevent_close，
-//       恢复 1100×800 后延迟 120ms 再真正关闭，让 window-state 记录新尺寸。
 // ============================================================
 #[cfg(desktop)]
 fn setup_window_close_guard(app: &tauri::App) {
@@ -143,7 +164,6 @@ fn setup_window_close_guard(app: &tauri::App) {
                     let logical_w = size.width as f64 / scale;
                     let logical_h = size.height as f64 / scale;
 
-                    // 极简模式 ≈ 525 × 300（±10 宽容度适配不同 DPI）
                     let is_mini = (logical_w - 525.0).abs() < 10.0
                         && (logical_h - 300.0).abs() < 10.0;
 
@@ -151,10 +171,8 @@ fn setup_window_close_guard(app: &tauri::App) {
                         api.prevent_close();
                         let win_a = win_for_event.clone();
                         let win_b = win_for_event.clone();
-                        // 恢复标准尺寸 + 取消置顶，让 window-state 保存正常尺寸
                         let _ = win_a.set_size(tauri::LogicalSize::new(1100.0, 800.0));
                         let _ = win_a.set_always_on_top(false);
-                        // 延迟关闭：让窗口尺寸变化事件完全抵达 window-state 监听器
                         tauri::async_runtime::spawn(async move {
                             std::thread::sleep(Duration::from_millis(120));
                             let _ = win_b.close();
@@ -175,13 +193,9 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        // 自动更新插件（原有）
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
-
-        // 选项 A - 1：窗口状态记忆
         builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
 
-        // 选项 A - 2：全局快捷键（Ctrl+Shift+S 发出 shortcut:toggle-timer 事件）
         builder = builder.plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -189,7 +203,6 @@ pub fn run() {
                     if event.state() == ShortcutState::Pressed {
                         let target = build_toggle_shortcut();
                         if shortcut == &target {
-                            // 交由前端根据当前 timerState 决定 start / pause / resume
                             let _ = app.emit("shortcut:toggle-timer", ());
                         }
                     }
@@ -197,7 +210,6 @@ pub fn run() {
                 .build(),
         );
 
-        // 选项 A - 3：原生通知
         builder = builder.plugin(tauri_plugin_notification::init());
     }
 
@@ -210,12 +222,9 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                // 托盘
                 setup_tray(app)?;
-                // 窗口关闭前尺寸防护
                 setup_window_close_guard(app);
 
-                // 注册全局快捷键
                 use tauri_plugin_global_shortcut::GlobalShortcutExt;
                 let shortcut = build_toggle_shortcut();
                 if let Err(e) = app.global_shortcut().register(shortcut) {

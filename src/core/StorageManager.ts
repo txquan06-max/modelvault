@@ -6,6 +6,14 @@ const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
 const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
 
+// 🌟 图库分区常量：业务代码统一使用，避免硬编码拼错
+export const FILE_SUBDIRS = {
+  COVER: 'covers',
+  REPORT: 'reports',
+  BACKGROUND: 'backgrounds',
+  AUDIO: 'audios',
+} as const;
+
 export const KEYS = {
   SESSIONS: 'modelvault_sessions',
   ACHIEVEMENTS: 'modelvault_achievements',
@@ -56,6 +64,19 @@ const isTauriEnv = () => typeof window !== 'undefined' && !!(window as any).__TA
 const tauriInvoke = async <T = any>(cmd: string, args?: Record<string, any>): Promise<T> => {
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(cmd, args);
+};
+
+// 🌟 Web 端辅助：按路径逐级获取目录句柄
+const getNestedDirectoryHandle = async (
+  rootHandle: any,
+  parts: string[],
+  create: boolean
+): Promise<any> => {
+  let currentDir = rootHandle;
+  for (const part of parts) {
+    currentDir = await currentDir.getDirectoryHandle(part, { create });
+  }
+  return currentDir;
 };
 
 export const StorageManager = {
@@ -207,7 +228,11 @@ export const StorageManager = {
     } catch (err) { return false; }
   },
 
+  // ============================================================
+  // 保存文件到本地（支持子目录路径，如 "covers/cover_1.webp"）
+  // ============================================================
   async saveFileToLocal(filename: string, blob: Blob): Promise<string | null> {
+    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -223,19 +248,34 @@ export const StorageManager = {
       }
     }
 
+    // -------- Web --------
     if (!assetsDirHandle) return null;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
         if ((await assetsDirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') return null;
       }
-      const fileHandle = await assetsDirHandle.getFileHandle(filename, { create: true });
+
+      // 处理多级路径：covers/cover_xxx.webp → ['covers', 'cover_xxx.webp']
+      const parts = filename.split('/').filter(p => p);
+      const actualFilename = parts.pop()!;
+      const dirHandle = parts.length > 0
+        ? await getNestedDirectoryHandle(assetsDirHandle, parts, true)
+        : assetsDirHandle;
+
+      const fileHandle = await dirHandle.getFileHandle(actualFilename, { create: true });
       const writable = await fileHandle.createWritable();
       await writable.write(blob);
       await writable.close();
       return `local://${filename}`;
-    } catch (err) { return null; }
+    } catch (err) {
+      console.error('[Web] saveFileToLocal failed:', err);
+      return null;
+    }
   },
 
+  // ============================================================
+  // 加载本地文件（支持子目录路径）
+  // ============================================================
   async loadLocalFileUrl(filename: string): Promise<string | null> {
     const cached = localUrlCache.get(filename);
     if (cached) {
@@ -246,6 +286,7 @@ export const StorageManager = {
     const cleanFilename = filename.replace('local://', '');
     let url: string | null = null;
 
+    // -------- Tauri --------
     if (isTauriEnv()) {
       if (!assetsMounted) return null;
       try {
@@ -255,9 +296,17 @@ export const StorageManager = {
       } catch (err) {
         console.warn('[Tauri] read_local_file failed:', err);
       }
-    } else if (assetsDirHandle) {
+    }
+    // -------- Web --------
+    else if (assetsDirHandle) {
       try {
-        const fileHandle = await assetsDirHandle.getFileHandle(cleanFilename);
+        const parts = cleanFilename.split('/').filter(p => p);
+        const actualFilename = parts.pop()!;
+        const dirHandle = parts.length > 0
+          ? await getNestedDirectoryHandle(assetsDirHandle, parts, false)
+          : assetsDirHandle;
+
+        const fileHandle = await dirHandle.getFileHandle(actualFilename);
         const file = await fileHandle.getFile();
         url = URL.createObjectURL(file);
       } catch (err) {
@@ -298,20 +347,15 @@ export const StorageManager = {
   },
 
   async _set(key: string, val: string) {
-    // 🌟 防护：init 完成前不允许写入核心数据
     if (key === DATA_KEY && !isInit) {
       console.warn('[StorageManager] _set(DATA_KEY) 在 init 完成前被调用，已跳过以防覆盖');
       return;
     }
 
-    // 🌟 关键修复：先同步更新 memoryCache（立即生效）
-    // 让后续同步读取（如 getAllModels()）能立即看到新数据，避免补录等场景的数据滞后。
     const prevValue = memoryCache[key];
     memoryCache[key] = val;
 
     try {
-      // 快照逻辑：只在 DATA_KEY 有旧值时才做，且间隔 >= 10min
-      // 用 prevValue（旧值）作为快照，是"回滚点"
       if (key === DATA_KEY && prevValue) {
         const now = Date.now();
         if (now - lastSnapshotAt >= SNAPSHOT_MIN_INTERVAL) {
@@ -419,6 +463,9 @@ export const StorageManager = {
     return isInit;
   },
 
+  // ============================================================
+  // Getter / Setter
+  // ============================================================
   getSessions: () => memoryCache[KEYS.SESSIONS] || '[]',
   getAchievements: () => memoryCache[KEYS.ACHIEVEMENTS] || '[]',
   getUsername: () => memoryCache[KEYS.USERNAME] || 'New Builder',

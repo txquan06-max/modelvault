@@ -22,6 +22,7 @@ import { Modals } from './components/Modals';
 import { SplashScreen } from './components/SplashScreen';
 import { TutorialTour, type TourStep } from './components/TutorialTour';
 import { AchievementOverlay, type AchievementData } from './components/AchievementOverlay';
+import { ScrollToTop } from './components/ScrollToTop'; // 🌟 新增引入
 
 import { BOTS, type BotType, QuoteEngine } from './core/QuoteEngine';
 
@@ -96,23 +97,6 @@ function App() {
   useEffect(() => { isMiniModeRef.current = isMiniMode; }, [isMiniMode]);
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
-
-  // ==================== 🌟 新增：音频挂起与释放清理 ====================
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        AudioManager.suspend();
-      } else {
-        AudioManager.resume();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      // 卸载时清理所有音频资源
-      AudioManager.dispose();
-    };
-  }, []);
 
   // ==================== 启动静音 + 首次交互解锁 ====================
   useEffect(() => {
@@ -809,6 +793,7 @@ function App() {
           i18n={i18n}
         />
         <AchievementOverlay achievement={activeAchievement} onClose={() => setActiveAchievement(null)} t={t} i18n={i18n} />
+        <ScrollToTop /> {/* 🌟 挂载回顶按钮 */}
 
         {pendingTabChange && (
           <div className="modal-overlay" style={{ zIndex: 9999 }}>

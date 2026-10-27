@@ -1,5 +1,5 @@
 // src/views/JournalView.tsx
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
 import { SessionManager } from '../core/SessionManager';
@@ -10,11 +10,16 @@ export const JournalView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  // 🌟 批次 10B：完全零 props，月份过滤器改为组件内部 state
   const [journalFilterMonth, setJournalFilterMonth] = useState('');
+  const [syncTrigger, setSyncTrigger] = useState(0); // 🌟 新增：用于强制刷新
 
-  // 🌟 顺手修复：原 App.tsx 传入的 getHistoryLogs() 并没有应用月份过滤
-  // 这里内聚到 JournalView，并真正按 journalFilterMonth 过滤
+  // 🌟 监听本地文件夹同步事件
+  useEffect(() => {
+    const handleSync = () => setSyncTrigger(s => s + 1);
+    window.addEventListener('mv-journal-synced', handleSync);
+    return () => window.removeEventListener('mv-journal-synced', handleSync);
+  }, []);
+
   const logs = useMemo(() => {
     const allLogs = SessionManager.getAllSessions()
       .sort((a, b) => b.startedAt - a.startedAt)
@@ -24,12 +29,11 @@ export const JournalView = () => {
 
     const filterKey = normalizeMonthInput(journalFilterMonth); // YYYY-MM -> YYYYMM
     return allLogs.filter(s => getMonthKey(s.startedAt) === filterKey);
-  }, [journalFilterMonth]);
+  }, [journalFilterMonth, syncTrigger]); // 🌟 依赖中加入 syncTrigger
 
   return (
     <div className="view-content journal-view" style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
 
-      {/* 顶部筛选栏：扩大触达面积 + 图标联动 + 暗色原生日历 */}
       <div
         style={{
           display: 'flex',
@@ -41,11 +45,10 @@ export const JournalView = () => {
         }}
       >
         <span style={{ fontSize: '13px', color: '#ccc', fontWeight: 'bold', flexShrink: 0 }}>
-          {isZh ? '制作日志' : 'Journal'}
+          {t('journal_log')}
         </span>
 
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* 整块容器可点击，点击除 input 本身的区域会 focus + showPicker */}
           <div
             style={{
               position: 'relative',
@@ -140,7 +143,7 @@ export const JournalView = () => {
                 (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 0.15)';
               }}
             >
-              {isZh ? '清除' : 'Clear'}
+              {t('clear')}
             </button>
           )}
         </div>

@@ -111,14 +111,16 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - activeSeconds) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && activeSeconds > 0;
 
-  // 🌟 新增：计算当前工序的历史累计时长
-  const stageHistorySeconds = useMemo(() => {
+  // 🌟 优化：仅在切换工序或结算时读取历史，避免每秒遍历大数组导致卡顿
+  const pastStageSeconds = useMemo(() => {
     if (!currentTaskId || !currentStageId) return 0;
     const sessions = SessionManager.getAllSessions();
     return sessions
       .filter((s: any) => s.taskId === currentTaskId && s.stageId === currentStageId)
       .reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
-  }, [currentTaskId, currentStageId, activeSeconds, timerState, lastSession]);
+  }, [currentTaskId, currentStageId, lastSession]);
+
+  const stageHistorySeconds = pastStageSeconds + (lastSession ? 0 : activeSeconds);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -262,7 +264,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     if (!newModelNameInput.trim() && !selectedGunpla) return;
     AudioManager.playClick();
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
-    const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || 'Unknown', zh: newModelSeriesInput.trim() || '未知' };
+    const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || t('unknown'), zh: newModelSeriesInput.trim() || t('unknown') };
 
     const duplicate = models.find((m: any) => (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade.toUpperCase() === newModelGrade.toUpperCase());
     if (duplicate) { showToast(t('toast_duplicate_model')); return; }
@@ -370,18 +372,16 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: '2px' }}>
         
-        {/* 顶部栏：时间 + 布局切换 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px', flexShrink: 0 }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#888', fontWeight: 'bold' }}>🕒 {localTime}</div>
           <div style={{ display: 'flex', gap: '4px' }}>
             {onClose && (
-              <button onClick={onClose} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)' }} title={isZh ? '退出' : 'Close'}>✕</button>
+              <button onClick={onClose} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)' }} title={t('close')}>✕</button>
             )}
             <button onClick={togglePipLayout} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: 'clamp(10px, 2.5vw, 12px)', transition: 'all 0.2s', flexShrink: 0 }} title={t('pip_switch_layout')}>⇄</button>
           </div>
         </div>
         
-        {/* 第一行：模型 & 部位 */}
         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
           <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ flex: 1, minWidth: 0, padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none' }}>
             {availableModels.map((m: any) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
@@ -391,7 +391,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           </select>
         </div>
 
-        {/* 第二行：工序选择器 */}
         {currentTask && (
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', flexShrink: 0, scrollbarWidth: 'none' }}>
             {currentTask.stages.map((stage: any) => (
@@ -408,29 +407,26 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           </div>
         )}
 
-        {/* 第三行：今日 & 打卡 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px', flexShrink: 0 }}>
           <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#10b981', fontWeight: 'bold' }}>⏳ {t('today')}: {formatTime(todayTotal)}</div>
           {!isCheckedIn ? (
             <button id="tour-checkin" className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', fontSize: 'clamp(8px, 2vw, 10px)', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
           ) : (
-            <span style={{ color: '#10b981', fontSize: 'clamp(8px, 2vw, 10px)', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
+            <span style={{ color: '#10b981', fontSize: 'clamp(8px, 2vw, 10px)', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>✅ {t('checkedIn')} ({checkinStreak} {t('days_unit')})</span>
           )}
         </div>
 
-        {/* 🌟 计时器区域：增加历史累计展示 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(36px, 12vh, 64px)', margin: 0, lineHeight: 1, textShadow: `0 0 20px ${botData.color}40`, textAlign: 'center' }}>
             {formatTime(activeSeconds)}
           </div>
           {stageHistorySeconds > 0 && (
             <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#aaa', marginTop: '2px' }}>
-              {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+              {t('stage_history_accumulated')}: {formatTime(stageHistorySeconds)}
             </div>
           )}
         </div>
 
-        {/* 控制按钮区 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
           {isFinishingPart ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
@@ -477,7 +473,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>{renderChatHistory(true)}</div>
         </div>
 
-        {/* PiP 内嵌结算 */}
         {lastSession && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(10, 10, 10, 0.95)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px', borderRadius: '12px', animation: 'fadeIn 0.2s ease-out' }}>
             <div style={{ fontSize: '12px', color: botData.color, fontWeight: 'bold', marginBottom: '8px' }}>{t('focus_complete_title')}</div>
@@ -514,7 +509,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(80px, 20vw, 120px)', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>{formatTime(activeSeconds)}</div>
           {stageHistorySeconds > 0 && (
             <div style={{ fontSize: '14px', color: '#888', marginBottom: '20px' }}>
-              {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+              {t('stage_history_accumulated')}: {formatTime(stageHistorySeconds)}
             </div>
           )}
           <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -567,7 +562,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         {!isCheckedIn ? (
           <button id="tour-checkin" className="mini-btn" style={{ background: '#f59e0b', color: '#000', border: 'none', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }} onClick={handleCheckin}>📅 {t('checkin')}</button>
         ) : (
-          <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {t('checkedIn')} ({checkinStreak}{isZh ? '天' : 'd'})</span>
+          <span style={{ color: '#10b981', fontSize: '12px', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '6px' }}>✅ {t('checkedIn')} ({checkinStreak} {t('days_unit')})</span>
         )}
       </div>
 
@@ -585,12 +580,12 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
           {isTauriEnv && (
-            <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {isZh ? '专注极简模式' : 'Focus Mini Mode'}</button>
+            <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {t('mini_mode')}</button>
           )}
           {!isTauriEnv && (
-            <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {isZh ? '网页悬浮窗' : 'Web PiP'}</button>
+            <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {t('web_pip')}</button>
           )}
-          <button onClick={() => { setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {isZh ? '沉浸模式' : 'Immersive Mode'}</button>
+          <button onClick={() => { setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {t('immersive_mode')}</button>
         </div>
       </div>
 
@@ -693,10 +688,9 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
 
       <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '88px', textShadow: '0 0 30px rgba(255,255,255,0.2)', width: '100%', margin: '14px 0' }}>{formatTime(activeSeconds)}</div>
 
-      {/* 🌟 新增：标准布局中的历史累计展示 */}
       {stageHistorySeconds > 0 && (
         <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', marginTop: '-10px', marginBottom: '10px' }}>
-          {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+          {t('stage_history_accumulated')}: {formatTime(stageHistorySeconds)}
         </div>
       )}
 
@@ -761,7 +755,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         <div className="focus-right">{rightContent}</div>
       </div>
 
-      {/* 🌟 标准模式下的专注结算全屏浮层 */}
       {lastSession && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{

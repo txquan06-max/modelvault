@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AudioManager } from '../core/AudioManager';
@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { CheckinManager } from '../core/CheckinManager';
 import { ModelManager } from '../core/ModelManager';
+import { SessionManager } from '../core/SessionManager'; // 🌟 引入用于查询历史时长
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { AchievementManager } from '../core/AchievementManager';
 import { UserManager } from '../core/UserManager';
@@ -104,12 +105,20 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === useAppStore.getState().equippedTitle);
   const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
 
-  // 🌟 新增：判断素组是否完成
   const assemblyStage = currentTask?.stages.find((s: any) => s.nameKey === 'stage_assembly');
   const isAssemblyDone = assemblyStage?.status === 'Completed';
 
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - activeSeconds) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && activeSeconds > 0;
+
+  // 🌟 新增：计算当前工序的历史累计时长
+  const stageHistorySeconds = useMemo(() => {
+    if (!currentTaskId || !currentStageId) return 0;
+    const sessions = SessionManager.getAllSessions();
+    return sessions
+      .filter((s: any) => s.taskId === currentTaskId && s.stageId === currentStageId)
+      .reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
+  }, [currentTaskId, currentStageId, activeSeconds, timerState, lastSession]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -372,7 +381,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           </div>
         </div>
         
-        {/* 第一行：模型 & 部位 (通过 flex 自适应压缩) */}
+        {/* 第一行：模型 & 部位 */}
         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
           <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ flex: 1, minWidth: 0, padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none' }}>
             {availableModels.map((m: any) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
@@ -382,7 +391,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           </select>
         </div>
 
-        {/* 第二行：工序选择器（横向滑动，绝不换行） */}
+        {/* 第二行：工序选择器 */}
         {currentTask && (
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', flexShrink: 0, scrollbarWidth: 'none' }}>
             {currentTask.stages.map((stage: any) => (
@@ -409,11 +418,16 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           )}
         </div>
 
-        {/* 计时器 */}
+        {/* 🌟 计时器区域：增加历史累计展示 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(36px, 12vh, 64px)', margin: 0, lineHeight: 1, textShadow: `0 0 20px ${botData.color}40`, textAlign: 'center' }}>
             {formatTime(activeSeconds)}
           </div>
+          {stageHistorySeconds > 0 && (
+            <div style={{ fontSize: 'clamp(9px, 2vw, 11px)', color: '#aaa', marginTop: '2px' }}>
+              {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+            </div>
+          )}
         </div>
 
         {/* 控制按钮区 */}
@@ -431,7 +445,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
               {timerState === 'Idle' && (
                 <>
                   <button className="btn start" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>
-                  {/* 🌟 只有素组完成，才显示“完成该部位” */}
                   {currentTask && currentTask.status !== 'Completed' && isAssemblyDone && (
                     <button className="btn no" style={{ flex: 1, padding: '8px', fontSize: '13px', borderRadius: '6px', border: '1px solid #10b981', color: '#10b981', background: 'rgba(16,185,129,0.1)' }} onClick={handleFinishPartClick}>✓ {t('finishPart')}</button>
                   )}
@@ -499,6 +512,11 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
           </div>
 
           <div className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: 'clamp(80px, 20vw, 120px)', fontVariantNumeric: 'tabular-nums', fontWeight: 200, margin: '20px 0', textShadow: `0 0 40px ${botData.color}40` }}>{formatTime(activeSeconds)}</div>
+          {stageHistorySeconds > 0 && (
+            <div style={{ fontSize: '14px', color: '#888', marginBottom: '20px' }}>
+              {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
             {timerState === 'Idle' && <button className="btn start" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handleStart} disabled={!currentTaskId}>{t('start')}</button>}
             {timerState === 'Running' && <button className="btn pause" style={{ width: '140px', padding: '16px', fontSize: '18px', borderRadius: '30px' }} onClick={handlePause}>{t('pause')}</button>}
@@ -654,7 +672,6 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
 
       <div className="task-header">
         <div className="task-name">{currentTaskName}{currentModel?.isRebuilding && <span className="rebuild-badge">🔧 {t('rebuilding')}</span>}</div>
-        {/* 🌟 只有素组完成，才显示“完成该部位” */}
         {currentTask && currentTask.status !== 'Completed' && isAssemblyDone && timerState === 'Idle' && !lastSession && !isFinishingPart && (
           <button className="finish-part-btn" onClick={handleFinishPartClick}>✓ {t('finishPart')}</button>
         )}
@@ -675,6 +692,13 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
       )}
 
       <div id="tour-timer" className={`timer-display ${timerState.toLowerCase()} ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '88px', textShadow: '0 0 30px rgba(255,255,255,0.2)', width: '100%', margin: '14px 0' }}>{formatTime(activeSeconds)}</div>
+
+      {/* 🌟 新增：标准布局中的历史累计展示 */}
+      {stageHistorySeconds > 0 && (
+        <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', marginTop: '-10px', marginBottom: '10px' }}>
+          {isZh ? '本工序历史累计' : 'Stage History'}: {formatTime(stageHistorySeconds)}
+        </div>
+      )}
 
       {timeboxTarget > 0 && activeSeconds > 0 && !isFinishingPart && (
         <div className={`timebox-remaining ${isTimeUp ? 'time-up' : ''}`} style={{ fontSize: '14px', marginBottom: '8px' }}>{isTimeUp ? t('timeboxEnd') : `⏳ ${formatTime(remainingSeconds)}`}</div>

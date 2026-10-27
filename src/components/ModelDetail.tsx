@@ -3,7 +3,7 @@ import { SessionManager } from '../core/SessionManager';
 import { StorageManager, FILE_SUBDIRS } from '../core/StorageManager';
 import { ModelManager } from '../core/ModelManager';
 import { DailyQuestManager } from '../core/DailyQuestManager';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store/useAppStore';
@@ -33,11 +33,10 @@ const useLocalImageSrc = (image?: string): string | null => {
   return url;
 };
 
-// 🌟 顶部相册缩略图组件
 const GalleryPhoto = ({ url, onClick, onRemove }: { url: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
   const resolvedUrl = useLocalImageSrc(url);
   return (
-    <div style={{ width: '160px', height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative', flexShrink: 0, background: '#222', scrollSnapAlign: 'start' }}>
+    <div style={{ width: '85%', minWidth: '85%', height: '180px', borderRadius: '12px', overflow: 'hidden', position: 'relative', flexShrink: 0, background: '#222', scrollSnapAlign: 'center' }}>
       {resolvedUrl ? (
         <img src={resolvedUrl} alt="gallery" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} onClick={onClick} />
       ) : (
@@ -53,7 +52,6 @@ const GalleryPhoto = ({ url, onClick, onRemove }: { url: string, onClick: () => 
   );
 };
 
-// 工序内的小缩略图组件
 const PhotoThumbnail = ({ photoUrl, onClick, onRemove }: { photoUrl: string, onClick: () => void, onRemove: (e: React.MouseEvent) => void }) => {
   const url = useLocalImageSrc(photoUrl);
   return (
@@ -168,9 +166,12 @@ export const ModelDetail = (props: any) => {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const previewResolvedUrl = useLocalImageSrc(previewPhotoUrl || undefined);
 
-  // 删除确认
   const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<{ taskId: string, stageId: string, photoUrl: string } | null>(null);
   const [deleteGalleryConfirm, setDeleteGalleryConfirm] = useState<string | null>(null);
+
+  // 🌟 轮播用 Ref 和状态
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
 
   const stageTimeStats = useMemo(() => {
     const stageTime: Record<string, number> = {};
@@ -183,6 +184,33 @@ export const ModelDetail = (props: any) => {
       });
     return stageTime;
   }, [viewingModel, allSessions]);
+
+  // 🌟 提取合并相册的所有图片（去掉重复）
+  const allCarouselPhotos = useMemo(() => {
+    const photos = [
+      viewingModel.coverImage,
+      ...(viewingModel.galleryPhotos || []),
+      ...viewingModel.tasks.flatMap((t: any) => t.stages.flatMap((s: any) => s.processPhotos || []))
+    ].filter(Boolean) as string[];
+    return Array.from(new Set(photos));
+  }, [viewingModel]);
+
+  // 🌟 自动轮播逻辑
+  useEffect(() => {
+    if (isHoveringCarousel || allCarouselPhotos.length <= 1) return;
+    const timer = setInterval(() => {
+      if (carouselRef.current) {
+        const { scrollLeft, clientWidth, scrollWidth } = carouselRef.current;
+        const nextScroll = scrollLeft + clientWidth * 0.85;
+        if (scrollLeft + clientWidth >= scrollWidth - 10) {
+          carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          carouselRef.current.scrollTo({ left: nextScroll, behavior: 'smooth' });
+        }
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [isHoveringCarousel, allCarouselPhotos.length]);
 
   useEffect(() => {
     if (isEditingImportedStatus) {
@@ -216,7 +244,6 @@ export const ModelDetail = (props: any) => {
     }
   };
 
-  // 🌟 顶部通用相册上传
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -268,7 +295,6 @@ export const ModelDetail = (props: any) => {
     useAppStore.getState().triggerAutoBackup();
   };
 
-  // 🌟 工序内专属相册上传
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, taskId: string, stageId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -393,12 +419,18 @@ export const ModelDetail = (props: any) => {
   return (
     <div className="detail-view">
       {/* 🌟 顶部：相册轮播区 */}
-      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', marginBottom: '16px' }}>
-        
+      <div 
+        ref={carouselRef}
+        onMouseEnter={() => setIsHoveringCarousel(true)}
+        onMouseLeave={() => setIsHoveringCarousel(false)}
+        onTouchStart={() => setIsHoveringCarousel(true)}
+        onTouchEnd={() => setTimeout(() => setIsHoveringCarousel(false), 2000)}
+        style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', marginBottom: '16px', alignItems: 'center' }}
+      >
         {/* 1. 封面卡片 */}
         <div 
           className="detail-hero" 
-          style={{ minWidth: '85%', width: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'start', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}
+          style={{ width: '85%', minWidth: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'center', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}
           onClick={() => setIsEditingCover(true)}
         >
           <div className="detail-hero-info" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)' }}>
@@ -411,8 +443,8 @@ export const ModelDetail = (props: any) => {
           <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>📷 {t('btn_cover')}</div>
         </div>
 
-        {/* 2. 相册照片 */}
-        {viewingModel.galleryPhotos?.map((url: string) => (
+        {/* 2. 合并后的相册照片 (轮播展示) */}
+        {allCarouselPhotos.filter(url => url !== viewingModel.coverImage).map((url: string) => (
           <GalleryPhoto
             key={url}
             url={url}
@@ -422,7 +454,7 @@ export const ModelDetail = (props: any) => {
         ))}
 
         {/* 3. 上传按钮 */}
-        <label style={{ width: '160px', height: '180px', flexShrink: 0, scrollSnapAlign: 'start', borderRadius: '12px', border: '2px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', gap: '8px' }}>
+        <label style={{ width: '85%', minWidth: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'center', borderRadius: '12px', border: '2px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', gap: '8px' }}>
           <span style={{ fontSize: '32px' }}>+</span>
           <span style={{ fontSize: '12px' }}>{t('add_progress_photo')}</span>
           <input type="file" accept="image/*" onChange={handleGalleryUpload} style={{ display: 'none' }} />
@@ -492,7 +524,8 @@ export const ModelDetail = (props: any) => {
         </div>
       )}
 
-      <div className="timeline-container" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
+      {/* 🌟 修复嵌套滚动：取消 maxHeight 和 overflowY，让其随外层自然滚动 */}
+      <div className="timeline-container" style={{ paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
           if (needsRebuild && task.name !== 'part_legacy') return null;
 

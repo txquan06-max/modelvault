@@ -5,6 +5,7 @@ import { MigrationManager, CURRENT_SCHEMA_VERSION } from './MigrationManager';
 const DATA_KEY = 'modelvault_core_data';
 const SNAPSHOT_PREFIX = 'modelvault_snapshot_';
 const SNAPSHOT_MIN_INTERVAL = 10 * 60 * 1000;
+const JOURNAL_FILE = 'journal/sessions.json'; // 🌟 新增：日志保存路径
 
 export const FILE_SUBDIRS = {
   COVER: 'covers',
@@ -144,6 +145,8 @@ export const StorageManager = {
           if (saved) {
             assetsMounted = true;
             console.log('✅ 已恢复素材文件夹挂载:', saved);
+            // 🌟 启动时若已挂载，自动同步本地日记
+            await StorageManager.syncJournalFromDisk();
           }
         } catch (e) {
           console.warn('[Tauri] 恢复素材文件夹挂载失败:', e);
@@ -212,6 +215,8 @@ export const StorageManager = {
         if (selected && typeof selected === 'string') {
           await tauriInvoke('set_assets_dir', { path: selected });
           assetsMounted = true;
+          // 🌟 挂载成功后自动同步日记
+          await StorageManager.syncJournalFromDisk();
           return true;
         }
         return false;
@@ -224,6 +229,8 @@ export const StorageManager = {
     if (!('showDirectoryPicker' in window)) return false;
     try {
       assetsDirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+      // 🌟 Web端挂载成功后自动同步日记
+      await StorageManager.syncJournalFromDisk();
       return true;
     } catch (err) { return false; }
   },
@@ -264,6 +271,81 @@ export const StorageManager = {
     } catch (err) {
       console.error('[Web] saveFileToLocal failed:', err);
       return null;
+    }
+  },
+
+  // 🌟 新增：保存文本到本地
+  async saveTextToLocal(filename: string, text: string): Promise<string | null> {
+    const blob = new Blob([text], { type: 'application/json' });
+    return this.saveFileToLocal(filename, blob);
+  },
+
+  // 🌟 新增：读取本地文本
+  async readLocalFileText(filename: string): Promise<string | null> {
+    const cleanFilename = filename.replace('local://', '');
+    
+    if (isTauriEnv()) {
+      if (!assetsMounted) return null;
+      try {
+        const bytes = await tauriInvoke<number[]>('read_local_file', { filename: cleanFilename });
+        return new TextDecoder().decode(new Uint8Array(bytes));
+      } catch (err) {
+        console.warn('[Tauri] read_local_file_text failed:', err);
+        return null;
+      }
+    }
+    
+    if (!assetsDirHandle) return null;
+    try {
+      const parts = cleanFilename.split('/').filter(p => p);
+      const actualFilename = parts.pop()!;
+      const dirHandle = parts.length > 0
+        ? await getNestedDirectoryHandle(assetsDirHandle, parts, false)
+        : assetsDirHandle;
+      const fileHandle = await dirHandle.getFileHandle(actualFilename);
+      const file = await fileHandle.getFile();
+      return await file.text();
+    } catch (err) {
+      return null;
+    }
+  },
+
+  // 🌟 新增：从本地文件夹同步日记到内存
+  async syncJournalFromDisk() {
+    try {
+      const localJournal = await StorageManager.readLocalFileText(JOURNAL_FILE);
+      if (!localJournal) return;
+      
+      const parsed = JSON.parse(localJournal);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      
+      const currentRaw = memoryCache[KEYS.SESSIONS];
+      const current = currentRaw ? JSON.parse(currentRaw) : [];
+      
+      // 合并去重逻辑
+      const merged = [...current];
+      const existingIds = new Set(current.map((s: any) => s.id));
+      let addedCount = 0;
+      
+      parsed.forEach((s: any) => {
+        if (s.id && !existingIds.has(s.id)) {
+          merged.push(s);
+          existingIds.add(s.id);
+          addedCount++;
+        }
+      });
+      
+      if (addedCount > 0) {
+        merged.sort((a, b) => a.startedAt - b.startedAt);
+        const newRaw = JSON.stringify(merged);
+        memoryCache[KEYS.SESSIONS] = newRaw;
+        await localforage.setItem(KEYS.SESSIONS, newRaw);
+        console.log(`✅ 从本地文件夹恢复了 ${addedCount} 条日志记录`);
+        // 派发事件以便 UI 刷新（如果已经挂载了的话）
+        window.dispatchEvent(new CustomEvent('mv-journal-synced'));
+      }
+    } catch (e) {
+      console.warn('[StorageManager] syncJournalFromDisk failed:', e);
     }
   },
 
@@ -324,18 +406,15 @@ export const StorageManager = {
     return null;
   },
 
-  // 🌟 新增：物理删除本地文件
   async deleteLocalFile(filename: string): Promise<boolean> {
     const cleanFilename = filename.replace('local://', '');
     
-    // 1. 清理内存缓存
     const cached = localUrlCache.get(filename);
     if (cached) {
       URL.revokeObjectURL(cached.url);
       localUrlCache.delete(filename);
     }
 
-    // 2. Tauri 端
     if (isTauriEnv()) {
       if (!assetsMounted) return false;
       try {
@@ -347,7 +426,6 @@ export const StorageManager = {
       }
     }
 
-    // 3. Web 端
     if (!assetsDirHandle) return false;
     try {
       if ((await assetsDirHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
@@ -541,7 +619,11 @@ export const StorageManager = {
   getUnlockedBots: (): string[] => { try { return JSON.parse(memoryCache[KEYS.UNLOCKED_BOTS] || '["tu"]'); } catch { return ['tu']; } },
   getCurrentBot: (): string => memoryCache[KEYS.CURRENT_BOT] || 'tu',
 
-  setSessions: (data: string) => StorageManager._set(KEYS.SESSIONS, data),
+  // 🌟 修改：每次保存日志时，同时静默写入挂载文件夹
+  setSessions: (data: string) => {
+    StorageManager._set(KEYS.SESSIONS, data);
+    StorageManager.saveTextToLocal(JOURNAL_FILE, data).catch(() => {});
+  },
   setAchievements: (data: string) => StorageManager._set(KEYS.ACHIEVEMENTS, data),
   setUsername: (data: string) => StorageManager._set(KEYS.USERNAME, data),
   setTimeboxTarget: (data: number) => StorageManager._set(KEYS.TIMEBOX_TARGET, data.toString()),

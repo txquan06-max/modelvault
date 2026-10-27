@@ -1128,7 +1128,7 @@ export const CORE_DB: GunplaItem[] = [
   { id: 'bb-gundiver', name: { en: 'BB Senshi Gundiver', jp: 'BB戦士 ガンダイバー', zh: 'BB战士 高达潜水员' }, series: { en: 'SD Command Chronicles', jp: 'SDコマンド戦記', zh: 'SD指挥战记' }, grade: 'SD' },
   { id: 'bb-gun-cephalo', name: { en: 'BB Senshi Gun Cephalo', jp: 'BB戦士 ガンセイヴァー', zh: 'BB战士 拯救高达' }, series: { en: 'SD Command Chronicles', jp: 'SDコマンド戦記', zh: 'SD指挥战记' }, grade: 'SD' },
   { id: 'bb-gun-buster', name: { en: 'BB Senshi Gun Buster', jp: 'BB戦士 ガンバスター', zh: 'BB战士 巴斯高达' }, series: { en: 'SD Command Chronicles', jp: 'SDコマンド戦記', zh: 'SD指挥战记' }, grade: 'SD' },
-  { id: 'bb-gun-blaster', name: { en: 'BB Senshi Gun Blaster', jp: 'BB戦士 ガンブラスター', zh: 'BB战士 布拉斯特高达' }, series: { en: 'SD Command Chronicles', jp: 'SDコマンド戦記', zh: 'SD指挥战记' }, grade: 'SD' }
+  { id: 'bb-gun-blaster', name: { en: 'BB Senshi Gun Blaster', jp: 'BB戦士 ガンブラスター', zh: 'BB战士 布拉斯特高达' }, series: { en: 'SD Command Chronicles', jp: 'SDコマンド戦記', zh: 'SD指挥战记' }, grade: 'SD' },
   // ========================================================
   // ==================== 终极补充包：杂兵 / 外传 / 最终决战 ====================
   // ========================================================

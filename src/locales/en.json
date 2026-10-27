@@ -450,5 +450,6 @@
   "recovery_title": "Data Recovery Check",
   "recovery_desc": "Due to a local storage issue in the previous version, your data might not have been saved. If you previously exported a .json backup, please import it here. If you are a new user, you can safely skip.",
   "recovery_import_btn": "📁 Select Backup to Import",
-  "recovery_skip_btn": "New User / No Backup"
+  "recovery_skip_btn": "New User / No Backup",
+  "update_failed_hint": "Download failed. Please try manual download.", "update_manual_btn": "🔗 Go to GitHub to download manually"
 }

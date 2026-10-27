@@ -94,6 +94,7 @@ function App() {
 
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null); // 🌟 新增：更新错误状态
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
   const [webPipContainer, setWebPipContainer] = useState<HTMLElement | null>(null);
@@ -468,6 +469,7 @@ function App() {
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
     setUpdateProgress(0);
+    setUpdateError(null);
     try {
       let downloaded = 0;
       let contentLength = 0;
@@ -481,9 +483,16 @@ function App() {
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (err) {
-      showToast(t('toast_update_failed'));
+      console.error('[Updater] Download failed:', err);
       setUpdateProgress(null);
+      setUpdateError(t('update_failed_hint'));
     }
+  };
+
+  const handleManualDownload = () => {
+    // 打开 GitHub Releases 页面
+    window.open('https://github.com/txquan06-max/modelvault/releases', '_blank');
+    setUpdateInfo(null);
   };
 
   // ==================== Tab 切换 ====================
@@ -878,19 +887,35 @@ function App() {
 
         {updateInfo && (
           <div className="modal-overlay" style={{ zIndex: 10000, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
-            <div className="modal-content" style={{ width: '320px', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)', textAlign: 'center' }}>
+            <div className="modal-content" style={{ width: '340px', border: '1px solid #3b82f6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)', textAlign: 'center' }}>
               <h3 style={{ color: '#3b82f6', fontSize: '18px', marginBottom: '12px' }}>{t('update_new_version_title', { version: updateInfo.version })}</h3>
+              
               <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '16px', lineHeight: 1.5, maxHeight: '80px', overflowY: 'auto', textAlign: 'left', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '4px' }}>
                 {updateInfo.body || t('update_default_body')}
               </p>
+
+              {updateError && (
+                <p style={{ fontSize: '12px', color: '#ef4444', marginBottom: '16px', fontWeight: 'bold' }}>
+                  ⚠️ {updateError}
+                </p>
+              )}
+
               {updateProgress !== null ? (
                 <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginBottom: '16px' }}>
                   <div style={{ width: `${updateProgress}%`, height: '100%', background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', transition: 'width 0.2s' }} />
                 </div>
               ) : (
-                <div className="modal-actions" style={{ justifyContent: 'center' }}>
-                  <button className="btn start" style={{ flex: 1 }} onClick={handleDownloadUpdate}>{t('update_now')}</button>
-                  <button className="btn no" style={{ flex: 1 }} onClick={() => setUpdateInfo(null)}>{t('update_later')}</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div className="modal-actions" style={{ justifyContent: 'center', marginTop: 0 }}>
+                    <button className="btn start" style={{ flex: 1 }} onClick={handleDownloadUpdate}>{t('update_now')}</button>
+                    <button className="btn no" style={{ flex: 1 }} onClick={() => setUpdateInfo(null)}>{t('update_later')}</button>
+                  </div>
+                  <button 
+                    onClick={handleManualDownload}
+                    style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', marginTop: '4px' }}
+                  >
+                    {t('update_manual_btn')}
+                  </button>
                 </div>
               )}
             </div>

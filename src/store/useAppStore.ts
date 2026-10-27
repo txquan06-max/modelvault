@@ -34,6 +34,8 @@ interface AppState {
   expandedTaskId: string | null;
 
   toastMsg: string | null;
+  undoToastMsg: string | null;
+  undoAction: (() => void) | null;
 
   timerState: 'Idle' | 'Running' | 'Paused';
   activeSeconds: number;
@@ -87,6 +89,8 @@ interface AppState {
   setExpandedTaskId: (id: string | null) => void;
   showToast: (msg: string) => void;
   setToastMsg: (msg: string | null) => void;
+  showUndoToast: (msg: string, undoFn: () => void) => void;
+  clearUndoToast: () => void;
 
   startTimer: () => void;
   pauseTimer: () => void;
@@ -128,9 +132,10 @@ interface AppState {
   setIsAssetsMounted: (val: boolean) => void;
 }
 
+let undoToastTimer: any = null;
+
 export const useAppStore = create<AppState>((set: any, get: any) => {
   
-  // 🌟 辅助函数：保存当前工作现场
   const saveWorkbench = (modelId: string, taskId: string, stageId: string | null) => {
     if (modelId && taskId) {
       StorageManager.setLastWorkbench({ modelId, taskId, stageId });
@@ -148,6 +153,8 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
     expandedTaskId: null,
 
     toastMsg: null,
+    undoToastMsg: null,
+    undoAction: null,
 
     timerState: 'Idle',
     activeSeconds: 0,
@@ -206,7 +213,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
       let { currentModelId, currentTaskId, currentStageId } = get();
       const isCurrentValid = currentModelId && available.some((m: Model) => m.id === currentModelId);
 
-      // 🌟 智能恢复：仅当当前状态无效（应用重启、被删、已完成）时，才读工作现场
       if (!isCurrentValid) {
         const savedWorkbench = StorageManager.getLastWorkbench();
         if (savedWorkbench && available.some(m => m.id === savedWorkbench.modelId)) {
@@ -276,9 +282,9 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
         checkinStreak: StorageManager.getCheckinStreak(),
         isCheckedIn: CheckinManager.isCheckedInToday(),
         storageEstimate: est,
+        isAssetsMounted: StorageManager.isAssetsMounted(),
       });
 
-      // 同步工作现场到硬盘，确保刷新/重启时能恢复
       saveWorkbench(currentModelId, currentTaskId, currentStageId);
       AudioManager.preloadCustomAudios().catch(e => console.warn('预加载音效失败', e));
     },
@@ -312,6 +318,19 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
     setToastMsg: (msg: string | null) => {
       if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
       set({ toastMsg: msg });
+    },
+
+    // 🌟 新增：展示带撤销按钮的 Toast
+    showUndoToast: (msg: string, undoFn: () => void) => {
+      if (undoToastTimer) clearTimeout(undoToastTimer);
+      set({ undoToastMsg: msg, undoAction: undoFn });
+      undoToastTimer = setTimeout(() => {
+        set({ undoToastMsg: null, undoAction: null });
+      }, 5000);
+    },
+    clearUndoToast: () => {
+      if (undoToastTimer) { clearTimeout(undoToastTimer); undoToastTimer = null; }
+      set({ undoToastMsg: null, undoAction: null });
     },
 
     startTimer: () => {
@@ -379,7 +398,6 @@ export const useAppStore = create<AppState>((set: any, get: any) => {
     cancelDone: () => {
       AudioManager.playClick();
       set({ lastSession: null });
-      // 🌟 优化文案：明确告诉用户时间已经保住了
       get().showToast(i18n.t('toast_time_saved'));
     },
 

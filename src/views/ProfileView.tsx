@@ -731,7 +731,7 @@ export const ProfileView = () => {
         </div>
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.4.0 (Desktop)</p>
+          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.1 (Desktop)</p>
           <a href="https://github.com/txquan06-max/modelvault" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>

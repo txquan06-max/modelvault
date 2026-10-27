@@ -6,7 +6,7 @@
 // 只要 sw.js 文件内容有差异（哪怕只有这一个字符串），浏览器就会触发更新检测
 // ============================================
 
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.1.1';
 const CACHE_NAME = `modeljourney-${CACHE_VERSION}`;
 
 // 需要预缓存的静态资源（首次安装时尽量拉取）

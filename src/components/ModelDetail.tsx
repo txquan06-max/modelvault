@@ -79,6 +79,116 @@ const STAGE_COLORS: Record<string, string> = {
   stage_topcoat: '#ef4444',
 };
 
+// 🌟 新增：单机体拼装趋势折线图
+const ModelDailyChart = ({ modelId, t, i18n }: { modelId: string, t: any, i18n: any }) => {
+  const isZh = i18n.language === 'zh';
+  
+  const dailyData = useMemo(() => {
+    const allSessions = SessionManager.getAllSessions();
+    const model = ModelManager.getAllModels().find(m => m.id === modelId);
+    if (!model) return [];
+
+    const taskIds = model.tasks.map(t => t.id);
+    const modelSessions = allSessions.filter((s: any) => taskIds.includes(s.taskId));
+    
+    const days = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const year = d.getFullYear();
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const date = d.getDate().toString().padStart(2, '0');
+      const dateStr = `${year}-${month}-${date}`;
+      
+      const daySessions = modelSessions.filter((s: any) => {
+        const sd = new Date(s.startedAt);
+        return sd.getFullYear() === year && (sd.getMonth() + 1) === (d.getMonth() + 1) && sd.getDate() === d.getDate();
+      });
+      
+      const totalSec = daySessions.reduce((sum: number, s: any) => sum + s.activeSeconds, 0);
+      return { dateStr, label: isZh ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getMonth() + 1}/${d.getDate()}`, value: totalSec, isToday: i === 6 };
+    });
+
+    return days;
+  }, [modelId, isZh]);
+
+  const hasData = dailyData.some(d => d.value > 0);
+  if (!hasData) return null; // 如果该模型没有任何记录，不显示图表
+
+  const maxSec = Math.max(...dailyData.map(d => d.value), 3600);
+  const width = 400;
+  const height = 120;
+  const paddingX = 20;
+  const paddingY = 20;
+  const chartWidth = width - paddingX * 2;
+  const chartHeight = height - paddingY * 2;
+
+  const points = dailyData.map((d, i) => {
+    const x = paddingX + (i / 6) * chartWidth;
+    const y = height - paddingY - (d.value / maxSec) * chartHeight;
+    return { x, y, ...d };
+  });
+
+  const linePath = points.reduce((acc, p, i, a) => {
+    if (i === 0) return `M ${p.x},${p.y}`;
+    const prev = a[i - 1];
+    const cp1x = prev.x + (p.x - prev.x) / 2;
+    const cp1y = prev.y;
+    const cp2x = prev.x + (p.x - prev.x) / 2;
+    const cp2y = p.y;
+    return `${acc} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p.x},${p.y}`;
+  }, '');
+
+  const areaPath = `${linePath} L ${points[6].x},${height - paddingY} L ${points[0].x},${height - paddingY} Z`;
+
+  return (
+    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          📈 {t('model_timeline_title')}
+        </div>
+      </div>
+      
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={`areaGradient-${modelId}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(59, 130, 246, 0.4)" />
+            <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
+          </linearGradient>
+          <linearGradient id={`lineGradient-${modelId}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#8b5cf6" />
+          </linearGradient>
+          <filter id={`glow-${modelId}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {[0, 0.5, 1].map((p, i) => (
+          <line key={i} x1={paddingX} y1={height - paddingY - p * chartHeight} x2={width - paddingX} y2={height - paddingY - p * chartHeight} stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="4 4" />
+        ))}
+
+        <path d={areaPath} fill={`url(#areaGradient-${modelId})`} />
+        <path d={linePath} fill="none" stroke={`url(#lineGradient-${modelId})`} strokeWidth="3" filter={`url(#glow-${modelId})`} />
+
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r={4} fill="#3b82f6" stroke="#fff" strokeWidth="2" />
+            {p.value > 0 && (
+              <text x={p.x} y={p.y - 10} fill="#10b981" fontSize="10" textAnchor="middle" fontWeight="bold">
+                {Math.floor(p.value / 60)}m
+              </text>
+            )}
+            <text x={p.x} y={height - 2} fill={p.isToday ? '#3b82f6' : '#666'} fontSize="9" textAnchor="middle" fontWeight={p.isToday ? 'bold' : 'normal'}>
+              {p.isToday ? t('today') : p.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
 const StageDistributionChart = ({
   stageTime,
   formatTime,
@@ -169,7 +279,6 @@ export const ModelDetail = (props: any) => {
   const [deletePhotoConfirm, setDeletePhotoConfirm] = useState<{ taskId: string, stageId: string, photoUrl: string } | null>(null);
   const [deleteGalleryConfirm, setDeleteGalleryConfirm] = useState<string | null>(null);
 
-  // 🌟 轮播用 Ref 和状态
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isHoveringCarousel, setIsHoveringCarousel] = useState(false);
 
@@ -185,7 +294,6 @@ export const ModelDetail = (props: any) => {
     return stageTime;
   }, [viewingModel, allSessions]);
 
-  // 🌟 提取合并相册的所有图片（去掉重复）
   const allCarouselPhotos = useMemo(() => {
     const photos = [
       viewingModel.coverImage,
@@ -195,7 +303,6 @@ export const ModelDetail = (props: any) => {
     return Array.from(new Set(photos));
   }, [viewingModel]);
 
-  // 🌟 自动轮播逻辑
   useEffect(() => {
     if (isHoveringCarousel || allCarouselPhotos.length <= 1) return;
     const timer = setInterval(() => {
@@ -418,7 +525,6 @@ export const ModelDetail = (props: any) => {
 
   return (
     <div className="detail-view">
-      {/* 🌟 顶部：相册轮播区 */}
       <div 
         ref={carouselRef}
         onMouseEnter={() => setIsHoveringCarousel(true)}
@@ -427,7 +533,6 @@ export const ModelDetail = (props: any) => {
         onTouchEnd={() => setTimeout(() => setIsHoveringCarousel(false), 2000)}
         style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', marginBottom: '16px', alignItems: 'center' }}
       >
-        {/* 1. 封面卡片 */}
         <div 
           className="detail-hero" 
           style={{ width: '85%', minWidth: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'center', backgroundImage: coverPreviewUrl ? `url(${coverPreviewUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '12px', position: 'relative', cursor: 'pointer' }}
@@ -443,7 +548,6 @@ export const ModelDetail = (props: any) => {
           <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>📷 {t('btn_cover')}</div>
         </div>
 
-        {/* 2. 合并后的相册照片 (轮播展示) */}
         {allCarouselPhotos.filter(url => url !== viewingModel.coverImage).map((url: string) => (
           <GalleryPhoto
             key={url}
@@ -453,14 +557,15 @@ export const ModelDetail = (props: any) => {
           />
         ))}
 
-        {/* 3. 上传按钮 */}
         <label style={{ width: '85%', minWidth: '85%', height: '180px', flexShrink: 0, scrollSnapAlign: 'center', borderRadius: '12px', border: '2px dashed #555', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: '#888', gap: '8px' }}>
           <span style={{ fontSize: '32px' }}>+</span>
           <span style={{ fontSize: '12px' }}>{t('add_progress_photo')}</span>
           <input type="file" accept="image/*" onChange={handleGalleryUpload} style={{ display: 'none' }} />
         </label>
-
       </div>
+
+      {/* 🌟 新增：本机专属拼装趋势图 */}
+      <ModelDailyChart modelId={viewingModel.id} t={t} i18n={i18n} />
 
       <StageDistributionChart stageTime={stageTimeStats} formatTime={formatTime} t={t} />
 
@@ -524,7 +629,6 @@ export const ModelDetail = (props: any) => {
         </div>
       )}
 
-      {/* 🌟 修复嵌套滚动：取消 maxHeight 和 overflowY，让其随外层自然滚动 */}
       <div className="timeline-container" style={{ paddingRight: '4px' }}>
         {viewingModel.tasks.map((task: any) => {
           if (needsRebuild && task.name !== 'part_legacy') return null;
@@ -564,7 +668,6 @@ export const ModelDetail = (props: any) => {
                           </div>
                         </div>
 
-                        {/* 工序专属照片 */}
                         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginTop: '8px' }}>
                           {photos.map((url: string, idx: number) => (
                             <PhotoThumbnail
@@ -652,7 +755,6 @@ export const ModelDetail = (props: any) => {
         </button>
       </div>
 
-      {/* 大图预览弹窗 */}
       {previewPhotoUrl && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'zoom-out' }} onClick={() => setPreviewPhotoUrl(null)}>
           {previewResolvedUrl ? (
@@ -664,7 +766,6 @@ export const ModelDetail = (props: any) => {
         document.body
       )}
 
-      {/* 删除相册图确认 */}
       {deleteGalleryConfirm && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '12px', border: '1px solid #444', maxWidth: '320px', width: '100%' }}>
@@ -681,7 +782,6 @@ export const ModelDetail = (props: any) => {
         document.body
       )}
 
-      {/* 删除工序图确认 */}
       {deletePhotoConfirm && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#2d2d2d', padding: '20px', borderRadius: '12px', border: '1px solid #444', maxWidth: '320px', width: '100%' }}>

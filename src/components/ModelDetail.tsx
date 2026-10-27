@@ -79,7 +79,6 @@ const STAGE_COLORS: Record<string, string> = {
   stage_topcoat: '#ef4444',
 };
 
-// 🌟 新增：单机体拼装趋势折线图
 const ModelDailyChart = ({ modelId, t, i18n }: { modelId: string, t: any, i18n: any }) => {
   const isZh = i18n.language === 'zh';
   
@@ -112,7 +111,7 @@ const ModelDailyChart = ({ modelId, t, i18n }: { modelId: string, t: any, i18n: 
   }, [modelId, isZh]);
 
   const hasData = dailyData.some(d => d.value > 0);
-  if (!hasData) return null; // 如果该模型没有任何记录，不显示图表
+  if (!hasData) return null;
 
   const maxSec = Math.max(...dailyData.map(d => d.value), 3600);
   const width = 400;
@@ -253,7 +252,7 @@ export const ModelDetail = (props: any) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
 
-  const { models, setModels, refreshData, currentBot, username, level, equippedTitle } = useAppStore();
+  const { models, setModels, refreshData, currentBot, username, level, equippedTitle, showUndoToast } = useAppStore();
 
   const {
     viewingModel, viewingModelTotalSec, formatTime, expandedTaskId, setExpandedTaskId,
@@ -391,15 +390,40 @@ export const ModelDetail = (props: any) => {
     e.target.value = '';
   };
 
+  // 🌟 修复：这里的 url 参数补充了 : string 类型
   const confirmRemoveGallery = () => {
     if (!deleteGalleryConfirm) return;
     AudioManager.playClick();
-    const updated = ModelManager.removeModelGalleryPhoto(viewingModel.id, deleteGalleryConfirm);
-    setModels(updated);
+    const urlToRemove = deleteGalleryConfirm;
+    
+    // 先在本地状态里删除
+    const newGallery = (viewingModel.galleryPhotos || []).filter((url: string) => url !== urlToRemove);
+    const updatedModels = models.map((m: any) => m.id === viewingModel.id ? { ...m, galleryPhotos: newGallery } : m);
+    
+    // 直接更新底层数据，暂不触发物理删除
+    ModelManager.saveModels(updatedModels);
+    setModels(updatedModels);
     refreshData();
     setDeleteGalleryConfirm(null);
-    showToast(t('toast_deleted'));
     useAppStore.getState().triggerAutoBackup();
+
+    // 触发撤销 Toast
+    showUndoToast(t('toast_deleted'), () => {
+      // 撤销操作：把照片加回去
+      const restoredGallery = [...(viewingModel.galleryPhotos || []), urlToRemove];
+      const restoredModels = models.map((m: any) => m.id === viewingModel.id ? { ...m, galleryPhotos: restoredGallery } : m);
+      ModelManager.saveModels(restoredModels);
+      setModels(restoredModels);
+      refreshData();
+      useAppStore.getState().triggerAutoBackup();
+    });
+
+    // 5 秒后如果没有撤销，真正物理删除
+    setTimeout(() => {
+      if (urlToRemove.startsWith('local://')) {
+        StorageManager.deleteLocalFile(urlToRemove).catch(e => console.warn(e));
+      }
+    }, 5000);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, taskId: string, stageId: string) => {
@@ -446,12 +470,61 @@ export const ModelDetail = (props: any) => {
     if (!deletePhotoConfirm) return;
     const { taskId, stageId, photoUrl } = deletePhotoConfirm;
     AudioManager.playClick();
-    const updated = ModelManager.removeStagePhoto(taskId, stageId, photoUrl);
-    setModels(updated);
+    
+    // 先本地状态移除
+    const updatedModels = models.map((m: any) => {
+      if (m.id !== viewingModel.id) return m;
+      return {
+        ...m,
+        tasks: m.tasks.map((t: any) => {
+          if (t.id !== taskId) return t;
+          return {
+            ...t,
+            stages: t.stages.map((s: any) => {
+              if (s.id !== stageId) return s;
+              return { ...s, processPhotos: (s.processPhotos || []).filter((url: string) => url !== photoUrl) };
+            })
+          };
+        })
+      };
+    });
+
+    ModelManager.saveModels(updatedModels);
+    setModels(updatedModels);
     refreshData();
     setDeletePhotoConfirm(null);
-    showToast(t('toast_deleted'));
     useAppStore.getState().triggerAutoBackup();
+
+    // 触发撤销
+    showUndoToast(t('toast_deleted'), () => {
+      const restoredModels = models.map((m: any) => {
+        if (m.id !== viewingModel.id) return m;
+        return {
+          ...m,
+          tasks: m.tasks.map((t: any) => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              stages: t.stages.map((s: any) => {
+                if (s.id !== stageId) return s;
+                return { ...s, processPhotos: [...(s.processPhotos || []), photoUrl] };
+              })
+            };
+          })
+        };
+      });
+      ModelManager.saveModels(restoredModels);
+      setModels(restoredModels);
+      refreshData();
+      useAppStore.getState().triggerAutoBackup();
+    });
+
+    // 延时物理删除
+    setTimeout(() => {
+      if (photoUrl.startsWith('local://')) {
+        StorageManager.deleteLocalFile(photoUrl).catch(e => console.warn(e));
+      }
+    }, 5000);
   };
 
   const handleGenerateShareCard = async () => {
@@ -548,7 +621,7 @@ export const ModelDetail = (props: any) => {
           <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>📷 {t('btn_cover')}</div>
         </div>
 
-        {allCarouselPhotos.filter(url => url !== viewingModel.coverImage).map((url: string) => (
+        {allCarouselPhotos.filter((url: string) => url !== viewingModel.coverImage).map((url: string) => (
           <GalleryPhoto
             key={url}
             url={url}
@@ -564,9 +637,7 @@ export const ModelDetail = (props: any) => {
         </label>
       </div>
 
-      {/* 🌟 新增：本机专属拼装趋势图 */}
       <ModelDailyChart modelId={viewingModel.id} t={t} i18n={i18n} />
-
       <StageDistributionChart stageTime={stageTimeStats} formatTime={formatTime} t={t} />
 
       {isEditingCover && (

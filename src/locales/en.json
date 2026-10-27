@@ -451,5 +451,10 @@
   "recovery_desc": "Due to a local storage issue in the previous version, your data might not have been saved. If you previously exported a .json backup, please import it here. If you are a new user, you can safely skip.",
   "recovery_import_btn": "📁 Select Backup to Import",
   "recovery_skip_btn": "New User / No Backup",
-  "update_failed_hint": "Download failed. Please try manual download.", "update_manual_btn": "🔗 Go to GitHub to download manually"
+  "update_failed_hint": "Download failed. Please try manual download.", "update_manual_btn": "🔗 Go to GitHub to download manually",
+  "undo": "Undo",
+  "assets_disconnect_title": "Local Gallery Disconnected",
+  "assets_disconnect_desc": "Failed to read the mounted local folder (maybe unplugged or moved). Please remount to ensure photos and journals sync properly.",
+  "assets_disconnect_reconnect": "Remount Gallery",
+  "assets_disconnect_skip": "Later"
 }

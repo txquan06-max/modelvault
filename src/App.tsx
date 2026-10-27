@@ -57,7 +57,7 @@ function App() {
     models, setModels, currentModelId, setCurrentModelId,
     currentTaskId, setCurrentTaskId, currentStageId, setCurrentStageId,
     viewingModelId, setViewingModelId, expandedTaskId, setExpandedTaskId,
-    toastMsg, showToast,
+    toastMsg, showToast, undoToastMsg, undoAction, clearUndoToast,
     timerState, activeSeconds,
     chatMessages, setChatMessages,
     showCompleteModelConfirm, setShowCompleteModelConfirm, confirmCompleteModel,
@@ -67,7 +67,7 @@ function App() {
     webChatInterval, pipChatInterval,
     refreshData,
     bgMain, bgSize, bgPosition, setBgSize, setBgPosition,
-    ambientType,
+    ambientType, isAssetsMounted, setIsAssetsMounted
   } = useAppStore();
 
   const [showSplash, setShowSplash] = useState(true);
@@ -78,6 +78,9 @@ function App() {
   // 🌟 数据抢救弹窗状态
   const [showDataRecovery, setShowDataRecovery] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
+
+  // 🌟 新增：图库断连状态
+  const [showAssetDisconnected, setShowAssetDisconnected] = useState(false);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -94,7 +97,7 @@ function App() {
 
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
-  const [updateError, setUpdateError] = useState<string | null>(null); // 🌟 新增：更新错误状态
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
 
   const [webPipContainer, setWebPipContainer] = useState<HTMLElement | null>(null);
@@ -125,6 +128,16 @@ function App() {
       setShowDataRecovery(true);
     }
   }, [models, showSplash]);
+
+  // 🌟 监听图库断连事件
+  useEffect(() => {
+    const handleDisconnect = () => {
+      setIsAssetsMounted(false);
+      setShowAssetDisconnected(true);
+    };
+    window.addEventListener('mv-assets-disconnected', handleDisconnect);
+    return () => window.removeEventListener('mv-assets-disconnected', handleDisconnect);
+  }, [setIsAssetsMounted]);
 
   // ==================== Splash & 更新 ====================
   const handleFinishSplash = useCallback(() => setShowSplash(false), []);
@@ -490,7 +503,6 @@ function App() {
   };
 
   const handleManualDownload = () => {
-    // 打开 GitHub Releases 页面
     window.open('https://github.com/txquan06-max/modelvault/releases', '_blank');
     setUpdateInfo(null);
   };
@@ -747,6 +759,35 @@ function App() {
         document.body
       )}
 
+      {/* 🌟 图库断连弹窗 */}
+      {showAssetDisconnected && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+          <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #ef4444', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(239, 68, 68, 0.2)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔌</div>
+            <h2 style={{ fontSize: '20px', color: '#fff', marginBottom: '12px', fontWeight: 'bold' }}>{t('assets_disconnect_title')}</h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.6', marginBottom: '24px' }}>
+              {t('assets_disconnect_desc')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button className="btn start" style={{ padding: '14px', fontSize: '15px', borderRadius: '8px', background: '#ef4444' }} onClick={async () => {
+                const success = await StorageManager.selectAssetsFolder();
+                if (success) {
+                  setIsAssetsMounted(true);
+                  setShowAssetDisconnected(false);
+                  showToast(t('toast_local_mount_success'));
+                }
+              }}>
+                {t('assets_disconnect_reconnect')}
+              </button>
+              <button className="btn no" style={{ padding: '14px', fontSize: '15px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={() => setShowAssetDisconnected(false)}>
+                {t('assets_disconnect_skip')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showTutorial && !showSplash && (
         <TutorialTour
           steps={tutorialSteps}
@@ -766,6 +807,20 @@ function App() {
           )
         )}
         {toastMsg && <div className="toast">{toastMsg}</div>}
+
+        {/* 🌟 全局撤销 Toast */}
+        {undoToastMsg && (
+          <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: '20px', top: 'auto' }}>
+            <span>{undoToastMsg}</span>
+            <button 
+              onClick={() => { if(undoAction) undoAction(); clearUndoToast(); }}
+              style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
+            >
+              {t('undo')}
+            </button>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, height: '3px', background: '#ef4444', animation: 'toast-countdown 5s linear forwards' }} />
+          </div>
+        )}
 
         <div className="mini-window">
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>

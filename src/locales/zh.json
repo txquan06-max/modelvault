@@ -451,5 +451,10 @@
   "recovery_desc": "由于上一个版本存在本地存储缺陷，您的数据可能未能成功保存。如果您曾在旧版本中使用过「数据备份 → 导出数据」，请在此处导入您的 .json 备份文件。如果您是新用户，可直接跳过。",
   "recovery_import_btn": "📁 选择备份文件导入",
   "recovery_skip_btn": "我是新用户 / 暂无备份",
-  "update_failed_hint": "更新下载失败，请尝试手动前往 GitHub 下载", "update_manual_btn": "🔗 手动前往 GitHub 下载"
+  "update_failed_hint": "更新下载失败，请尝试手动前往 GitHub 下载", "update_manual_btn": "🔗 手动前往 GitHub 下载",
+  "undo": "撤销",
+  "assets_disconnect_title": "本地图库已断开",
+  "assets_disconnect_desc": "检测到挂载的本地文件夹读取失败（可能被拔出或移动）。请重新挂载以确保照片和日记能正常同步。",
+  "assets_disconnect_reconnect": "重新挂载图库",
+  "assets_disconnect_skip": "稍后再说"
 }

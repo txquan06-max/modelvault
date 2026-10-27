@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { SessionManager } from './core/SessionManager';
-import { ModelManager } from './core/ModelManager';
+import { ModelManager, type Model } from './core/ModelManager'; // 🌟 引入类型
 import { AchievementManager } from './core/AchievementManager';
 import { AudioManager } from './core/AudioManager';
 import { StorageManager } from './core/StorageManager';
@@ -75,11 +75,8 @@ function App() {
   const [isMiniMode, setIsMiniMode] = useState(false);
   const [isWindowActive, setIsWindowActive] = useState(true);
 
-  // 🌟 数据抢救弹窗状态
   const [showDataRecovery, setShowDataRecovery] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
-
-  // 🌟 新增：图库断连状态
   const [showAssetDisconnected, setShowAssetDisconnected] = useState(false);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
@@ -107,7 +104,6 @@ function App() {
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
 
-  // ==================== 启动静音 + 首次交互解锁 ====================
   useEffect(() => {
     AudioManager.lock();
     const unlock = () => { AudioManager.unlock(); };
@@ -121,7 +117,6 @@ function App() {
     };
   }, []);
 
-  // 🌟 数据恢复检测逻辑
   useEffect(() => {
     if (showSplash) return;
     if (models.length === 0 && !localStorage.getItem(DATA_RECOVERY_WARNED)) {
@@ -129,7 +124,6 @@ function App() {
     }
   }, [models, showSplash]);
 
-  // 🌟 监听图库断连事件
   useEffect(() => {
     const handleDisconnect = () => {
       setIsAssetsMounted(false);
@@ -139,7 +133,6 @@ function App() {
     return () => window.removeEventListener('mv-assets-disconnected', handleDisconnect);
   }, [setIsAssetsMounted]);
 
-  // ==================== Splash & 更新 ====================
   const handleFinishSplash = useCallback(() => setShowSplash(false), []);
 
   useEffect(() => {
@@ -148,7 +141,6 @@ function App() {
     return () => window.removeEventListener('tauri-update-available', handleUpdate);
   }, []);
 
-  // ==================== Tauri 窗口焦点 ====================
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: any = null;
@@ -159,7 +151,6 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // ==================== Tauri 托盘事件监听 ====================
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: any = null;
@@ -177,7 +168,6 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, []);
 
-  // ==================== 全局快捷键 Ctrl+Shift+S 监听 ====================
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: any = null;
@@ -200,7 +190,6 @@ function App() {
     return () => { if (unlisten) unlisten(); };
   }, [i18n]);
 
-  // ==================== Web PiP ====================
   useEffect(() => {
     const handler = async () => {
       if (!('documentPictureInPicture' in window)) {
@@ -255,7 +244,6 @@ function App() {
     return () => window.removeEventListener('mv-open-web-pip', handler as EventListener);
   }, [t, showToast]);
 
-  // ==================== Timer tick ====================
   useEffect(() => {
     const interval = setInterval(() => {
       useAppStore.getState().tickTimer();
@@ -263,21 +251,18 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // ==================== Ambient ====================
   useEffect(() => {
     if (timerState === 'Running') AudioManager.playAmbient(ambientType);
     else AudioManager.stopAmbient();
     return () => AudioManager.stopAmbient();
   }, [timerState, ambientType]);
 
-  // ==================== Chat 持久化 ====================
   useEffect(() => {
     if (chatMessages.length > 0) {
       sessionStorage.setItem('mv_chat_messages', JSON.stringify(chatMessages));
     }
   }, [chatMessages]);
 
-  // ==================== Bot 初始化 ====================
   useEffect(() => {
     QuoteEngine.setBot(currentBot);
     if (chatMessages.length === 0) {
@@ -286,7 +271,6 @@ function App() {
     }
   }, [currentBot, i18n.language]);
 
-  // ==================== 存储初始化 ====================
   useEffect(() => {
     const initStorage = async () => {
       await StorageManager.requestPersistentStorage();
@@ -295,7 +279,6 @@ function App() {
     initStorage();
   }, []);
 
-  // ==================== 聊天定时器 ====================
   useEffect(() => {
     if (showSplash) return;
     let chatTimer: any;
@@ -320,7 +303,6 @@ function App() {
     };
   }, [i18n.language, webChatInterval, pipChatInterval, isMiniMode, showSplash, isWindowActive]);
 
-  // ==================== Timebox 结束通知 ====================
   useEffect(() => {
     const state = useAppStore.getState();
     if (timerState === 'Running' && state.timeboxTarget > 0 && activeSeconds >= state.timeboxTarget && !state.hasPlayedTimeboxSound) {
@@ -351,7 +333,6 @@ function App() {
     }
   }, [activeSeconds, timerState, t]);
 
-  // ==================== 定期提醒 ====================
   useEffect(() => {
     if (timerState === 'Running' && reminderIntervalRef.current > 0) {
       if (activeSeconds > 0 && activeSeconds % reminderIntervalRef.current === 0 && activeSeconds !== lastRemindedAtRef.current) {
@@ -366,7 +347,6 @@ function App() {
     if (timerState !== 'Running') lastRemindedAtRef.current = 0;
   }, [timerState]);
 
-  // ==================== 通知权限 & 拖拽拦截 ====================
   useEffect(() => {
     if (!isTauri && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       Notification.requestPermission();
@@ -384,7 +364,6 @@ function App() {
     };
   }, []);
 
-  // ==================== 成就队列 ====================
   useEffect(() => {
     if (!activeAchievement && achievementQueue.length > 0) {
       const next = achievementQueue[0];
@@ -398,7 +377,6 @@ function App() {
     if (newlyEarned.length > 0) setAchievementQueue(prev => [...prev, ...newlyEarned as AchievementData[]]);
   };
 
-  // ==================== 数据抢救处理 ====================
   const handleRecoveryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -429,7 +407,6 @@ function App() {
     setShowDataRecovery(false);
   };
 
-  // ==================== 极简模式 ====================
   const handleToggleMiniMode = useCallback(async () => {
     if (isMiniModeRef.current) {
       setIsMiniMode(false);
@@ -465,7 +442,6 @@ function App() {
     return () => window.removeEventListener('mv-toggle-mini-mode', handleToggleMiniMode);
   }, [handleToggleMiniMode]);
 
-  // ==================== 置顶 / 更新 ====================
   const toggleAlwaysOnTop = async () => {
     if (!isTauri) { showToast(t('toast_pin_desktop_only')); return; }
     try {
@@ -507,28 +483,27 @@ function App() {
     setUpdateInfo(null);
   };
 
-  // ==================== Tab 切换 ====================
   const handleTabChange = (newTab: MainTab) => {
     if (activeTab === 'focus' && timerState === 'Running') setPendingTabChange(newTab);
     else { AudioManager.playClick(); setActiveTab(newTab); }
   };
 
-  // ==================== ModelDetail handlers ====================
-  const viewingModel = models.find((m: any) => m.id === viewingModelId);
+  // 🌟 修复：明确指定 Model 类型
+  const viewingModel = models.find((m: Model) => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel
-    ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t: any) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0)
+    ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0)
     : 0;
 
-  const checkAndPromptCompleteModel = (updatedModels: any[], modelId?: string) => {
+  const checkAndPromptCompleteModel = (updatedModels: Model[], modelId?: string) => {
     let targetId = modelId;
     if (!targetId) {
       const curTaskId = useAppStore.getState().currentTaskId;
-      const m = updatedModels.find((m: any) => m.tasks.some((t: any) => t.id === curTaskId));
+      const m = updatedModels.find((m: Model) => m.tasks.some((t) => t.id === curTaskId));
       targetId = m?.id;
     }
     if (!targetId) return;
-    const targetModel = updatedModels.find((m: any) => m.id === targetId);
-    if (targetModel && targetModel.tasks.length > 0 && targetModel.tasks.every((t: any) => t.status === 'Completed') && targetModel.status !== 'Completed') {
+    const targetModel = updatedModels.find((m: Model) => m.id === targetId);
+    if (targetModel && targetModel.tasks.length > 0 && targetModel.tasks.every((t) => t.status === 'Completed') && targetModel.status !== 'Completed') {
       useAppStore.setState({ showCompleteModelConfirm: true, completeModelId: targetId });
     }
   };
@@ -559,7 +534,7 @@ function App() {
   const handleStartRebuild = (taskId: string | null) => {
     AudioManager.playClick();
     setPendingRebuildTask(taskId);
-    const stages = viewingModel?.tasks.find((t: any) => t.name === 'part_legacy')?.stages.filter((s: any) => s.status === 'Completed').map((s: any) => s.nameKey) || ['stage_assembly'];
+    const stages = viewingModel?.tasks.find((t) => t.name === 'part_legacy')?.stages.filter((s) => s.status === 'Completed').map((s) => s.nameKey) || ['stage_assembly'];
     setImportedStages(stages);
     setRebuildMode('part');
     setIsEditingImportedStatus(true);
@@ -570,16 +545,16 @@ function App() {
     AudioManager.playStageDone();
     const updated = ModelManager.startLegacyRebuild(viewingModel.id, importedStages, rebuildMode === 'whole');
     let targetTaskId = null;
-    const currentModelUpdated = updated.find((m: any) => m.id === viewingModel.id);
+    const currentModelUpdated = updated.find((m: Model) => m.id === viewingModel.id);
     if (currentModelUpdated) {
       if (rebuildMode === 'whole') {
-        const wholeTask = currentModelUpdated.tasks.find((t: any) => t.name === 'part_whole');
+        const wholeTask = currentModelUpdated.tasks.find((t) => t.name === 'part_whole');
         if (wholeTask) targetTaskId = wholeTask.id;
       } else {
-        const firstPart = currentModelUpdated.tasks.find((t: any) => t.name !== 'part_legacy' && t.status !== 'Completed');
+        const firstPart = currentModelUpdated.tasks.find((t) => t.name !== 'part_legacy' && t.status !== 'Completed');
         if (firstPart) targetTaskId = firstPart.id;
         else {
-          const legacyTask = currentModelUpdated.tasks.find((t: any) => t.name === 'part_legacy');
+          const legacyTask = currentModelUpdated.tasks.find((t) => t.name === 'part_legacy');
           if (legacyTask) targetTaskId = legacyTask.id;
         }
       }
@@ -651,7 +626,6 @@ function App() {
     e.target.value = '';
   };
 
-  // ==================== Bot ====================
   const handleUnlockBot = (botId: BotType, cost: number) => {
     if (coinsBalance >= cost) {
       setCoinsBalance(coinsBalance - cost);
@@ -669,7 +643,6 @@ function App() {
     showToast(t('toast_switch_bot', { name: isZh ? BOTS[botId].name : BOTS[botId].enName }));
   };
 
-  // ==================== 教程 ====================
   const tutorialSteps: TourStep[] = [
     { targetId: 'tour-welcome', title: t('tut_welcome_title'), content: t('tut_welcome_content'), page: 'focus' },
     { targetId: 'btn-add-model', title: t('tut_step1_title'), content: t('tut_step1_content'), page: 'focus' },
@@ -714,7 +687,6 @@ function App() {
     localStorage.setItem('hasSeenTutorial', 'true');
   };
 
-  // ==================== PiP 独立窗口 ====================
   if (isPipMode) {
     return (
       <div className="app-wrapper" style={{ background: 'transparent' }}>
@@ -723,7 +695,6 @@ function App() {
     );
   }
 
-  // ==================== Mini 模式 ====================
   if (isMiniMode) {
     return (
       <div className="app-wrapper mini-mode-wrapper" style={{ background: '#09090b' }}>
@@ -736,7 +707,6 @@ function App() {
     <>
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
 
-      {/* 🌟 数据抢救弹窗 */}
       {showDataRecovery && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #3b82f6', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(59, 130, 246, 0.2)' }}>
@@ -759,7 +729,6 @@ function App() {
         document.body
       )}
 
-      {/* 🌟 图库断连弹窗 */}
       {showAssetDisconnected && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #ef4444', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(239, 68, 68, 0.2)' }}>
@@ -808,7 +777,6 @@ function App() {
         )}
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
-        {/* 🌟 全局撤销 Toast */}
         {undoToastMsg && (
           <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: '20px', top: 'auto' }}>
             <span>{undoToastMsg}</span>

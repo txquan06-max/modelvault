@@ -6,8 +6,8 @@ import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
 import { useAppStore } from '../store/useAppStore';
 import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { CheckinManager } from '../core/CheckinManager';
-import { ModelManager } from '../core/ModelManager';
-import { SessionManager } from '../core/SessionManager'; // 🌟 引入用于查询历史时长
+import { ModelManager, type Task } from '../core/ModelManager'; // 🌟 引入类型
+import { SessionManager } from '../core/SessionManager';
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { AchievementManager } from '../core/AchievementManager';
 import { UserManager } from '../core/UserManager';
@@ -98,20 +98,19 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const hiddenAtRef = useRef<number | null>(null);
 
   const botData = BOTS[currentBot as BotType] || BOTS['tu'];
-  const currentModel = models.find((m: any) => m.id === currentModelId);
-  const currentTask = tasks.find((t: any) => t.id === currentTaskId);
-  const currentStage = currentTask?.stages.find((s: any) => s.id === currentStageId);
-  const availableModels = models.filter((m: any) => m.status !== 'Completed');
-  const equippedTitleDef = UserManager.getTitleLibrary().find((t: any) => t.id === useAppStore.getState().equippedTitle);
+  const currentModel = models.find((m) => m.id === currentModelId);
+  const currentTask = tasks.find((t) => t.id === currentTaskId);
+  const currentStage = currentTask?.stages.find((s) => s.id === currentStageId);
+  const availableModels = models.filter((m) => m.status !== 'Completed');
+  const equippedTitleDef = UserManager.getTitleLibrary().find((t) => t.id === useAppStore.getState().equippedTitle);
   const currentTaskName = currentTask && currentTask.name ? t(currentTask.name) : t('noTask');
 
-  const assemblyStage = currentTask?.stages.find((s: any) => s.nameKey === 'stage_assembly');
+  const assemblyStage = currentTask?.stages.find((s) => s.nameKey === 'stage_assembly');
   const isAssemblyDone = assemblyStage?.status === 'Completed';
 
   const remainingSeconds = timeboxTarget > 0 ? Math.max(0, timeboxTarget - activeSeconds) : 0;
   const isTimeUp = timeboxTarget > 0 && remainingSeconds === 0 && activeSeconds > 0;
 
-  // 🌟 优化：仅在切换工序或结算时读取历史，避免每秒遍历大数组导致卡顿
   const pastStageSeconds = useMemo(() => {
     if (!currentTaskId || !currentStageId) return 0;
     const sessions = SessionManager.getAllSessions();
@@ -266,7 +265,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     const nameObj = selectedGunpla ? selectedGunpla.name : { en: newModelNameInput.trim(), zh: newModelNameInput.trim() };
     const seriesObj = selectedGunpla ? selectedGunpla.series : { en: newModelSeriesInput.trim() || t('unknown'), zh: newModelSeriesInput.trim() || t('unknown') };
 
-    const duplicate = models.find((m: any) => (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade.toUpperCase() === newModelGrade.toUpperCase());
+    const duplicate = models.find((m) => (m.name.en === nameObj.en || m.name.zh === nameObj.zh) && m.grade.toUpperCase() === newModelGrade.toUpperCase());
     if (duplicate) { showToast(t('toast_duplicate_model')); return; }
 
     const updated = ModelManager.addModel(nameObj, newModelGrade, seriesObj, useDefaultTasks, isWholeBuild);
@@ -367,7 +366,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     </div>
   );
 
-  // ==================== PiP 模式（网页悬浮窗 & Tauri 极简模式） ====================
+  // ==================== PiP 模式 ====================
   if (isPip) {
     const controlPanel = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: '2px' }}>
@@ -384,16 +383,16 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         
         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
           <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ flex: 1, minWidth: 0, padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none' }}>
-            {availableModels.map((m: any) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
+            {availableModels.map((m) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
           </select>
           <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ flex: 1, minWidth: 0, padding: '4px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: 'clamp(9px, 2.5vw, 11px)', outline: 'none' }}>
-            {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
+            {tasks.map((t_item) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
           </select>
         </div>
 
         {currentTask && (
           <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px', flexShrink: 0, scrollbarWidth: 'none' }}>
-            {currentTask.stages.map((stage: any) => (
+            {currentTask.stages.map((stage) => (
               <button
                 key={stage.id}
                 className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`}
@@ -499,10 +498,10 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
         <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '20px' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', zIndex: 10 }}>
             <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle'} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
-              {availableModels.map((m: any) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en}</option>)}
+              {availableModels.map((m) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en}</option>)}
             </select>
             <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0} style={{ padding: '8px', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: '8px', outline: 'none' }}>
-              {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t(t_item.name)}</option>)}
+              {tasks.map((t_item) => <option key={t_item.id} value={t_item.id}>{t(t_item.name)}</option>)}
             </select>
           </div>
 
@@ -655,12 +654,12 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
       <div className="selector-group" style={{ marginBottom: '16px' }}>
         <div className="selector-row">
           <select value={currentModelId} onChange={(e) => { setCurrentModelId(e.target.value); }} disabled={timerState !== 'Idle' || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
-            {availableModels.map((m: any) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
+            {availableModels.map((m) => <option key={m.id} value={m.id}>{isZh ? m.name.zh : m.name.en} {m.isRebuilding ? '🔧' : ''}</option>)}
           </select>
         </div>
         <div className="selector-row">
           <select value={currentTaskId} onChange={(e) => { setCurrentTaskId(e.target.value); }} disabled={timerState !== 'Idle' || tasks.length === 0 || lastSession !== null || isFinishingPart} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '10px 14px', borderRadius: '8px', outline: 'none' }}>
-            {tasks.map((t_item: any) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
+            {tasks.map((t_item) => <option key={t_item.id} value={t_item.id}>{t_item.status === 'Completed' ? '✅ ' : ''}{t(t_item.name)}</option>)}
           </select>
         </div>
       </div>
@@ -708,7 +707,7 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
 
       {currentTask && timerState !== 'Running' && !lastSession && !isFinishingPart && (
         <div className="stages-panel" style={{ justifyContent: 'center', margin: '10px 0', flexWrap: 'wrap' }}>
-          {currentTask.stages.map((stage: any) => (
+          {currentTask.stages.map((stage) => (
             <button key={stage.id} className={`stage-btn ${stage.id === currentStageId ? 'active' : ''} ${stage.status === 'Completed' ? 'done' : ''}`} onClick={() => { setCurrentStageId(stage.id); }} disabled={timerState === 'Paused'}>
               {t(stage.nameKey)} {stage.status === 'Completed' ? '✓' : ''}
             </button>

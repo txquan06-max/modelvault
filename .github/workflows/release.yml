@@ -51,18 +51,31 @@ jobs:
       - name: install frontend dependencies
         run: npm ci
 
+      # 🌟 修改：这里只负责 Build，不负责上传到 Release
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'ModelJourney v__VERSION__'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+      # 🌟 新增：把编译好的文件作为 Artifact 保存起来
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-bundles-${{ matrix.platform }}-${{ matrix.args }}
+          path: |
+            src-tauri/target/**/release/bundle/
+            src-tauri/target/**/release/*.json
+            src-tauri/target/**/release/*.sig
+            src-tauri/target/**/release/*.AppImage
+            src-tauri/target/**/release/*.deb
+            src-tauri/target/**/release/*.rpm
+            src-tauri/target/**/release/*.msi
+            src-tauri/target/**/release/*.exe
+            src-tauri/target/**/release/*.dmg
+            src-tauri/target/**/release/*.app*
 
   publish-android:
     permissions:
@@ -104,36 +117,22 @@ jobs:
           ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
         run: |
           CLEAN_BASE64=$(echo "$ANDROID_KEY_BASE64" | tr -d '\n\r ')
-          if [ -z "$CLEAN_BASE64" ]; then
-            echo "::error::ANDROID_KEY_BASE64 secret is empty! Please set it in GitHub Secrets."
-            exit 1
-          fi
           echo "$CLEAN_BASE64" | base64 --decode > src-tauri/gen/android/app/release.keystore
-          echo "Keystore restored successfully."
 
       - name: Build Android APK
         run: npm run tauri android build -- --apk --ci
         env:
-          NDK_VERSION: "26.1.10909125"
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_ALIAS_PASSWORD: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}
 
-      - name: Upload APK to Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 等待桌面端的 draft release 创建完成
-          sleep 10
-          # 查找生成的 apk 文件并上传
-          APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            gh release upload "${{ github.ref_name }}" "$APK_PATH" --clobber --repo ${{ github.repository }}
-          else
-            echo "APK build failed or not found"
-            exit 1
-          fi
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
 
+  # 🌟 新增：统一发布 Job，解决并发 404 问题
   publish-release:
     needs: [publish-tauri, publish-android]
     runs-on: ubuntu-latest
@@ -141,11 +140,29 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Publish draft release
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: find artifacts -type f
+
+      - name: Create Draft Release and Upload Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 将草稿转为正式发布
-          gh release edit "${{ github.ref_name }}" --draft=false --repo ${{ github.repository }}
+          # 1. 创建 Draft Release（如果已存在则忽略）
+          gh release create "${{ github.ref_name }}" --draft --title "ModelJourney ${{ github.ref_name }}" --notes "See the assets to download and install this version." || true
+          
+          # 2. 遍历所有下载的 artifact，提取需要的文件并上传
+          # 只上传安装包和 latest.json，避免上传一堆无用文件
+          find artifacts -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.tar.gz" -o -name "*.sig" -o -name "*.apk" -o -name "latest.json" \) -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
+
+      - name: Publish Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --draft=false
           echo "✅ Release ${{ github.ref_name }} has been published."

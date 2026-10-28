@@ -17,11 +17,8 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 37
     namespace = "com.modeljourney.app"
-        android {
-    namespace = "com.modeljourney.app"
-    compileSdk = 34
 
-    // 🌟 修改：直接读取 CI 提前还原好的文件
+    // 🌟 签名配置
     signingConfigs {
         create("release") {
             val keystoreFile = file("release.keystore")
@@ -42,18 +39,9 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+
     buildTypes {
-        release {
-            // 🌟 修改：如果文件存在则使用 release 签名
-            val keystoreFile = file("release.keystore")
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    
-    getByName("debug") {
+        getByName("debug") {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
@@ -67,9 +55,12 @@ android {
             }
         }
         getByName("release") {
-            optimization {
-               enable = true
+            // 🌟 如果 CI 生成了 release.keystore，则自动应用签名
+            val keystoreFile = file("release.keystore")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
             }
+            isMinifyEnabled = false
             proguardFiles(
                 *fileTree(".") {
                   include("**/*.pro")
@@ -78,6 +69,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8

@@ -826,7 +826,7 @@ body {
     bottom: 16px;
     left: 16px;
     right: 16px;
-    height: 60px;
+    height: 56px;
     background: rgba(30, 41, 59, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -837,7 +837,7 @@ body {
     align-items: center;
     z-index: 9999;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    padding: 0 8px;
+    padding: 0 4px;
     overflow-x: auto;
   }
   .mobile-bottom-nav::-webkit-scrollbar { display: none; }
@@ -847,23 +847,29 @@ body {
     border: none;
     color: #888;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    font-size: 10px;
+    font-size: 11px; /* 🌟 字号调小 */
     font-weight: bold;
     cursor: pointer;
-    padding: 6px;
+    padding: 8px 4px;
     border-radius: 10px;
     transition: all 0.2s;
-    min-width: 50px;
+    white-space: nowrap;
+    min-width: 48px;
   }
 
-  .mobile-bottom-nav button span { font-size: 18px; line-height: 1; }
-  .mobile-bottom-nav button.active { color: #3b82f6; background: rgba(59, 130, 246, 0.15); transform: translateY(-2px); }
-}
+  .mobile-bottom-nav button.active { 
+    color: #3b82f6; 
+    background: rgba(59, 130, 246, 0.15); 
+    transform: translateY(-2px); 
+  }
 
+  /* 移动端底部导航栏防遮挡留白 */
+  .scroll-content {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+  }
+}
 /* 虚拟列表渲染容器优化 */
 .virtual-grid-row {
   will-change: transform;
@@ -873,7 +879,6 @@ body {
    主窗口缩小时的体验降级 (当宽度 < 600px 时)
    ========================================= */
 @media (max-width: 599px) {
-  /* 主窗口隐藏全站背景图，省电省资源 */
   .app-bg-img, .bg-overlay { display: none !important; }
   
   .mini-window {
@@ -886,10 +891,8 @@ body {
     background: rgba(20, 25, 35, 0.98) !important;
   }
 
-  /* 隐藏顶部的 6 个 Tab，因为太挤了，建议直接使用悬浮小窗 */
   .tabs { display: none !important; }
   
-  /* 强制 Focus 视图变成单列 */
   .focus-layout {
     flex-direction: column !important;
     gap: 12px !important;
@@ -901,11 +904,8 @@ body {
     border: none !important;
   }
 
-  /* 缩小后不需要看的组件（头像、聊天记录）直接隐藏，只保留核心计时器 */
+  /* 不再隐藏添加按钮，否则手机上无法添加模型和部位 */
   .profile-card, .mini-timer-bar { display: none !important; }
-  
-  /* 隐藏所有的复杂按钮，只保留核心控制 */
-  .add-controls, .stages-panel, .timebox-selector { display: none !important; }
 
   .timer-display { font-size: 64px !important; margin: 10px 0 !important; }
 }

@@ -851,7 +851,7 @@ function App() {
             </div>
           )}
 
-          <div className="scroll-content" style={{ paddingBottom: isMobile ? '80px' : '4px' }}>
+          <div className="scroll-content" style={{ paddingBottom: isMobile ? '100px' : '4px' }}>
             {viewingModel ? (
               <ModelDetail
                 viewingModel={viewingModel}
@@ -894,28 +894,22 @@ function App() {
         {isMobile && !viewingModel && (
           <div className="mobile-bottom-nav">
             <button className={activeTab === 'focus' ? 'active' : ''} onClick={() => handleTabChange('focus')}>
-              <span>⏱</span>
-              <span>{t('focus')}</span>
+              {t('focus')}
             </button>
             <button className={activeTab === 'journal' ? 'active' : ''} onClick={() => handleTabChange('journal')}>
-              <span>📖</span>
-              <span>{t('journal')}</span>
+              {t('journal')}
             </button>
             <button className={activeTab === 'hangar' ? 'active' : ''} onClick={() => handleTabChange('hangar')}>
-              <span>📦</span>
-              <span>{t('hangar')}</span>
+              {t('hangar')}
             </button>
             <button className={activeTab === 'gundam' ? 'active' : ''} onClick={() => handleTabChange('gundam')}>
-              <span>🤖</span>
-              <span>{t('mecha')}</span>
+              {t('mecha')}
             </button>
             <button className={activeTab === 'gallery' ? 'active' : ''} onClick={() => handleTabChange('gallery')}>
-              <span>👥</span>
-              <span>{t('animold')}</span>
+              {t('animold')}
             </button>
             <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => handleTabChange('profile')}>
-              <span>👤</span>
-              <span>{t('profile')}</span>
+              {t('profile')}
             </button>
           </div>
         )}

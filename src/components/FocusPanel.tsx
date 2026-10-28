@@ -6,7 +6,7 @@ import { BOTS, type BotType, QuoteEngine } from '../core/QuoteEngine';
 import { useAppStore } from '../store/useAppStore';
 import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { CheckinManager } from '../core/CheckinManager';
-import { ModelManager, type Task } from '../core/ModelManager'; // 🌟 引入类型
+import { ModelManager } from '../core/ModelManager';
 import { SessionManager } from '../core/SessionManager';
 import { DailyQuestManager } from '../core/DailyQuestManager';
 import { AchievementManager } from '../core/AchievementManager';
@@ -48,6 +48,7 @@ const sendNativeNotification = (title: string, body: string) => {
 export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   const {
     models, currentModelId, setCurrentModelId,
@@ -65,6 +66,12 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
     bgPip, bgSize, bgPosition,
     showToast,
   } = useAppStore();
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const [isFinishingPart, setIsFinishingPart] = useState(false);
   const [finishPartPhoto, setFinishPartPhoto] = useState('');
@@ -572,16 +579,18 @@ export const FocusPanel = ({ isPip = false, onClose }: FocusPanelProps) => {
   const rightContent = (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px', width: '100%' }}>
+        {/* 🌟 修改：无论是手机还是桌面端，都显示添加按钮 */}
         <div className="add-controls" style={{ marginBottom: 0 }}>
           <button id="btn-add-model" className="add-btn-large" onClick={() => { setIsAddingModel(true); }} disabled={timerState !== 'Idle' || isFinishingPart}>+ {t('addModel')}</button>
           <button id="btn-add-task" className="add-btn-large" onClick={() => { setIsAddingTask(true); }} disabled={timerState !== 'Idle' || !currentModelId || isFinishingPart}>+ {t('addTask')}</button>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start', width: '100%', flexWrap: 'wrap' }}>
-          {isTauriEnv && (
+          {/* 🌟 修改：如果是手机端，隐藏极简模式和网页悬浮窗 */}
+          {!isMobile && isTauriEnv && (
             <button id="btn-mini-mode" onClick={() => window.dispatchEvent(new CustomEvent('mv-toggle-mini-mode'))} style={{ background: 'rgba(139, 92, 246, 0.2)', border: '1px solid #8b5cf6', color: '#8b5cf6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>🔍 {t('mini_mode')}</button>
           )}
-          {!isTauriEnv && (
+          {!isMobile && !isTauriEnv && (
             <button id="btn-web-pip" onClick={handleOpenWebPiP} style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>📺 {t('web_pip')}</button>
           )}
           <button onClick={() => { setIsImmersive(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: botData.color, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px', flexShrink: 0 }}>⛶ {t('immersive_mode')}</button>

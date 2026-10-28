@@ -97,7 +97,7 @@ jobs:
           java-version: '17'
 
       - name: setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4.0.4
 
       - name: Build Android APK
         run: npm run tauri android build -- --apk --ci

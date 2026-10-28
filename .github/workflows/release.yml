@@ -100,8 +100,16 @@ jobs:
         uses: android-actions/setup-android@v4.0.4
 
       - name: Restore Keystore File
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
         run: |
-          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 --decode > src-tauri/gen/android/app/release.keystore
+          CLEAN_BASE64=$(echo "$ANDROID_KEY_BASE64" | tr -d '\n\r ')
+          if [ -z "$CLEAN_BASE64" ]; then
+            echo "::error::ANDROID_KEY_BASE64 secret is empty! Please set it in GitHub Secrets."
+            exit 1
+          fi
+          echo "$CLEAN_BASE64" | base64 --decode > src-tauri/gen/android/app/release.keystore
+          echo "Keystore restored successfully."
 
       - name: Build Android APK
         run: npm run tauri android build -- --apk --ci

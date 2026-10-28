@@ -31,9 +31,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcyM0VDMjQ3Q0U3QzNFQkYKUldTL1Buek9SOEkrY2hrRXprQkllYmZvUkxRWGpqZ3EyWWpRU0V4UkZrQ1JJamdrUFdwckJoN1IK",
       "endpoints": [
-        "https://github.com/txquan06-max/modelvault/releases/latest/download/latest.json",
-        "https://ghproxy.net/https://github.com/txquan06-max/modelvault/releases/latest/download/latest.json",
-        "https://gh-proxy.com/https://github.com/txquan06-max/modelvault/releases/latest/download/latest.json"
+        "https://github.com/txquan06-max/modelvault/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

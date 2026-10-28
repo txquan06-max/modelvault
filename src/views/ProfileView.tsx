@@ -17,6 +17,13 @@ const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTER
 export const ProfileView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const {
     username, setUsername, level, levelProgress, coinsBalance,
@@ -50,7 +57,7 @@ export const ProfileView = () => {
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
 
-  // 🌟 新增：检查更新状态
+  // 🌟 检查更新状态
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'latest' | 'available' | 'error'>('idle');
   const [updateErrorMsg, setUpdateErrorMsg] = useState('');
@@ -344,7 +351,7 @@ export const ProfileView = () => {
   // 🌟 检查更新逻辑
   const handleCheckUpdate = async () => {
     if (!isTauri) {
-      showToast(t('toast_pin_desktop_only')); // 借用提示仅桌面端可用
+      showToast(t('toast_pin_desktop_only'));
       return;
     }
     setCheckingUpdate(true);
@@ -357,7 +364,6 @@ export const ProfileView = () => {
       const update = await check();
       if (update) {
         setUpdateStatus('available');
-        // 派发全局事件，触发 App.tsx 中的更新弹窗
         window.dispatchEvent(new CustomEvent('tauri-update-available', { detail: update }));
       } else {
         setUpdateStatus('latest');
@@ -366,7 +372,9 @@ export const ProfileView = () => {
       console.error('[Tauri] Manual update check failed:', err);
       setUpdateStatus('error');
       let msg = err?.message || String(err);
-      if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
+      if (msg.includes('not found') || msg.includes('plugin updater not found')) {
+        setUpdateErrorMsg(isZh ? '当前环境不支持自动更新（移动端/未配置）' : 'Auto-update not supported in this environment');
+      } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
         setUpdateErrorMsg(isZh ? '网络连接失败，请检查代理或网络环境' : 'Network error, check proxy or connection');
       } else if (msg.includes('signature') || msg.includes('pubkey')) {
         setUpdateErrorMsg(isZh ? '签名校验失败 (pubkey 不匹配)' : 'Signature verification failed');
@@ -707,8 +715,8 @@ export const ProfileView = () => {
       <div className="data-backup-section">
         <h4>{t('dataBackup')} <span style={{ float: 'right', fontSize: '11px', color: '#888' }}>Used: {StorageManager.getStorageUsage()} MB</span></h4>
         
-        {/* 🌟 新增：检查更新区域 */}
-        {isTauri && (
+        {/* 🌟 修改：只有桌面端才显示检查更新 */}
+        {isTauri && !isMobile && (
           <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🔄 {isZh ? '版本更新' : 'Update'}</span>

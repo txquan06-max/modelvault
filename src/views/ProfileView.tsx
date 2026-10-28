@@ -12,6 +12,8 @@ import { GunplaSearch, type GunplaItem } from '../core/GunplaDB';
 import { useAppStore } from '../store/useAppStore';
 import { formatTime, handleFocusScroll } from '../utils/format';
 
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+
 export const ProfileView = () => {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language === 'zh';
@@ -43,10 +45,15 @@ export const ProfileView = () => {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const [clearAssets, setClearAssets] = useState(false); // 🌟 新增：是否同时清空物理文件
+  const [clearAssets, setClearAssets] = useState(false);
 
   const [showModelDetails, setShowModelDetails] = useState(false);
   const [showTimeDetails, setShowTimeDetails] = useState(false);
+
+  // 🌟 新增：检查更新状态
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'latest' | 'available' | 'error'>('idle');
+  const [updateErrorMsg, setUpdateErrorMsg] = useState('');
 
   useEffect(() => {
     setQuests(DailyQuestManager.getTodayQuests());
@@ -244,7 +251,6 @@ export const ProfileView = () => {
     e.target.value = '';
   };
 
-  // 🌟 优化：如果勾选了同时清空资产，先遍历删除物理文件
   const handleResetData = async () => {
     AudioManager.playClick();
     setIsResetting(true);
@@ -265,10 +271,10 @@ export const ProfileView = () => {
           });
         });
 
-        const bgMain = StorageManager.getBgMain();
-        const bgPip = StorageManager.getBgPip();
-        if (bgMain?.startsWith('local://')) filesToDelete.push(bgMain);
-        if (bgPip?.startsWith('local://')) filesToDelete.push(bgPip);
+        const bgMainUrl = StorageManager.getBgMain();
+        const bgPipUrl = StorageManager.getBgPip();
+        if (bgMainUrl?.startsWith('local://')) filesToDelete.push(bgMainUrl);
+        if (bgPipUrl?.startsWith('local://')) filesToDelete.push(bgPipUrl);
 
         const audios = StorageManager.getCustomAudios();
         Object.values(audios).forEach(url => { if (typeof url === 'string' && url.startsWith('local://')) filesToDelete.push(url); });
@@ -332,6 +338,43 @@ export const ProfileView = () => {
     } else {
       AudioManager.playClick();
       showToast(t('notEnoughCoins'));
+    }
+  };
+
+  // 🌟 检查更新逻辑
+  const handleCheckUpdate = async () => {
+    if (!isTauri) {
+      showToast(t('toast_pin_desktop_only')); // 借用提示仅桌面端可用
+      return;
+    }
+    setCheckingUpdate(true);
+    setUpdateStatus('idle');
+    setUpdateErrorMsg('');
+    AudioManager.playClick();
+
+    try {
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const update = await check();
+      if (update) {
+        setUpdateStatus('available');
+        // 派发全局事件，触发 App.tsx 中的更新弹窗
+        window.dispatchEvent(new CustomEvent('tauri-update-available', { detail: update }));
+      } else {
+        setUpdateStatus('latest');
+      }
+    } catch (err: any) {
+      console.error('[Tauri] Manual update check failed:', err);
+      setUpdateStatus('error');
+      let msg = err?.message || String(err);
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout')) {
+        setUpdateErrorMsg(isZh ? '网络连接失败，请检查代理或网络环境' : 'Network error, check proxy or connection');
+      } else if (msg.includes('signature') || msg.includes('pubkey')) {
+        setUpdateErrorMsg(isZh ? '签名校验失败 (pubkey 不匹配)' : 'Signature verification failed');
+      } else {
+        setUpdateErrorMsg(msg.substring(0, 50));
+      }
+    } finally {
+      setCheckingUpdate(false);
     }
   };
 
@@ -663,6 +706,33 @@ export const ProfileView = () => {
 
       <div className="data-backup-section">
         <h4>{t('dataBackup')} <span style={{ float: 'right', fontSize: '11px', color: '#888' }}>Used: {StorageManager.getStorageUsage()} MB</span></h4>
+        
+        {/* 🌟 新增：检查更新区域 */}
+        {isTauri && (
+          <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid #3b82f6', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>🔄 {isZh ? '版本更新' : 'Update'}</span>
+              <button 
+                className="mini-btn" 
+                style={{ background: '#3b82f6', color: '#fff', border: 'none' }}
+                onClick={handleCheckUpdate}
+                disabled={checkingUpdate}
+              >
+                {checkingUpdate ? (isZh ? '检查中...' : 'Checking...') : (isZh ? '检查更新' : 'Check Update')}
+              </button>
+            </div>
+            {updateStatus === 'latest' && (
+              <div style={{ fontSize: '12px', color: '#10b981' }}>✅ {isZh ? '当前已是最新版本' : 'You are up to date!'}</div>
+            )}
+            {updateStatus === 'available' && (
+              <div style={{ fontSize: '12px', color: '#f59e0b' }}>✨ {isZh ? '发现新版本，请查看弹窗' : 'New version found, check dialog.'}</div>
+            )}
+            {updateStatus === 'error' && (
+              <div style={{ fontSize: '12px', color: '#ef4444' }}>❌ {isZh ? '检查失败：' : 'Failed: '}{updateErrorMsg}</div>
+            )}
+          </div>
+        )}
+
         <div className="backup-actions" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
           <button className="backup-btn" style={{ flex: 1, minWidth: '100px' }} onClick={exportData}>{t('exportData')}</button>
           <label className="backup-btn import-label" style={{ flex: 1, minWidth: '100px', display: 'flex', justifyContent: 'center' }}>{t('importData')}<input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} /></label>
@@ -714,7 +784,6 @@ export const ProfileView = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 8px 0' }}>{t('resetConfirm')}</p>
               
-              {/* 🌟 新增：是否同时清空物理文件 */}
               {isAssetsMounted && (
                 <label className="checkbox-label" style={{ marginBottom: '8px' }}>
                   <input type="checkbox" checked={clearAssets} onChange={e => setClearAssets(e.target.checked)} />
@@ -731,7 +800,7 @@ export const ProfileView = () => {
         </div>
 
         <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <p style={{ margin: '0 0 6px 0' }}>ModelVault Beta v0.1.1 (Desktop)</p>
+          <p style={{ margin: '0 0 6px 0' }}>ModelJourney v0.1.3 (Desktop)</p>
           <a href="https://github.com/txquan06-max/modelvault" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>🐞 {t('feedback')}</a>
         </div>
       </div>

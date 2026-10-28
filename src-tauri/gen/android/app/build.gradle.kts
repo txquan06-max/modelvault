@@ -17,12 +17,15 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 37
     namespace = "com.modeljourney.app"
-        signingConfigs {
+        android {
+    namespace = "com.modeljourney.app"
+    compileSdk = 34
+
+    // 🌟 修改：直接读取 CI 提前还原好的文件
+    signingConfigs {
         create("release") {
-            val keyBase64 = System.getenv("ANDROID_KEY_BASE64")
-            if (keyBase64 != null) {
-                val keystoreFile = file("keystore.jks")
-                keystoreFile.writeBytes(android.util.Base64.decode(keyBase64, android.util.Base64.DEFAULT))
+            val keystoreFile = file("release.keystore")
+            if (keystoreFile.exists()) {
                 storeFile = keystoreFile
                 storePassword = System.getenv("ANDROID_KEY_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
@@ -30,6 +33,7 @@ android {
             }
         }
     }
+
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.modeljourney.app"
@@ -40,12 +44,16 @@ android {
     }
     buildTypes {
         release {
-            // 🌟 修改：使用刚才创建的 release 签名
-            signingConfig = signingConfigs.getByName("release")
+            // 🌟 修改：如果文件存在则使用 release 签名
+            val keystoreFile = file("release.keystore")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-        getByName("debug") {
+    
+    getByName("debug") {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true

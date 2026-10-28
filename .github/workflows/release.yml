@@ -99,11 +99,14 @@ jobs:
       - name: setup Android SDK
         uses: android-actions/setup-android@v4.0.4
 
+      - name: Restore Keystore File
+        run: |
+          echo "${{ secrets.ANDROID_KEY_BASE64 }}" | base64 --decode > src-tauri/gen/android/app/release.keystore
+
       - name: Build Android APK
         run: npm run tauri android build -- --apk --ci
         env:
           NDK_VERSION: "26.1.10909125"
-          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_ALIAS_PASSWORD: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}

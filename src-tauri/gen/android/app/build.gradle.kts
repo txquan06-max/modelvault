@@ -17,6 +17,19 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 37
     namespace = "com.modeljourney.app"
+        signingConfigs {
+        create("release") {
+            val keyBase64 = System.getenv("ANDROID_KEY_BASE64")
+            if (keyBase64 != null) {
+                val keystoreFile = file("keystore.jks")
+                keystoreFile.writeBytes(android.util.Base64.decode(keyBase64, android.util.Base64.DEFAULT))
+                storeFile = keystoreFile
+                storePassword = System.getenv("ANDROID_KEY_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_ALIAS_PASSWORD")
+            }
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.modeljourney.app"
@@ -26,6 +39,12 @@ android {
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
     buildTypes {
+        release {
+            // 🌟 修改：使用刚才创建的 release 签名
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         getByName("debug") {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["usesCleartextTraffic"] = "true"

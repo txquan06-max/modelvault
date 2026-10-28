@@ -76,8 +76,11 @@ function App() {
   const [isWindowActive, setIsWindowActive] = useState(true);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
+  // 数据抢救弹窗状态
   const [showDataRecovery, setShowDataRecovery] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
+  
+  // 图库断连状态
   const [showAssetDisconnected, setShowAssetDisconnected] = useState(false);
 
   const [pendingTabChange, setPendingTabChange] = useState<MainTab | null>(null);
@@ -105,7 +108,7 @@ function App() {
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
 
-  // 🌟 监听窗口尺寸变化，切换移动端/桌面端 UI
+  // 监听窗口尺寸变化，切换移动端/桌面端 UI
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
@@ -125,6 +128,7 @@ function App() {
     };
   }, []);
 
+  // 数据恢复检测逻辑
   useEffect(() => {
     if (showSplash) return;
     if (models.length === 0 && !localStorage.getItem(DATA_RECOVERY_WARNED)) {
@@ -132,6 +136,7 @@ function App() {
     }
   }, [models, showSplash]);
 
+  // 监听图库断连事件
   useEffect(() => {
     const handleDisconnect = () => {
       setIsAssetsMounted(false);
@@ -714,6 +719,7 @@ function App() {
     <>
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
 
+      {/* 数据抢救弹窗 */}
       {showDataRecovery && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #3b82f6', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(59, 130, 246, 0.2)' }}>
@@ -736,6 +742,7 @@ function App() {
         document.body
       )}
 
+      {/* 图库断连弹窗 */}
       {showAssetDisconnected && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999999, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
           <div style={{ background: '#1e293b', padding: '30px', borderRadius: '16px', border: '1px solid #ef4444', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(239, 68, 68, 0.2)' }}>
@@ -785,7 +792,7 @@ function App() {
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
         {undoToastMsg && (
-          <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: '80px', top: 'auto' }}>
+          <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: isMobile ? '80px' : '20px', top: 'auto' }}>
             <span>{undoToastMsg}</span>
             <button 
               onClick={() => { if(undoAction) undoAction(); clearUndoToast(); }}
@@ -883,7 +890,7 @@ function App() {
           </div>
         </div>
 
-        {/* 🌟 新增：移动端底部导航 */}
+        {/* 移动端底部导航 */}
         {isMobile && !viewingModel && (
           <div className="mobile-bottom-nav">
             <button className={activeTab === 'focus' ? 'active' : ''} onClick={() => handleTabChange('focus')}>
@@ -897,6 +904,14 @@ function App() {
             <button className={activeTab === 'hangar' ? 'active' : ''} onClick={() => handleTabChange('hangar')}>
               <span>📦</span>
               <span>{t('hangar')}</span>
+            </button>
+            <button className={activeTab === 'gundam' ? 'active' : ''} onClick={() => handleTabChange('gundam')}>
+              <span>🤖</span>
+              <span>{t('mecha')}</span>
+            </button>
+            <button className={activeTab === 'gallery' ? 'active' : ''} onClick={() => handleTabChange('gallery')}>
+              <span>👥</span>
+              <span>{t('animold')}</span>
             </button>
             <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => handleTabChange('profile')}>
               <span>👤</span>

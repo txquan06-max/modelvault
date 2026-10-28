@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { SessionManager } from './core/SessionManager';
-import { ModelManager, type Model } from './core/ModelManager'; // 🌟 引入类型
+import { ModelManager, type Model } from './core/ModelManager';
 import { AchievementManager } from './core/AchievementManager';
 import { AudioManager } from './core/AudioManager';
 import { StorageManager } from './core/StorageManager';
@@ -74,6 +74,7 @@ function App() {
   const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem('hasSeenTutorial') === null);
   const [isMiniMode, setIsMiniMode] = useState(false);
   const [isWindowActive, setIsWindowActive] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   const [showDataRecovery, setShowDataRecovery] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
@@ -103,6 +104,13 @@ function App() {
   useEffect(() => { isMiniModeRef.current = isMiniMode; }, [isMiniMode]);
   const lastRemindedAtRef = useRef(0);
   const reminderIntervalRef = useRef(StorageManager.getReminderInterval());
+
+  // 🌟 监听窗口尺寸变化，切换移动端/桌面端 UI
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     AudioManager.lock();
@@ -488,7 +496,6 @@ function App() {
     else { AudioManager.playClick(); setActiveTab(newTab); }
   };
 
-  // 🌟 修复：明确指定 Model 类型
   const viewingModel = models.find((m: Model) => m.id === viewingModelId);
   const viewingModelTotalSec = viewingModel
     ? SessionManager.getAllSessions().filter((s: any) => viewingModel.tasks.some((t) => t.id === s.taskId)).reduce((sum: number, s: any) => sum + s.activeSeconds, 0)
@@ -768,7 +775,7 @@ function App() {
       )}
 
       <div className="app-wrapper" style={{ opacity: showSplash ? 0 : 1, transition: 'opacity 0.5s' }}>
-        {bgMain && (
+        {bgMain && !isMobile && (
           bgMain.startsWith('local://') ? (
             <LocalImage src={bgMain} className="app-bg-img" style={{ objectFit: bgSize as any, objectPosition: bgPosition }} />
           ) : (
@@ -778,7 +785,7 @@ function App() {
         {toastMsg && <div className="toast">{toastMsg}</div>}
 
         {undoToastMsg && (
-          <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: '20px', top: 'auto' }}>
+          <div className="toast" style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 99999, bottom: '80px', top: 'auto' }}>
             <span>{undoToastMsg}</span>
             <button 
               onClick={() => { if(undoAction) undoAction(); clearUndoToast(); }}
@@ -790,7 +797,7 @@ function App() {
           </div>
         )}
 
-        <div className="mini-window">
+        <div className={`mini-window ${isMobile ? 'mobile-mode' : ''}`}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '8px', flexShrink: 0 }}>
             <button
               onClick={toggleAlwaysOnTop}
@@ -801,7 +808,7 @@ function App() {
             <button className="lang-btn" onClick={() => { AudioManager.playClick(); const next = isZh ? 'en' : 'zh'; i18n.changeLanguage(next); localStorage.setItem('lang', next); }}>{isZh ? 'EN' : '中'}</button>
           </div>
 
-          {!viewingModel && (
+          {!isMobile && !viewingModel && (
             <div className="tabs">
               <button id="tab-focus" className={`tab ${activeTab === 'focus' ? 'active' : ''}`} onClick={() => handleTabChange('focus')}>⏱ {t('focus')}</button>
               <button id="tab-journal" className={`tab ${activeTab === 'journal' ? 'active' : ''}`} onClick={() => handleTabChange('journal')}>📖 {t('journal')}</button>
@@ -837,7 +844,7 @@ function App() {
             </div>
           )}
 
-          <div className="scroll-content">
+          <div className="scroll-content" style={{ paddingBottom: isMobile ? '80px' : '4px' }}>
             {viewingModel ? (
               <ModelDetail
                 viewingModel={viewingModel}
@@ -875,6 +882,28 @@ function App() {
             )}
           </div>
         </div>
+
+        {/* 🌟 新增：移动端底部导航 */}
+        {isMobile && !viewingModel && (
+          <div className="mobile-bottom-nav">
+            <button className={activeTab === 'focus' ? 'active' : ''} onClick={() => handleTabChange('focus')}>
+              <span>⏱</span>
+              <span>{t('focus')}</span>
+            </button>
+            <button className={activeTab === 'journal' ? 'active' : ''} onClick={() => handleTabChange('journal')}>
+              <span>📖</span>
+              <span>{t('journal')}</span>
+            </button>
+            <button className={activeTab === 'hangar' ? 'active' : ''} onClick={() => handleTabChange('hangar')}>
+              <span>📦</span>
+              <span>{t('hangar')}</span>
+            </button>
+            <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => handleTabChange('profile')}>
+              <span>👤</span>
+              <span>{t('profile')}</span>
+            </button>
+          </div>
+        )}
 
         <Modals
           showCompleteModelConfirm={showCompleteModelConfirm}

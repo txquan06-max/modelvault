@@ -199,7 +199,7 @@ body {
 .icon-btn:hover { opacity: 1; }
 
 /* =========================================
-   🌟 迷你计时条（新增）
+   🌟 迷你计时条
    ========================================= */
 .mini-timer-bar {
   display: flex;
@@ -461,6 +461,11 @@ body {
   white-space: nowrap;
 }
 
+@keyframes toast-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
 /* =========================================
    Journal View
    ========================================= */
@@ -590,7 +595,7 @@ body {
 .import-label { display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
 
 /* =========================================
-   Legacy Import (历史补录) 暂存列表
+   Legacy Import 暂存列表
    ========================================= */
 .legacy-temp-list {
   display: flex;
@@ -862,6 +867,8 @@ body {
 /* 虚拟列表渲染容器优化 */
 .virtual-grid-row {
   will-change: transform;
+}
+
 /* =========================================
    主窗口缩小时的体验降级 (当宽度 < 600px 时)
    ========================================= */
@@ -901,5 +908,4 @@ body {
   .add-controls, .stages-panel, .timebox-selector { display: none !important; }
 
   .timer-display { font-size: 64px !important; margin: 10px 0 !important; }
-}
 }

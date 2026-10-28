@@ -1,11 +1,17 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::Duration;
 
+// 🌟 1. 核心通用导入（桌面端和移动端都有）
+use tauri::{Emitter, Manager, State};
+
+// 🌟 2. 桌面端专属导入（用 cfg 隔离，避免 Android 报错）
+#[cfg(desktop)]
+use std::time::Duration;
+#[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, State, WindowEvent,
+    WindowEvent,
 };
 
 // ============================================================
@@ -104,8 +110,10 @@ fn delete_local_file(state: State<AssetsDir>, filename: String) -> Result<(), St
 }
 
 // ============================================================
-// 7C. 系统托盘初始化
+// 🌟 桌面端专属：系统托盘、全局快捷键、窗口防护
 // ============================================================
+
+#[cfg(desktop)]
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "显示主窗口 / Show Window", true, None::<&str>)?;
     let start_item = MenuItem::with_id(app, "start", "开始计时 / Start Timer", true, None::<&str>)?;
@@ -155,18 +163,12 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-// ============================================================
-// 选项 A - 2：全局快捷键 Ctrl+Shift+S
-// ============================================================
 #[cfg(desktop)]
 fn build_toggle_shortcut() -> tauri_plugin_global_shortcut::Shortcut {
     use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
     Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyS)
 }
 
-// ============================================================
-// 选项 A - 1：窗口关闭前尺寸防护
-// ============================================================
 #[cfg(desktop)]
 fn setup_window_close_guard(app: &tauri::App) {
     if let Some(window) = app.get_webview_window("main") {
@@ -247,6 +249,13 @@ pub fn run() {
                     log::info!("[Shortcut] 已注册 Ctrl+Shift+S 全局快捷键");
                 }
             }
+            
+            // 🌟 消除 Android 下未使用变量的警告
+            #[cfg(mobile)]
+            {
+                let _ = app;
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

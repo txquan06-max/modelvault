@@ -64,17 +64,73 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
+  publish-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: install frontend dependencies
+        run: npm ci
+
+      - name: setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android APK
+        run: npm run tauri android build -- --apk --ci
+        env:
+          NDK_VERSION: "26.1.10909125"
+
+      - name: Upload APK to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 等待桌面端的 draft release 创建完成
+          sleep 10
+          # 查找生成的 apk 文件并上传
+          APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            gh release upload "${{ github.ref_name }}" "$APK_PATH" --clobber --repo ${{ github.repository }}
+          else
+            echo "APK build failed or not found"
+            exit 1
+          fi
+
   publish-release:
-    needs: publish-tauri
+    needs: [publish-tauri, publish-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4  # 🌟 修复点 1：必须先 checkout 才能有 git 环境
+      - uses: actions/checkout@v4
       
       - name: Publish draft release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |             # 🌟 修复点 2：加上 --repo 显式指定仓库，双保险
+        run: |
+          # 将草稿转为正式发布
           gh release edit "${{ github.ref_name }}" --draft=false --repo ${{ github.repository }}
           echo "✅ Release ${{ github.ref_name }} has been published."
